@@ -1,0 +1,25 @@
+# Entornos Virtuales
+.venv/
+venv/
+env/
+
+# Archivos de Python generados
+__pycache__/
+*.pyc
+*.pyo
+
+# Directorios de Build/Distribución
+build/
+dist/
+*.egg-info/
+
+# Archivos de librería de trading (ej. backtesting)
+backtests/
+
+# Datos sensibles y Logs
+*.env
+logs/
+
+# Archivos específicos de backtesting.py
+# Los archivos sqlite que backtesting usa para guardar resultados
+*.sqlite
