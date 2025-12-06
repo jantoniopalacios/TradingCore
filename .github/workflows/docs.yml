@@ -35,6 +35,14 @@ jobs:
       # 3. Instalación de dependencias (MkDocs y mkdocstrings)
       - run: pip install mkdocs mkdocstrings[python] mkdocs-material
 
+      # 3.5. 🌟 INSTALAR DEPENDENCIAS DEL MOTOR 🌟
+      - name: Install Trading Engine Dependencies
+        run: pip install -r engines/trading_engine/requirements.txt
+        
+      # 3.6. 🌟 INSTALAR MÓDULO DEL MOTOR (Modo Editable) 🌟
+      - name: Install Trading Engine Module
+        run: pip install -e ./engines/trading_engine
+
       # 4. Configuración del entorno de GitHub Pages
       - uses: actions/configure-pages@v4
 
