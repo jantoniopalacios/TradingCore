@@ -1,21 +1,19 @@
-# Logica_Trading.py
-
 """
 El fichero Logica_Trading.py contiene las funciones centrales que definen el comportamiento y las reglas de decisión de la 
 estrategia de backtesting System.
 
 ACTUALIZACIÓN: Este módulo ahora actúa como COORDINADOR, delegando la lógica específica de cada indicador 
-a los módulos de la carpeta 'indicadores_tecnicos' para mejorar la modularidad y el mantenimiento.
+a los módulos de la carpeta 'indicators' para mejorar la modularidad y el mantenimiento.
 """
 
 from backtesting.lib import crossover
 import pandas as pd
 import numpy as np
+
 # Importación del módulo auxiliar para los estados
 from trading_engine.utils.Calculos_Tecnicos import verificar_estado_indicador 
 
-# --- NUEVAS IMPORTACIONES DE MÓDULOS ---
-# Importamos la lógica de cada indicador
+# --- NUEVAS IMPORTACIONES DE MÓDULOS (Lógica Delegada) ---
 from trading_engine.indicators.Filtro_EMA import update_ema_state, check_ema_buy_signal, apply_ema_global_filter, check_ema_sell_signal
 from trading_engine.indicators.Filtro_RSI import update_rsi_state, check_rsi_buy_signal, check_rsi_sell_signal
 from trading_engine.indicators.Filtro_MACD import update_macd_state, check_macd_buy_signal, check_macd_sell_signal
@@ -23,17 +21,32 @@ from trading_engine.indicators.Filtro_Stochastic import update_oscillator_state,
 from trading_engine.indicators.Filtro_MoS import update_mos_state, apply_mos_filter
 from trading_engine.indicators.Filtro_Volume import update_volume_state, apply_volume_filter
 
+# Importación para tipado (asumiendo que System es la clase que se usa como self)
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from estrategia_system import System as StrategySelf 
+
 # ----------------------------------------------------------------------
 # --- FUNCIONES AUXILIARES PARA LOGS ---
 # ----------------------------------------------------------------------
 
-def _log_trade_action_sl_update(strategy_self, old_sl, new_sl):
-    # (El contenido de esta función no cambia y se mantiene igual que en la versión anterior)
-    
+def _log_trade_action_sl_update(strategy_self: 'StrategySelf', old_sl: float, new_sl: float) -> None:
     """
-    Descripción: Función auxiliar para registrar específicamente la actualización del Stop Loss dinámico (Trailing Stop) dentro 
-    del log de operaciones (strategy_self.trades_list).
-    ...
+    Función auxiliar para registrar la actualización del Stop Loss dinámico (Trailing Stop) 
+    en la lista de operaciones de la estrategia (`strategy_self.trades_list`).
+
+    Parameters
+    ----------
+    strategy_self : StrategySelf
+        Instancia de la clase System (Strategy) del backtest.
+    old_sl : float
+        Valor anterior del Stop Loss antes de la actualización.
+    new_sl : float
+        Nuevo valor (mayor) del Stop Loss después de la actualización.
+        
+    Returns
+    -------
+    None
     """
     strategy_self.trades_list.append({
         "Symbol": strategy_self.ticker, 
@@ -41,7 +54,7 @@ def _log_trade_action_sl_update(strategy_self, old_sl, new_sl):
         "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
         # --- Datos de Trade CERRADO (Log de SL) ---
         "Precio_Entrada": "N/A", 
-        "Stop_Loss_Inicial": round(old_sl, 2), # El SL anterior
+        "Stop_Loss_Inicial": round(old_sl, 2) if old_sl is not None else "N/A", # El SL anterior
         "Precio_Salida": "N/A",
         "Resultado": "N/A",
         # --- Métricas Financieras (N/A) ---
@@ -62,12 +75,22 @@ def _log_trade_action_sl_update(strategy_self, old_sl, new_sl):
 # --- CÁLCULO DE ESTADOS DE INDICADORES (FUNCIÓN CENTRALIZADA Y DELEGADA) ---
 # ----------------------------------------------------------------------
 
-def _actualizar_estados_indicadores(strategy_self):
+def _actualizar_estados_indicadores(strategy_self: 'StrategySelf') -> None:
     """
-    Función crucial que se ejecuta en cada ciclo de next().
-    DELEGA el cálculo y actualización de los estados dinámicos a los módulos de indicadores.
+    Función crucial que se ejecuta en cada ciclo de next(). Delega el cálculo y 
+    actualización de los estados dinámicos (`_STATE`) a los módulos de indicadores.
 
-    Rol: Coordinación del Análisis Técnico.
+    Este proceso centralizado asegura que todos los estados se calculen antes de 
+    la toma de decisiones de compra o venta en el mismo ciclo (barra de precio).
+
+    Parameters
+    ----------
+    strategy_self : StrategySelf
+        Instancia de la clase System (Strategy).
+        
+    Returns
+    -------
+    None
     """
     
     # 1. EMA
@@ -97,7 +120,6 @@ def _actualizar_estados_indicadores(strategy_self):
 
     # 6. VOLUMEN
     if strategy_self.volume_active:
-        # Llama a la función que calcula los estados dinámicos (Min/Max/Asc/Desc) de la V-MA
         update_volume_state(strategy_self, verificar_estado_indicador)
 
 
@@ -105,14 +127,30 @@ def _actualizar_estados_indicadores(strategy_self):
 # --- LÓGICA DE APERTURA (COMPRA) ---
 # ----------------------------------------------------------------------
 
-def check_buy_signal(strategy_self):
+def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     """
-    Revisa las condiciones de COMPRA combinando todos los filtros activos.
+    Revisa las condiciones de COMPRA combinando todos los filtros activos (AND y OR).
 
-    Rol: Decisión de Compra (Coordinación de Señales OR y Filtros AND).
+    Esta es la función principal de entrada que orquesta la lógica:
+    1. Calcula/actualiza los estados de todos los indicadores.
+    2. Evalúa las señales de entrada (lógica OR entre indicadores).
+    3. Aplica los filtros globales excluyentes (lógica AND).
+    4. Ejecuta la compra y establece el Stop Loss inicial si la señal es válida.
+
+    Parameters
+    ----------
+    strategy_self : StrategySelf
+        Instancia de la clase System (Strategy).
+
+    Returns
+    -------
+    None
+        La función ejecuta la orden de compra si las condiciones se cumplen 
+        (a través de `strategy_self.buy()`).
     """
     if strategy_self.position:
-            return 
+        # Ya hay una posición abierta, no hay señal de compra.
+        return 
 
     # 1. CALCULAR Y ACTUALIZAR ESTADOS
     _actualizar_estados_indicadores(strategy_self)
@@ -125,25 +163,21 @@ def check_buy_signal(strategy_self):
     # --- 1. FILTROS DE SEÑAL (Lógica OR) ---
     # ----------------------------------------------------------------------
 
-    # A. EMA
+    # Delegación de chequeos de compra (OR Lógica)
     condicion_base_tecnica, log_reason_ema = check_ema_buy_signal(strategy_self, condicion_base_tecnica)
-    if log_reason_ema:
-        technical_reasons['EMA'] = log_reason_ema
+    if log_reason_ema: technical_reasons['EMA'] = log_reason_ema
 
-    # B. RSI
     if strategy_self.rsi:
         condicion_base_tecnica, log_reason_rsi = check_rsi_buy_signal(strategy_self, condicion_base_tecnica)
-        if log_reason_rsi:
-            technical_reasons['RSI'] = log_reason_rsi
+        if log_reason_rsi: technical_reasons['RSI'] = log_reason_rsi
 
-    # C. MACD
     if strategy_self.macd:
         condicion_base_tecnica, log_reason_macd = check_macd_buy_signal(strategy_self, condicion_base_tecnica)
-        if log_reason_macd:
-            technical_reasons['MACD'] = log_reason_macd
+        if log_reason_macd: technical_reasons['MACD'] = log_reason_macd
 
-    # D. STOCHASTIC (Usando la función genérica)
+    # STOCHASTIC (Manejo de Fast/Mid/Slow con OR prioritario)
     log_reason_stoch = None
+    # Prioridad: Fast > Mid > Slow
     if strategy_self.stoch_fast:
         stoch_buy, reason = check_oscillator_buy_signal(strategy_self, 'stoch_fast', strategy_self.stoch_k_fast, strategy_self.stoch_d_fast, strategy_self.stoch_fast_low_level)
         if stoch_buy:
@@ -162,18 +196,18 @@ def check_buy_signal(strategy_self):
             condicion_base_tecnica = True
             log_reason_stoch = reason
             
-    if log_reason_stoch:
-        technical_reasons['Stoch'] = log_reason_stoch
+    if log_reason_stoch: technical_reasons['Stoch'] = log_reason_stoch
 
 
     # ----------------------------------------------------------------------
     # --- 2. FILTRO GLOBAL EMA LENTA (Condición AND) ---
     # ----------------------------------------------------------------------
     
+    # Este filtro puede anular una señal de compra si la tendencia es muy desfavorable.
     condicion_base_tecnica = apply_ema_global_filter(strategy_self, condicion_base_tecnica)
 
     # ----------------------------------------------------------------------
-    # --- 3. VERIFICACIÓN DE MODO BUY & HOLD (COMPRA SIN FILTROS) ---
+    # --- 3. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
     # ----------------------------------------------------------------------
     indicadores_tecnicos_activos = (
         strategy_self.ema_cruce_signal or
@@ -184,37 +218,30 @@ def check_buy_signal(strategy_self):
         strategy_self.stoch_slow
     )
     if not condicion_base_tecnica:
-        # Si NO hay indicadores activos y la condición base es False (es decir, el usuario quiere Buy & Hold con filtro mínimo)
+        # Lógica Buy & Hold: Compra si no hay señales activas PERO la tendencia de la EMA Lenta es favorable.
         if not indicadores_tecnicos_activos:
-            # La compra se activa solo si la EMA Lenta está en un estado favorable (mínimo o ascendente).
             condicion_base_tecnica = strategy_self.ema_slow_minimo_STATE or strategy_self.ema_slow_ascendente_STATE
             if condicion_base_tecnica:
                 technical_reasons['B&H'] = "B&H Mínimo"
 
     # ----------------------------------------------------------------------
-    # --- 4. FILTRO DE VOLUMEN (Condición AND Excluyente) 
+    # --- 4. FILTRO DE VOLUMEN (Condición AND Excluyente) ---
     # ----------------------------------------------------------------------
-    # El filtro de Volumen es una condición AND: DEBE cumplirse para continuar.
     volume_condition_met, volume_log_reason = apply_volume_filter(strategy_self)
     
     if not volume_condition_met:
-        # Si el volumen es un filtro activo y falla, abortamos la señal de compra
-        # (Opcional: puedes registrar el 'volume_log_reason' aquí antes de salir)
+        # Falla el filtro de volumen, abortamos la señal de compra
         return
     
-    # Si pasa el filtro de volumen, añadimos la razón de log a la lista de registros
-    if volume_log_reason:
-        technical_reasons['Volume'] = volume_log_reason # Usamos technical_reasons o creamos una sección de Filtros
+    if volume_log_reason: technical_reasons['Volume'] = volume_log_reason 
 
     # ----------------------------------------------------------------------
     # --- 5. FILTRO FUNDAMENTAL (Margen de Seguridad - Condición AND) ---
     # ----------------------------------------------------------------------
-    
     cond_mos_valida, mos_log_reason = apply_mos_filter(strategy_self)
 
     # Si MoS está activo y no es válido, salimos de la función de compra
     if strategy_self.margen_seguridad_active and not cond_mos_valida:
-        # Aquí puedes registrar el fallo del filtro fundamental
         return
     
     # ----------------------------------------------------------------------
@@ -225,10 +252,10 @@ def check_buy_signal(strategy_self):
     if condicion_base_tecnica and cond_mos_valida:
         
         strategy_self.buy()
-        # 1. El precio máximo inicial debe ser el precio de entrada (Close[-1]).
+        # Inicializa el precio máximo para el Trailing Stop Loss
         strategy_self.max_price = strategy_self.data.Close[-1]
         
-        # 2. El Stop Loss inicial DEBE calcularse usando el parámetro del usuario.
+        # Calcula el Stop Loss inicial
         strategy_self.my_stop_loss = strategy_self.max_price * (1 - strategy_self.stoploss_percentage_below_close)
 
         # 🌟 REGISTRO DE COMPRA DETALLADO 🌟
@@ -247,6 +274,7 @@ def check_buy_signal(strategy_self):
         descripcion_adicional = " (" + " | ".join(log_parts) + ")" if log_parts else ""
         descripcion_compra = "COMPRA" + descripcion_adicional
         
+        # Registro en trades_list
         strategy_self.trades_list.append({
             "Symbol": strategy_self.ticker, 
             "Tipo": "COMPRA",
@@ -269,11 +297,26 @@ def check_buy_signal(strategy_self):
 # --- LÓGICA DE CIERRE (VENTA) ---
 # ----------------------------------------------------------------------
 
-def manage_existing_position(strategy_self):
+def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     """
-    Gestiona el cierre de la posición (cierre técnico o stop-loss dinámico).
+    Gestiona el cierre de la posición (cierre técnico o stop-loss dinámico/Trailing Stop).
 
-    Rol: Decisión de Venta (Coordinación de Cierres Técnicos OR).
+    Esta es la función principal de salida que orquesta la lógica:
+    1. Calcula/actualiza los estados de los indicadores.
+    2. Evalúa las señales de cierre técnico (lógica OR entre indicadores).
+    3. Si no hay cierre técnico, gestiona el Stop Loss dinámico (Trailing SL).
+    4. Ejecuta el cierre por Stop Loss si el precio cae por debajo del límite.
+
+    Parameters
+    ----------
+    strategy_self : StrategySelf
+        Instancia de la clase System (Strategy) con la posición abierta.
+
+    Returns
+    -------
+    None
+        La función ejecuta la orden de venta (cierre) a través de `strategy_self.position.close()` 
+        si se cumplen las condiciones de salida o Stop Loss.
     """
     if not strategy_self.position:
         return 
@@ -284,9 +327,7 @@ def manage_existing_position(strategy_self):
     close_position = False
     descripcion_cierre = "N/A"
     
-    # ----------------------------------------------------------------------
-    # --- LÓGICA DE CONTROL (VERIFICA SI HAY FILTROS ACTIVOS) ---
-    # ----------------------------------------------------------------------
+    # Lógica de Control: Solo ejecuta cierre técnico si hay indicadores activos.
     indicadores_tecnicos_activos = (
         strategy_self.ema_cruce_signal or
         (strategy_self.ema_slow_activo) or
@@ -308,25 +349,22 @@ def manage_existing_position(strategy_self):
             close_position = True
             descripcion_cierre = desc_ema
 
-        # 2. RSI
+        # 2. RSI (Solo si no hay señal anterior)
         if not close_position:
             close_position_rsi, desc_rsi = check_rsi_sell_signal(strategy_self)
             if close_position_rsi:
                 close_position = True
                 descripcion_cierre = desc_rsi
 
-        # 3. MACD
+        # 3. MACD (Solo si no hay señal anterior)
         if not close_position:
             close_position_macd, desc_macd = check_macd_sell_signal(strategy_self)
             if close_position_macd:
                 close_position = True
                 descripcion_cierre = desc_macd
 
-        # 4. ESTOCÁSTICOS (Usa la función genérica y comprueba los tres)
+        # 4. ESTOCÁSTICOS (Solo si no hay señal anterior - Prioridad: Fast > Mid > Slow)
         if not close_position:
-            # Aunque la función genérica comprueba los tres internamente, es más limpio 
-            # delegar la verificación y priorizar la señal más sensible (Fast, Mid, Slow)
-            
             # Fast
             close_position_stoch_fast, desc_stoch_fast = check_oscillator_sell_signal(strategy_self, 'stoch_fast')
             if close_position_stoch_fast:
@@ -348,52 +386,53 @@ def manage_existing_position(strategy_self):
                     descripcion_cierre = desc_stoch_slow
             
             
-    # ----------------------------------------------------------------------
-    # --- CIERRE Y REGISTRO TÉCNICO ---
-    # ----------------------------------------------------------------------
-    
-    if close_position:
-        # Si se cumple alguna condición de cierre técnico, cerramos la posición aquí
-        strategy_self.position.close()
+        # ----------------------------------------------------------------------
+        # --- CIERRE Y REGISTRO TÉCNICO ---
+        # ----------------------------------------------------------------------
         
-        # ... (El resto del log y reseteo de variables se mantiene igual)
-        trade_obj = strategy_self.trades[-1] if strategy_self.trades else None
-        
-        # Reseteo de variables de la estrategia
-        strategy_self.max_price = 0
-        strategy_self.my_stop_loss = None
-        
-        # 🌟 REGISTRO DE VENTA TÉCNICA 🌟
-        strategy_self.trades_list.append({
-            "Symbol": strategy_self.ticker, 
-            "Tipo": descripcion_cierre, # Usamos la descripción del motivo
-            "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
-            "Precio_Entrada": round(trade_obj.entry_price, 4) if trade_obj and trade_obj.entry_price is not None else "N/A",
-            "Stop_Loss_Inicial": "N/A", 
-            "Precio_Salida": round(trade_obj.exit_price, 4) if trade_obj and trade_obj.exit_price is not None else round(strategy_self.data.Close[-1], 4),
-            "Resultado": "Cerrada",
-            "PnL_Absoluto": round(trade_obj.pl, 2) if trade_obj and trade_obj.pl is not None else "N/A", 
-            "Retorno_Pct": round(trade_obj.pl_pct * 100, 2) if trade_obj and trade_obj.pl_pct is not None else "N/A", 
-            "Comision_Total": round(trade_obj._commissions, 2) if trade_obj and trade_obj._commissions is not None else "N/A",
-            "Descripcion": "Cierre tecnico", # Indicamos que fue un cierre técnico
-            "Fecha de operacion": "N/A", 
-            "Precio": "N/A", 
-            "Stop_loss": "N/A", 
-            "Nuevo_SL": "N/A",
-        })
-        
-        return 
-        
+        if close_position:
+            strategy_self.position.close()
+            
+            # Obtener el objeto trade para el log
+            trade_obj = strategy_self.trades[-1] if strategy_self.trades else None
+            
+            # Reseteo de variables de la estrategia
+            strategy_self.max_price = 0
+            strategy_self.my_stop_loss = None
+            
+            # 🌟 REGISTRO DE VENTA TÉCNICA 🌟
+            strategy_self.trades_list.append({
+                "Symbol": strategy_self.ticker, 
+                "Tipo": descripcion_cierre, 
+                "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
+                "Precio_Entrada": round(trade_obj.entry_price, 4) if trade_obj and trade_obj.entry_price is not None else "N/A",
+                "Stop_Loss_Inicial": "N/A", 
+                "Precio_Salida": round(trade_obj.exit_price, 4) if trade_obj and trade_obj.exit_price is not None else round(strategy_self.data.Close[-1], 4),
+                "Resultado": "Cerrada",
+                "PnL_Absoluto": round(trade_obj.pl, 2) if trade_obj and trade_obj.pl is not None else "N/A", 
+                "Retorno_Pct": round(trade_obj.pl_pct * 100, 2) if trade_obj and trade_obj.pl_pct is not None else "N/A", 
+                "Comision_Total": round(trade_obj._commissions, 2) if trade_obj and trade_obj._commissions is not None else "N/A",
+                "Descripcion": "Cierre tecnico", 
+                "Fecha de operacion": "N/A", 
+                "Precio": "N/A", 
+                "Stop_loss": "N/A", 
+                "Nuevo_SL": "N/A",
+            })
+            
+            return 
+            
     # ----------------------------------------------------------------------
     # --- GESTIÓN DE STOP LOSS DINÁMICO (Trailing Stop) ---
     # ----------------------------------------------------------------------
+    
+    # 1. Actualiza el precio máximo alcanzado
     current_high = strategy_self.data.High[-1]
     strategy_self.max_price = max(strategy_self.max_price, current_high)
     
-    # Calcular el nuevo SL
+    # 2. Calcular el nuevo SL basado en el máximo
     new_stop_loss = strategy_self.max_price * (1 - strategy_self.stoploss_percentage_below_close)
 
-    # Actualiza el SL solo si ha subido (trailing)
+    # 3. Actualiza el SL solo si ha subido (Trailing)
     if strategy_self.my_stop_loss is None or new_stop_loss > strategy_self.my_stop_loss:
         old_stop_loss = strategy_self.my_stop_loss
         strategy_self.my_stop_loss = new_stop_loss
@@ -401,10 +440,9 @@ def manage_existing_position(strategy_self):
         # Registrar la actualización del SL
         _log_trade_action_sl_update(strategy_self, old_stop_loss, new_stop_loss)
 
-
-    # Cierre por Stop Loss
+    # 4. Cierre por Stop Loss
     if strategy_self.my_stop_loss is not None and strategy_self.data.Close[-1] < strategy_self.my_stop_loss:
-        # ... (El resto del log por Stop Loss se mantiene igual)
+        
         strategy_self.position.close()
         
         final_stop_loss = strategy_self.my_stop_loss
