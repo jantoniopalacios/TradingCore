@@ -1,0 +1,27 @@
+site_name: TradingCore - Motor de Estrategias
+site_url: https://tucorreo.github.io/TradingCore/
+
+nav:
+  - Introducción: README.md
+  - Arquitectura: ARCHITECTURE.md
+  - Referencia API:
+    - Motor Central: api/motor_core.md
+    - Indicadores: api/motor_indicators.md
+
+theme:
+  name: material
+  language: es
+  palette:
+    scheme: slate
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [engines/trading_engine/src]
+          options:
+            show_source: false
+            show_bases: false
+            docstring_style: numpy
