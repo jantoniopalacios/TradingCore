@@ -25,3 +25,4 @@ plugins:
             show_source: false
             show_bases: false
             docstring_style: numpy
+            
