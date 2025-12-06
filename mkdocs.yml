@@ -1,4 +1,5 @@
 site_name: TradingCore - Motor de Estrategias
+site_description: Documentación oficial del motor.
 site_url: https://tucorreo.github.io/TradingCore/
 
 nav:
