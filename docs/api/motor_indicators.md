@@ -29,3 +29,16 @@ Este módulo contiene la implementación y la lógica de filtrado específica pa
         - update_macd_state
         - check_macd_buy_signal
         - check_macd_sell_signal
+
+## Filtro MACD (Moving Average Convergence Divergence)
+Este módulo contiene las funciones genéricas que se aplican a las diferentes versiones del oscilador Estocástico 
+(Rápido, Medio y Lento) que la estrategia utilice. Se utilizan prefijos dinámicos (e.g., `stoch_fast`) para 
+manejar los múltiples estados y configuraciones del oscilador.
+
+::: trading_engine.indicators.Filtro_Stochastic
+    options:
+      members:
+        - StochHelper
+        - update_oscillator_state
+        - check_oscillator_buy_signal
+        - check_oscillator_sell_signal
