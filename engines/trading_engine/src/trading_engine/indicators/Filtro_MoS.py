@@ -1,21 +1,37 @@
 # indicadores_tecnicos/Filtro_MOS.py
 """
 Módulo para la lógica del Margen de Seguridad (MoS).
-Generalmente utilizado como un filtro fundamental (condición AND) que requiere 
-que la valoración esté por encima de un umbral y, opcionalmente, que esté ascendiendo.
+
+Generalmente utilizado como un **filtro fundamental (condición AND)** que requiere 
+que la valoración esté por encima de un umbral de seguridad y, opcionalmente, que su tendencia
+sea ascendente. Este módulo contiene la lógica para actualizar el estado dinámico y aplicar el filtro.
 """
 
+from typing import Callable, Tuple, Optional, Any
 # Se asume que 'verificar_estado_indicador' será importado o pasado como argumento.
 
 # ----------------------------------------------------------------------
 # --- Actualización de Estado ---
 # ----------------------------------------------------------------------
-def update_mos_state(strategy_self, verificar_estado_indicador_func):
+def update_mos_state(strategy_self: Any, verificar_estado_indicador_func: Callable):
     """
     Actualiza el estado dinámico (STATE) del Margen de Seguridad (MoS).
     
-    :param strategy_self: Instancia de la estrategia.
-    :param verificar_estado_indicador_func: Función para calcular el estado dinámico.
+    Este estado indica si el MoS ha alcanzado un mínimo/máximo o si su tendencia es ascendente/descendente
+    en la vela actual. Los resultados se asignan a las variables de estado dinámicas
+    (e.g., :py:attr:`strategy_self.margen_seguridad_ascendente_STATE`).
+
+    Parameters
+    ----------
+    strategy_self : strategy_system.System
+        Instancia de la estrategia (clase Logica_Trading) que contiene el indicador MoS.
+    verificar_estado_indicador_func : Callable
+        Función auxiliar utilizada para calcular el estado dinámico (mínimo, máximo, ascendente, descendente) 
+        a partir de la serie histórica del MoS.
+
+    Returns
+    -------
+    None
     """
     if strategy_self.margen_seguridad_active and hasattr(strategy_self, 'margen_seguridad_ind'):
         # Solo verificamos el estado si tenemos suficientes datos cargados para el MoS
@@ -29,12 +45,30 @@ def update_mos_state(strategy_self, verificar_estado_indicador_func):
 # ----------------------------------------------------------------------
 # --- Filtro Fundamental (Condición AND) ---
 # ----------------------------------------------------------------------
-def apply_mos_filter(strategy_self):
+def apply_mos_filter(strategy_self: Any) -> Tuple[bool, Optional[str]]:
     """
     Aplica el filtro fundamental de Margen de Seguridad (MoS).
-    
-    :param strategy_self: Instancia de la estrategia.
-    :return: Tupla: (Booleano (condición fundamental válida), razón del log (str o None)).
+
+    Este filtro actúa como una **condición AND** para la entrada a la posición, requiriendo dos sub-condiciones:
+
+    1.  **Condición de Valoración:** El MoS actual debe ser superior al umbral configurado 
+        (ej. :py:attr:`strategy_self.margen_seguridad_threshold`).
+    2.  **Condición de Dinamismo (Opcional):** Si el usuario requiere que el MoS sea ascendente
+        (:py:attr:`strategy_self.margen_seguridad_ascendente` = True), esta condición debe cumplirse
+        en el estado actual (:py:attr:`strategy_self.margen_seguridad_ascendente_STATE`).
+
+    Si el filtro no está activo, se devuelve `True` por defecto.
+
+    Parameters
+    ----------
+    strategy_self : strategy_system.System
+        Instancia de la estrategia.
+
+    Returns
+    -------
+    tuple[bool, str | None]
+        - bool: `True` si el filtro es válido (o inactivo), `False` si lo invalida.
+        - str | None: Razón del log si el filtro es válido (e.g., "MOS:15.2 Ascendente") o `None`.
     """
     if strategy_self.margen_seguridad_active:
         if hasattr(strategy_self, 'margen_seguridad_ind') and strategy_self.margen_seguridad_ind is not None and strategy_self.margen_seguridad_ind[-1] is not None:
@@ -46,7 +80,7 @@ def apply_mos_filter(strategy_self):
             setting_mos_dinamismo = strategy_self.margen_seguridad_ascendente if strategy_self.margen_seguridad_ascendente is not None else False
             state_mos_dinamismo = strategy_self.margen_seguridad_ascendente_STATE if hasattr(strategy_self, 'margen_seguridad_ascendente_STATE') else False
             
-            # Lógica: Si el dinamismo está requerido, DEBE cumplirse en el estado. Si no está requerido, se ignora.
+            # Lógica: Si el dinamismo está requerido, DEBE cumplirse en el estado. Si no está requerido, se ignora (True).
             if setting_mos_dinamismo:
                 cond_mos_dinamismo_final = state_mos_dinamismo
             else:
