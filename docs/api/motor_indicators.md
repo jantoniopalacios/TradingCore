@@ -20,3 +20,12 @@ Este módulo contiene la implementación y la lógica de filtrado específica pa
         - update_rsi_state
         - check_rsi_buy_signal
         - check_rsi_sell_signal
+
+## Filtro MACD (Moving Average Convergence Divergence)
+
+::: trading_engine.indicators.Filtro_MACD
+    options:
+      members:
+        - update_macd_state
+        - check_macd_buy_signal
+        - check_macd_sell_signal
