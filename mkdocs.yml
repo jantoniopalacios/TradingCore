@@ -26,4 +26,4 @@ plugins:
             show_source: false
             show_bases: false
             docstring_style: numpy
-            show_private: true       
+            members_private: true
