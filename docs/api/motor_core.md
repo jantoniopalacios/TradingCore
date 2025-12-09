@@ -9,4 +9,5 @@ Este módulo contiene las funciones de coordinación y toma de decisiones del mo
       members:
         - check_buy_signal
         - manage_existing_position
+        - _log_trade_action_sl_update
         - _actualizar_estados_indicadores

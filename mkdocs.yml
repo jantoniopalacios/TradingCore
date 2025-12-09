@@ -1,6 +1,6 @@
 site_name: TradingCore - Motor de Estrategias
 site_description: Documentación oficial del motor.
-site_url: https://tucorreo.github.io/TradingCore/
+site_url: https://jantoniopalacios.github.io/TradingCore/
 
 nav:
   - Introducción: README.md
@@ -25,4 +25,5 @@ plugins:
           options:
             show_source: false
             show_bases: false
-            docstring_style: numpy          
+            docstring_style: numpy
+            show_private: true       
