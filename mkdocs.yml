@@ -8,6 +8,7 @@ nav:
   - Referencia API:
     - Motor Central: api/motor_core.md
     - Indicadores: api/motor_indicators.md
+    - Utilidades: api/motor_utils.md
 
 theme:
   name: material
