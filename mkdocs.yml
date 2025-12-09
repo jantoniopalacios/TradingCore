@@ -19,6 +19,7 @@ plugins:
   - search
   - mkdocstrings:
       default_handler: python
+      show_private: true
       handlers:
         python:
           paths: [engines/trading_engine/src]
@@ -26,4 +27,3 @@ plugins:
             show_source: false
             show_bases: false
             docstring_style: numpy
-            members_private: true
