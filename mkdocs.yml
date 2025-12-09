@@ -19,7 +19,6 @@ plugins:
   - search
   - mkdocstrings:
       default_handler: python
-      show_private: true
       handlers:
         python:
           paths: [engines/trading_engine/src]
