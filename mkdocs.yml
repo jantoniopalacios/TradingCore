@@ -1,0 +1,29 @@
+site_name: TradingCore - Motor de Estrategias
+site_description: Documentación oficial del motor.
+site_url: https://jantoniopalacios.github.io/TradingCore/
+
+nav:
+  - Introducción: README.md
+  - Arquitectura: ARCHITECTURE.md
+  - Referencia API:
+    - Motor Central: api/motor_core.md
+    - Indicadores: api/motor_indicators.md
+    - Utilidades: api/motor_utils.md
+
+theme:
+  name: material
+  language: es
+  palette:
+    scheme: slate
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [trading_engine]
+          options:
+            show_source: false
+            show_bases: false
+            docstring_style: numpy

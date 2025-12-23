@@ -1,0 +1,20 @@
+# trading_engine/pyproject.toml
+
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trading-core-engine"
+version = "0.0.1"
+description = "Core module for the TradingCore project."
+authors = [
+    {name = "Tu Nombre", email = "tu_email@example.com"},
+]
+readme = "README.md"  # Opcional
+requires-python = ">=3.11" # Asegura la compatibilidad con 3.11
+
+[tool.setuptools.packages.find]
+# Esto instruye a setuptools a buscar paquetes (directorios con __init__.py)
+# a partir del directorio actual ('.') donde se está ejecutando el comando.
+where = ["."]

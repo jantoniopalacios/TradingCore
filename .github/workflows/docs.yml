@@ -1,0 +1,62 @@
+# Nombre del flujo de trabajo
+name: Deploy Docs
+
+# Se ejecuta en cada push a la rama 'main'
+on:
+  push:
+    branches:
+      - main
+
+# Permisos requeridos para que la Action pueda publicar en GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Permite que las ejecuciones de GH Pages se cancelen si se envía una nueva versión
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  # El Job principal para construir y desplegar
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout: Clona el código del repositorio
+      - uses: actions/checkout@v4
+      
+      # 2. Configuración de Python
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' 
+          cache: 'pip' # Almacena en caché las dependencias de pip
+
+      # 3. Instalación de dependencias (MkDocs y mkdocstrings)
+      - run: pip install mkdocs mkdocstrings[python] mkdocs-material
+
+      # 3.5. 🌟 INSTALAR DEPENDENCIAS DEL MOTOR 🌟
+      - name: Install Trading Engine Dependencies
+        run: pip install -r requirements.txt
+        
+      # 3.6. 🌟 INSTALAR MÓDULO DEL MOTOR (Modo Editable) 🌟
+      - name: Install Trading Engine Module
+        run: pip install -e ./trading_engine
+
+      # 4. Configuración del entorno de GitHub Pages
+      - uses: actions/configure-pages@v4
+
+      # 5. Build: Compila el sitio web de MkDocs (genera la carpeta 'site')
+      - name: Build documentation
+        run: mkdocs build --strict
+        env:
+          # Volvemos a añadir esta variable, ya que la instalación editable no funciona
+          PYTHONPATH: ${{ github.workspace }}
+
+      # 6. Upload: Prepara los artefactos (la carpeta 'site') para el despliegue
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: './site'
+
+      # 7. Deploy: Publica el sitio en GitHub Pages
+      - uses: actions/deploy-pages@v4

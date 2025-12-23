@@ -1,0 +1,23 @@
+<div class="row">
+    <div class="col-md-12">
+        <h5 class="border-bottom pb-2 mb-3 text-primary">
+            <i class="bi bi-coin me-2"></i>Gestión de Activos (symbols.csv)
+        </h5>
+
+        <div class="alert alert-info" role="alert">
+            Edita el contenido completo del archivo **`symbols.csv`**. Se recomienda el formato **Ticker,Nombre** por línea. Los cambios se guardarán con el botón **"Guardar Configuración"** en la parte inferior de la página.
+        </div>
+
+        <div class="mb-3">
+            <label for="symbols_content" class="form-label fw-bold">Contenido de symbols.csv:</label>
+            <textarea 
+                class="form-control" 
+                id="symbols_content" 
+                name="symbols_content" 
+                rows="15" 
+                style="font-family: monospace;"
+                placeholder="AAPL,Apple Inc.&#10;MSFT,Microsoft Corp.&#10;GOOG,Alphabet Inc."
+            >{{ symbols_content | default('Symbol,Name&#10;') }}</textarea>
+        </div>
+        </div>
+</div>

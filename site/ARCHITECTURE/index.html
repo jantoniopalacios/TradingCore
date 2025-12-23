@@ -1,0 +1,743 @@
+
+<!doctype html>
+<html lang="es" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentación oficial del motor.">
+      
+      
+      
+        <link rel="canonical" href="https://tucorreo.github.io/TradingCore/ARCHITECTURE/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../api/motor_core/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Arquitectura - TradingCore - Motor de Estrategias</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#documentacion-de-arquitectura-backend-motor-de-trading" class="md-skip">
+          Saltar a contenido
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabecera">
+    <a href=".." title="TradingCore - Motor de Estrategias" class="md-header__button md-logo" aria-label="TradingCore - Motor de Estrategias" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            TradingCore - Motor de Estrategias
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Arquitectura
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Búsqueda" placeholder="Búsqueda" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Buscar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpiar" aria-label="Limpiar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando búsqueda
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navegación" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="TradingCore - Motor de Estrategias" class="md-nav__button md-logo" aria-label="TradingCore - Motor de Estrategias" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    TradingCore - Motor de Estrategias
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introducción
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitectura
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitectura
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-diseno-arquitectonico-monorepo-modular" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Diseño Arquitectónico: Monorepo Modular
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-estructura-del-motor-trading_engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Estructura del Motor (trading_engine)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Estructura del Motor (trading_engine)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-modulo-core-srctrading_enginecore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1. Módulo core (src/trading_engine/core/)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-modulo-indicators-srctrading_engineindicators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2. Módulo indicators (src/trading_engine/indicators/)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-interfaz-de-la-estrategia-clase-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Interfaz de la Estrategia (Clase System)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-guia-para-desarrolladores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Guía para Desarrolladores
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referencia API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Referencia API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/motor_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Motor Central
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/motor_indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicadores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-diseno-arquitectonico-monorepo-modular" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Diseño Arquitectónico: Monorepo Modular
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-estructura-del-motor-trading_engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Estructura del Motor (trading_engine)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Estructura del Motor (trading_engine)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-modulo-core-srctrading_enginecore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1. Módulo core (src/trading_engine/core/)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-modulo-indicators-srctrading_engineindicators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2. Módulo indicators (src/trading_engine/indicators/)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-interfaz-de-la-estrategia-clase-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Interfaz de la Estrategia (Clase System)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-guia-para-desarrolladores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Guía para Desarrolladores
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="documentacion-de-arquitectura-backend-motor-de-trading">🏛️ DOCUMENTACIÓN DE ARQUITECTURA (Backend / Motor de Trading)</h1>
+<p>Este documento describe la estructura modular, las responsabilidades de los componentes y las interfaces clave del Motor Central (<code>trading_engine</code>).</p>
+<hr />
+<h2 id="1-diseno-arquitectonico-monorepo-modular">1. Diseño Arquitectónico: Monorepo Modular</h2>
+<p>El proyecto <code>TradingCore</code> sigue una arquitectura de Monorepo Modular. Múltiples proyectos de ejecución (Escenarios) consumen una única biblioteca central de lógica (el Motor).</p>
+<ul>
+<li><strong>Principio Clave:</strong> El <strong>Motor Central</strong> es la única Fuente de Verdad para la lógica de Trading. Los Escenarios solo gestionan la <strong>Ejecución</strong>, la <strong>Configuración</strong> y la <strong>Comunicación</strong> (Backtesting, Live Trading, Web App).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Componente</th>
+<th style="text-align: left;">Ubicación</th>
+<th style="text-align: left;">Rol Principal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Motor Central</strong></td>
+<td style="text-align: left;"><code>engines/trading_engine/</code></td>
+<td style="text-align: left;">Lógica de Negocio (Decisión), Cálculos de Indicadores, Gestión de Datos Base.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Escenarios</strong></td>
+<td style="text-align: left;"><code>scenarios/</code></td>
+<td style="text-align: left;">Puntos de entrada para la ejecución (ej. <code>BacktestLocal</code>, <code>TradingWebLive</code>).</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-estructura-del-motor-trading_engine">2. Estructura del Motor (<code>trading_engine</code>)</h2>
+<h3 id="21-modulo-core-srctrading_enginecore">2.1. Módulo <code>core</code> (<code>src/trading_engine/core/</code>)</h3>
+<p>Contiene las funciones <em>controladoras</em> que son llamadas en cada tick o barra de precio.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Archivo</th>
+<th style="text-align: left;">Interfaz Clave</th>
+<th style="text-align: left;">Responsabilidad</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>Logica_Trading.py</code></td>
+<td style="text-align: left;"><code>check_buy_signal(strategy_self)</code></td>
+<td style="text-align: left;">Determina la señal de <strong>Entrada</strong>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Logica_Trading.py</code></td>
+<td style="text-align: left;"><code>manage_existing_position(strategy_self)</code></td>
+<td style="text-align: left;">Gestiona el <strong>Riesgo</strong> y la <strong>Salida</strong> (SL/TP/Trailing).</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>IMPORTANTE:</strong> Estas funciones deben ser <strong>puras</strong> en cuanto a la lógica de negocio. No deben contener lógica de ejecución del backtest (ej. <code>self.buy()</code>).</p>
+</blockquote>
+<h3 id="22-modulo-indicators-srctrading_engineindicators">2.2. Módulo <code>indicators</code> (<code>src/trading_engine/indicators/</code>)</h3>
+<p>Contiene la implementación de indicadores técnicos y filtros complejos.</p>
+<ul>
+<li><strong>Convención:</strong> Los indicadores deben implementarse como clases o funciones que devuelven series de datos (<code>pd.Series</code>) o clases <em>Helper</em> que facilitan la evaluación (<code>StochHelper</code>).</li>
+</ul>
+<h2 id="3-interfaz-de-la-estrategia-clase-system">3. Interfaz de la Estrategia (Clase <code>System</code>)</h2>
+<p>La clase <code>System</code> (ubicada en cada <code>estrategia_system.py</code>) es la interfaz de comunicación entre el entorno de ejecución (Backtesting) y el Motor Central.</p>
+<p><strong>Responsabilidades de <code>System</code>:</strong></p>
+<ol>
+<li><strong>Definición de Parámetros:</strong> Declara los atributos de configuración (ej. <code>ema_slow_period = 50</code>).</li>
+<li><strong>Inicialización (<code>init</code>)</strong>: Calcula todos los indicadores necesarios y los adjunta a <code>self</code> (ej. <code>self.ema_slow = self.I(...)</code>).</li>
+<li><strong>Delegación (<code>next</code>)</strong>: Llama a las funciones del Motor Central:
+    <code>python
+    if self.position:
+        manage_existing_position(self)
+    else:
+        if check_buy_signal(self):
+            self.buy()</code></li>
+</ol>
+<hr />
+<h2 id="4-guia-para-desarrolladores">4. Guía para Desarrolladores</h2>
+<p>Para añadir una nueva funcionalidad (ej. un nuevo filtro de volumen):</p>
+<ol>
+<li><strong>Implementación del Filtro:</strong> Implementar el cálculo en <code>engines/trading_engine/indicators/</code>.</li>
+<li><strong>Exposición:</strong> Asegurar que el cálculo se realice y se adjunte a <code>self</code> en el método <code>System.init()</code>.</li>
+<li><strong>Uso:</strong> Modificar las funciones <code>check_buy_signal()</code> o <code>manage_existing_position()</code> en <code>Logica_Trading.py</code> para utilizar el nuevo filtro.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado al portapapeles", "clipboard.copy": "Copiar al portapapeles", "search.result.more.one": "1 m\u00e1s en esta p\u00e1gina", "search.result.more.other": "# m\u00e1s en esta p\u00e1gina", "search.result.none": "No se encontraron documentos", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Teclee para comenzar b\u00fasqueda", "search.result.term.missing": "Falta", "select.version": "Seleccionar versi\u00f3n"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

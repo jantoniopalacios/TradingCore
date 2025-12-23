@@ -1,0 +1,1452 @@
+
+<!doctype html>
+<html lang="es" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentación oficial del motor.">
+      
+      
+      
+        <link rel="canonical" href="https://tucorreo.github.io/TradingCore/api/motor_indicators/">
+      
+      
+        <link rel="prev" href="../motor_core/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Indicadores - TradingCore - Motor de Estrategias</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#referencia-api-indicadores-tecnicos" class="md-skip">
+          Saltar a contenido
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabecera">
+    <a href="../.." title="TradingCore - Motor de Estrategias" class="md-header__button md-logo" aria-label="TradingCore - Motor de Estrategias" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            TradingCore - Motor de Estrategias
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Indicadores
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Búsqueda" placeholder="Búsqueda" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Buscar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpiar" aria-label="Limpiar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando búsqueda
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navegación" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="TradingCore - Motor de Estrategias" class="md-nav__button md-logo" aria-label="TradingCore - Motor de Estrategias" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    TradingCore - Motor de Estrategias
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introducción
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitectura
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referencia API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Referencia API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../motor_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Motor Central
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicadores
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicadores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#filtro-ema-exponential-moving-average" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtro EMA (Exponential Moving Average)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_EMA" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtro_EMA
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_EMA.update_ema_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        update_ema_state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_EMA.check_ema_buy_signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_ema_buy_signal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_EMA.apply_ema_global_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_ema_global_filter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_EMA.check_ema_sell_signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_ema_sell_signal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filtro-rsi-relative-strength-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtro RSI (Relative Strength Index)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_RSI" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtro_RSI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_RSI.update_rsi_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        update_rsi_state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_RSI.check_rsi_buy_signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_rsi_buy_signal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_RSI.check_rsi_sell_signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_rsi_sell_signal
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#filtro-ema-exponential-moving-average" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtro EMA (Exponential Moving Average)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_EMA" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtro_EMA
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_EMA.update_ema_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        update_ema_state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_EMA.check_ema_buy_signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_ema_buy_signal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_EMA.apply_ema_global_filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_ema_global_filter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_EMA.check_ema_sell_signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_ema_sell_signal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filtro-rsi-relative-strength-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtro RSI (Relative Strength Index)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_RSI" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtro_RSI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_RSI.update_rsi_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        update_rsi_state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_RSI.check_rsi_buy_signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_rsi_buy_signal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading_engine.indicators.Filtro_RSI.check_rsi_sell_signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_rsi_sell_signal
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="referencia-api-indicadores-tecnicos">Referencia API: Indicadores Técnicos</h1>
+<p>Este módulo contiene la implementación y la lógica de filtrado específica para cada indicador técnico.</p>
+<h2 id="filtro-ema-exponential-moving-average">Filtro EMA (Exponential Moving Average)</h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="trading_engine.indicators.Filtro_EMA"></a>
+    <div class="doc doc-contents first">
+
+        <p>Módulo para la lógica de la Media Móvil Exponencial (EMA).</p>
+<p>Contiene funciones delegadas para la actualización del estado dinámico (ascendente/descendente/mínimo/máximo) 
+de la EMA Lenta, y la generación de señales de compra/venta basadas en cruces y tendencia.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="trading_engine.indicators.Filtro_EMA.update_ema_state" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">update_ema_state</span><span class="p">(</span><span class="n">strategy_self</span><span class="p">,</span> <span class="n">verificar_estado_indicador_func</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Actualiza el estado dinámico (STATE) de la EMA Lenta (ma_slow) basado en sus últimos valores.</p>
+<p>Este estado se almacena como variables booleanas de instancia (ej. <code>ema_slow_minimo_STATE</code>) 
+para ser utilizado posteriormente por las funciones de señal y filtrado.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>strategy_self</code>
+            </td>
+            <td>
+                  <code><span title="estrategia_system.System">System</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Instancia de la clase System (Strategy), que accede a <code>self.ema_slow_series</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>verificar_estado_indicador_func</code>
+            </td>
+            <td>
+                  <code><span title="trading_engine.indicators.Filtro_EMA.CheckStateFunc">CheckStateFunc</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Función auxiliar que calcula el estado dinámico (minimo, maximo, ascendente, descendente) 
+de una serie de pandas.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Actualiza los atributos de estado de la instancia <code>strategy_self</code> directamente.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="trading_engine.indicators.Filtro_EMA.check_ema_buy_signal" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">check_ema_buy_signal</span><span class="p">(</span><span class="n">strategy_self</span><span class="p">,</span> <span class="n">condicion_base_tecnica</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Revisa las señales de compra (lógica OR) generadas por la EMA (Cruce, Mínimo o Ascendente).</p>
+<p>Cualquiera de estas señales puede establecer la <code>condicion_base_tecnica</code> como True.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>strategy_self</code>
+            </td>
+            <td>
+                  <code><span title="estrategia_system.System">System</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Instancia de la estrategia, que contiene las series EMA y las configuraciones del usuario.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condicion_base_tecnica</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Condición técnica global actual (el resultado de las señales OR anteriores).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="tuple">tuple</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <ul>
+<li>bool: Nueva <code>condicion_base_tecnica</code> (True si se activó una señal OR).</li>
+<li>Optional[str]: Razón del log de la señal activada, o None si no hay señal de EMA.</li>
+</ul>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="trading_engine.indicators.Filtro_EMA.apply_ema_global_filter" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">apply_ema_global_filter</span><span class="p">(</span><span class="n">strategy_self</span><span class="p">,</span> <span class="n">condicion_base_tecnica</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Aplica el filtro global excluyente (Condición AND) de la EMA Lenta.</p>
+<p>Este filtro puede anular cualquier señal de compra generada por la lógica OR si 
+las condiciones de tendencia de la EMA Lenta son desfavorables o si no se cumplen 
+los requerimientos mínimos.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>strategy_self</code>
+            </td>
+            <td>
+                  <code><span title="estrategia_system.System">System</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Instancia de la estrategia con los parámetros de filtrado activados.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condicion_base_tecnica</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Condición técnica global actual.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>La <code>condicion_base_tecnica</code> modificada (False si falla el filtro, True en caso contrario).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="trading_engine.indicators.Filtro_EMA.check_ema_sell_signal" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">check_ema_sell_signal</span><span class="p">(</span><span class="n">strategy_self</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Revisa la señal de venta de cierre técnico basada en el estado de la EMA Lenta.</p>
+<p>La señal de venta se activa si la EMA Lenta pasa a un estado de tendencia descendente, 
+sirviendo como filtro de salida de tendencia.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>strategy_self</code>
+            </td>
+            <td>
+                  <code><span title="estrategia_system.System">System</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Instancia de la estrategia.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="tuple">tuple</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <ul>
+<li>bool: True si la señal de venta está activa.</li>
+<li>Optional[str]: Descripción del cierre para el log, o None.</li>
+</ul>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="filtro-rsi-relative-strength-index">Filtro RSI (Relative Strength Index)</h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="trading_engine.indicators.Filtro_RSI"></a>
+    <div class="doc doc-contents first">
+
+        <p>Módulo para la lógica del Índice de Fuerza Relativa (RSI).</p>
+<p>Contiene funciones delegadas para la actualización del estado dinámico (ascendente/descendente/mínimo/máximo) 
+del RSI y la generación de señales de compra/venta basadas en giros y niveles de fuerza.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="trading_engine.indicators.Filtro_RSI.update_rsi_state" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">update_rsi_state</span><span class="p">(</span><span class="n">strategy_self</span><span class="p">,</span> <span class="n">verificar_estado_indicador_func</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Actualiza el estado dinámico (STATE) del indicador RSI.</p>
+<p>Calcula y almacena el estado dinámico (mínimo, máximo, ascendente, descendente) 
+en las variables de instancia <code>strategy_self</code> si el RSI está activo.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>strategy_self</code>
+            </td>
+            <td>
+                  <code><span title="estrategia_system.System">System</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Instancia de la clase System (Strategy), que accede a <code>self.rsi_ind</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>verificar_estado_indicador_func</code>
+            </td>
+            <td>
+                  <code><span title="trading_engine.indicators.Filtro_RSI.CheckStateFunc">CheckStateFunc</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Función auxiliar que calcula el estado dinámico de una serie de pandas.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Actualiza los atributos de estado de la instancia <code>strategy_self</code> directamente.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="trading_engine.indicators.Filtro_RSI.check_rsi_buy_signal" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">check_rsi_buy_signal</span><span class="p">(</span><span class="n">strategy_self</span><span class="p">,</span> <span class="n">condicion_base_tecnica</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Revisa las señales de compra (lógica OR) generadas por el RSI (Giro de Mínimo o Fuerza Pura).</p>
+<p>La señal de compra se activa por un giro desde un extremo (sobreventa) o por una fuerza 
+continua por encima de un umbral predefinido.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>strategy_self</code>
+            </td>
+            <td>
+                  <code><span title="estrategia_system.System">System</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Instancia de la estrategia, que contiene las series RSI y las configuraciones del usuario.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>condicion_base_tecnica</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Condición técnica global actual (el resultado de las señales OR anteriores).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="tuple">tuple</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <ul>
+<li>bool: Nueva <code>condicion_base_tecnica</code> (True si se activó una señal OR).</li>
+<li>Optional[str]: Razón del log de la señal activada, o None si no hay señal de RSI.</li>
+</ul>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="trading_engine.indicators.Filtro_RSI.check_rsi_sell_signal" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">check_rsi_sell_signal</span><span class="p">(</span><span class="n">strategy_self</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Revisa la señal de venta de cierre técnico basada en el estado de sobrecompra o tendencia descendente del RSI.</p>
+<p>La señal de venta se activa si la estrategia está configurada para reaccionar a 
+niveles máximos o a un cambio de tendencia descendente en el RSI.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>strategy_self</code>
+            </td>
+            <td>
+                  <code><span title="estrategia_system.System">System</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Instancia de la estrategia.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="tuple">tuple</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <ul>
+<li>bool: True si la señal de venta está activa.</li>
+<li>Optional[str]: Descripción del cierre para el log, o None.</li>
+</ul>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado al portapapeles", "clipboard.copy": "Copiar al portapapeles", "search.result.more.one": "1 m\u00e1s en esta p\u00e1gina", "search.result.more.other": "# m\u00e1s en esta p\u00e1gina", "search.result.none": "No se encontraron documentos", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Teclee para comenzar b\u00fasqueda", "search.result.term.missing": "Falta", "select.version": "Seleccionar versi\u00f3n"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  </body>
+</html>

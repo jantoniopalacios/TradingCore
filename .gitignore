@@ -1,0 +1,50 @@
+# --- Entornos Virtuales ---
+.venv/
+venv/
+env/
+.venv_web/
+
+# --- Archivos de Python generados ---
+__pycache__/
+*.pyc
+*.pyo
+
+# --- Build / Distribución ---
+build/
+dist/
+*.egg-info/
+
+# --- Librería de trading / Backtesting ---
+backtests/
+*.sqlite
+
+# --- Datos sensibles y Logs ---
+*.env
+logs/
+*.log
+
+# --- Configuración local / IDE ---
+.vscode/
+.DS_Store
+Thumbs.db
+
+# --- Documentación generada (ej. Sphinx) ---
+docs/_build/
+
+# Evitar subir resultados de backtests y logs
+Backtesting/Run_Results/**
+Backtesting/Graphics/**
+Backtesting/Logs/**
+
+# Evitar subir configuraciones locales
+Backtesting/Config/*.env
+!Backtesting/Config/variables_setup.env.example
+# Python
+__pycache__/
+*.py[cod]
+
+# --- Configuración local ---
+# Ignora todos los .env en cualquier subcarpeta
+**/*.env
+# Excepto el ejemplo que sirve de guía
+!Backtesting/Config/variables_setup.env.example
