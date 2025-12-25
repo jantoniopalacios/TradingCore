@@ -5,6 +5,28 @@ import logging
 from pathlib import Path
 
 # ----------------------------------------------------------------------
+# --- Ejecutar en modo debug ---
+# Si deseas activar el modo debug, descomenta la siguiente línea:
+# os.environ['FLASK_ENV'] = 'development'
+# o tambien la siguiente línea:
+# os.environ['FLASK_DEBUG'] = '1'
+# o bien, establece la variable de entorno FLASK_ENV a 'development' en tu sistema.
+# Esto hará que Flask recargue automáticamente la aplicación al detectar cambios en el código.
+# ----------------------------------------------------------------------
+# Para depuración avanzada, puedes usar:
+# import debugpy
+# debugpy.listen(("5678"))
+# print("Esperando a que el depurador se conecte...")
+# debugpy.wait_for_client()
+# ----------------------------------------------------------------------
+# --- Instrucciones para ejecutar ---
+# copilot-debug python -m scenarios.BaktestWeb.app "&" C:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/Activate.ps1
+# Luego abre tu navegador en http://localhost:5000
+# o http://localhost:5000/quien_soy para ver el modo de usuario actual.
+# ----------------------------------------------------------------------
+
+
+# ----------------------------------------------------------------------
 # --- IMPORTACIONES DE LA ESTRUCTURA ---
 # ----------------------------------------------------------------------
 # Importamos la función maestra de configuración
