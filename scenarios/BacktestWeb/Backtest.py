@@ -66,18 +66,22 @@ def ejecutar_backtest(config_dict: dict):
     """
     start_time = time.time()
     
-    # 🎯 PASO 1: Obtener las rutas dinámicas según el modo de usuario
-    # El config_dict que viene de la web ya contiene el 'user_mode' (ej: juantxu_local)
+    # 🎯 PASO 1: Aseguramos que el Proceso Hijo tenga su propio LOGGING
+    # Si no, los mensajes del motor no saldrán en 'trading_app.log'
+    from .configuracion import PROJECT_ROOT
+    log_path = PROJECT_ROOT / "trading_app.log"
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[logging.FileHandler(log_path, encoding='utf-8')]
+    )
+
+    # 🎯 PASO 2: Obtener rutas y RE-ASIGNAR parámetros a la clase System local del proceso
     user_mode = config_dict.get('user_mode', 'invitado')
     rutas_fisicas = inicializar_configuracion_usuario(user_mode)
-
-    # 🎯 PASO 2: Configurar la clase System y obtener los parámetros generales
-    try:
-        # Pasamos AMBOS argumentos requeridos
-        parametros_generales_y_rutas = asignar_parametros_a_system(config_dict, rutas_fisicas)
-    except Exception as e:
-        logger.error(f"❌ Error al asignar parámetros al sistema: {e}")
-        return pd.DataFrame()
+    
+    # Esto inyecta los parámetros del .env de ESTE usuario en la clase System de ESTE proceso
+    parametros_generales_y_rutas = asignar_parametros_a_system(config_dict, rutas_fisicas)
 
     # 2. Extracción de Parámetros Generales y Rutas
     start_date = parametros_generales_y_rutas.get('start_date') 
@@ -194,22 +198,17 @@ def ejecutar_backtest(config_dict: dict):
     )
     
     # ----------------------------------------------------------------------
-    # 8. POST-PROCESO (Guardado de Gráficos y Consolidación de Parámetros)
-    # ----------------------------------------------------------------------
-
-    # Guardar Gráficos HTML 
+    # 🎯 PASO 8: Guardado de Gráficos usando Pathlib (Más robusto)
+    graph_dir = Path(parametros_generales_y_rutas.get('graph_dir'))
     for symbol, bt_obj in backtest_objects.items():
-        graph_file = os.path.join(graph_dir, f"{symbol}_backtest.html")
+        graph_file = graph_dir / f"{symbol}_backtest.html"
         try:
-            # Asumo que bt_obj tiene un método plot compatible (e.g., Backtrader)
-            # NOTA: Si bt_obj es None porque el backtest falló para ese símbolo, se debe manejar.
             if bt_obj:
-                bt_obj.plot(filename=graph_file, open_browser=False) 
-                logger.info(f"Gráfico guardado para {symbol}.")
-            else:
-                logger.warning(f"No se pudo generar gráfico para {symbol}: Objeto de backtest vacío.")
+                # Convertimos Path a string porque algunas librerías de plotting no aceptan objetos Path
+                bt_obj.plot(filename=str(graph_file), open_browser=False) 
+                logger.info(f"✅ Gráfico guardado para {symbol} en {user_mode}")
         except Exception as e:
-            logger.error(f"Error al generar el gráfico para {symbol}: {e}")
+            logger.error(f"❌ Error gráfico {symbol}: {e}")
 
     # Consolidación de Parámetros
     parametros_completos = {}

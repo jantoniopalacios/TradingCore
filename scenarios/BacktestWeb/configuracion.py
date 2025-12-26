@@ -18,13 +18,25 @@ except ImportError:
         logger.warning("No se pudo importar la clase 'System'. Usando placeholder.")
         class System: pass
 
+# 1. Detección dinámica de la raíz buscando un marcador (como la carpeta .venv o Backtesting)
+def find_project_root(current_path):
+    # Recorremos hacia arriba buscando la carpeta raíz del proyecto entero
+    for parent in current_path.parents:
+        # Buscamos la carpeta que contiene la arquitectura principal
+        if (parent / "Backtesting").exists() and (parent / "Data_Files").exists():
+            return parent
+        # O por nombre exacto si los criterios de carpeta fallan
+        if parent.name == "TradingCore":
+            return parent
+            
+    # Si falla todo, subimos dos niveles desde este fichero
+    return current_path.parents[1]
+
 # ----------------------------------------------------------------------
 # --- RUTAS MAESTRAS Y RAÍZ (ESTRUCTURA CORREGIDA) ---
 # ----------------------------------------------------------------------
 WEB_STRATEGY_DIR = Path(__file__).parent 
-
-# Buscar el nombre de la carpeta por si acaso
-PROJECT_ROOT = next(p for p in WEB_STRATEGY_DIR.parents if p.name == "TradingCore")
+PROJECT_ROOT = find_project_root(WEB_STRATEGY_DIR)
 
 # Ahora Backtesting está en la raíz: TradingCore/Backtesting
 BACKTESTING_BASE_DIR = PROJECT_ROOT / "Backtesting"

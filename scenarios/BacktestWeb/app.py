@@ -1,8 +1,9 @@
 import socket
-from flask import Flask
-import os
 import logging
-from pathlib import Path
+import os
+from flask import Flask, send_from_directory
+from .configuracion import cargar_y_asignar_configuracion, PROJECT_ROOT
+from .routes.main_bp import main_bp
 
 # ----------------------------------------------------------------------
 # --- Ejecutar en modo debug ---
@@ -25,87 +26,56 @@ from pathlib import Path
 # o http://localhost:5000/quien_soy para ver el modo de usuario actual.
 # ----------------------------------------------------------------------
 
-
-# ----------------------------------------------------------------------
-# --- IMPORTACIONES DE LA ESTRUCTURA ---
-# ----------------------------------------------------------------------
-# Importamos la función maestra de configuración
-from .configuracion import cargar_y_asignar_configuracion, BACKTESTING_BASE_DIR
-
-# Importamos la función de limpieza modular
-try:
-    from .file_handler import clean_run_results_dir 
-except ImportError:
-    def clean_run_results_dir(results_path=None):
-        logging.warning("No se encontró file_handler.py.")
-
-# Importar el Blueprint
-from .routes.main_bp import main_bp 
-
-# ----------------------------------------------------------------------
-# --- CONFIGURACIÓN DE LA APLICACIÓN FLASK ---
-# ----------------------------------------------------------------------
 def create_app(user_mode="invitado"):
-    """Función de factoría para crear y configurar la aplicación Flask."""
-    
     app = Flask(__name__)
+    
+    # 1. SOLUCIÓN AL ERROR 404 (Favicon)
+    # Buscamos el icono en la carpeta static del proyecto
+    @app.route('/favicon.ico')
+    def favicon():
+        return send_from_directory(
+            os.path.join(app.root_path, 'static'),
+            'favicon.ico', 
+            mimetype='image/vnd.microsoft.icon'
+        )
 
-    app.config['USER_MODE'] = user_mode # Guardamos el nombre exacto del modo de usuario
-    
-    # 🌟 PASO CLAVE: Inicializamos el entorno del usuario (Clonación + Carga de variables)
-    # Esta función ya crea las carpetas, copia las plantillas y configura la clase System.
+    # 2. CONFIGURACIÓN DE USUARIO
+    # Cargamos la configuración técnica (tipada) y las rutas del sandbox
+    app.config['USER_MODE'] = user_mode
     config_usuario = cargar_y_asignar_configuracion(user_mode)
-    
-    # Pasamos todas las rutas y parámetros cargados al objeto app.config de Flask
     app.config.update(config_usuario)
 
-    @app.route('/quien_soy')
-    def debug_user():
-        return f"Usuario: {app.config.get('user_mode')} | Carpeta: {app.config.get('results_dir')}"
-    
-    # Clave Secreta
+    # 3. SEGURIDAD Y SESIONES
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "JuanBautistaGamiz_EraUnFrailePoeta")
-    
-# --- Configuración de Logging ---
-    log_format = '%%(asctime)s - %%(levelname)s - %%(message)s'
-    
-    # Configuramos el logging para que escriba en consola Y en el archivo
+
+    # 4. CONFIGURACIÓN DE LOGGING REFINADA
+    log_path = PROJECT_ROOT / "trading_app.log"
     logging.basicConfig(
         level=logging.INFO,
-        format=log_format,
+        format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler("trading_app.log"), # 👈 Esto crea el archivo
-            logging.StreamHandler()                # 👈 Esto mantiene los logs en VS Code
+            logging.FileHandler(log_path, encoding='utf-8'),
+            logging.StreamHandler()
         ]
     )
     
-    app.logger.info(f"Modo de usuario activado: {user_mode}")
-    app.logger.info(f"Ruta de resultados: {app.config['results_dir']}")
+    app.logger.info(f"🚀 Entorno inicializado para: {user_mode}")
+    app.logger.info(f"📂 Raíz del proyecto: {PROJECT_ROOT}")
 
-    ## 1. REGISTRAR EL BLUEPRINT
+    # 5. REGISTRO DE RUTAS
     app.register_blueprint(main_bp, url_prefix='/') 
 
     return app
 
-# ----------------------------------------------------------------------
-# --- INICIO DEL SERVIDOR ---
-# ----------------------------------------------------------------------
 if __name__ == '__main__':
-    # Por defecto, si se lanza este archivo directamente, usamos 'invitado_web'
+    # Lanzamiento inicial en modo invitado_web para depuración
     app = create_app(user_mode="invitado_web")
     
-    # Limpieza inicial de la carpeta de este usuario específico
-    clean_run_results_dir(app.config['results_dir'])
-
     try:
-        hostname = socket.gethostname()
-        local_ip = socket.gethostbyname(hostname)
-    except Exception:
-        local_ip = "0.0.0.0"
+        local_ip = socket.gethostbyname(socket.gethostname())
+    except:
+        local_ip = "127.0.0.1"
 
-    print("\n" + "="*60)
-    print(f"🚀 SERVIDOR ACTIVO EN TU RED LOCAL (Modo: {app.config['user_mode']})")
-    print(f"🔗 Enlace para otros equipos: http://{local_ip}:5000")
-    print("="*60 + "\n")
-
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    print(f"\n✅ SERVIDOR ACTIVO: http://{local_ip}:5000")
+   
+    app.run(host='0.0.0.0', port=5000, debug=True)
