@@ -20,16 +20,13 @@ except ImportError:
 
 # 1. Detección dinámica de la raíz buscando un marcador (como la carpeta .venv o Backtesting)
 def find_project_root(current_path):
-    # Recorremos hacia arriba buscando la carpeta raíz del proyecto entero
     for parent in current_path.parents:
-        # Buscamos la carpeta que contiene la arquitectura principal
-        if (parent / "Backtesting").exists() and (parent / "Data_Files").exists():
+        # Usamos .lower() para evitar errores de Windows vs Linux
+        child_names = [child.name.lower() for child in parent.iterdir() if child.is_dir()]
+        if "backtesting" in child_names and "data_files" in child_names:
             return parent
-        # O por nombre exacto si los criterios de carpeta fallan
         if parent.name == "TradingCore":
             return parent
-            
-    # Si falla todo, subimos dos niveles desde este fichero
     return current_path.parents[1]
 
 # ----------------------------------------------------------------------
@@ -46,9 +43,12 @@ BACKTESTING_BASE_DIR = PROJECT_ROOT / "Backtesting"
 DATA_FILES_BASE_PATH = PROJECT_ROOT / "Data_Files"
 
 # Moldes ahora en: TradingCore/Backtesting/Config/
-CONFIG_MAESTRA_DIR = BACKTESTING_BASE_DIR / "Config"
+CONFIG_MAESTRA_DIR = BACKTESTING_BASE_DIR / "Config" / "templates"
 PLANTILLA_ENV = CONFIG_MAESTRA_DIR / "variables_setup.env"
 PLANTILLA_CSV = CONFIG_MAESTRA_DIR / "symbols.csv"
+
+# Para el archivo de usuarios en Backtesting/users.csv
+RUTA_USERS_CSV = BACKTESTING_BASE_DIR / "users.csv"
 
 # Para verificar en la consola si la ruta es correcta al arrancar
 print(f"DEBUG: Raíz detectada: {PROJECT_ROOT.absolute()}")
@@ -67,33 +67,40 @@ logger = logging.getLogger("Configuracion")
 # ----------------------------------------------------------------------
 
 def inicializar_configuracion_usuario(user_mode="invitado"):
+    # 1. Carpeta de CONFIGURACIÓN personal (Donde viven su .env y sus símbolos)
+    user_config_dir = BACKTESTING_BASE_DIR / "Config" / user_mode
+    user_config_dir.mkdir(parents=True, exist_ok=True)
+
+    # 2. Carpeta de RESULTADOS (Donde van los CSVs generados)
     user_results_dir = BACKTESTING_BASE_DIR / "Run_Results" / user_mode
     user_results_dir.mkdir(parents=True, exist_ok=True)
 
+    # 3. Carpeta de GRÁFICOS
     user_graph_dir = BACKTESTING_BASE_DIR / "Graphics" / user_mode
     user_graph_dir.mkdir(parents=True, exist_ok=True)
 
-    f_var = user_results_dir / "variables_setup.env"
-    f_sym = user_results_dir / "symbols.csv"
+    # Definimos dónde deben estar sus ficheros de configuración
+    f_var = user_config_dir / "variables_setup.env"
+    f_sym = user_config_dir / "symbols.csv"
 
     print(f"\n--- 🛠️  INICIALIZANDO ENTORNO: {user_mode} ---")
 
-    # Clonación de .env
-    if not f_var.exists():
+    # Clonación de .env (desde Config_templates a Config/usuario/)
+    if not f_var.exists() or f_var.stat().st_size == 0:
         if PLANTILLA_ENV.exists():
             shutil.copy(PLANTILLA_ENV, f_var)
-            print(f"✅ Molde .env clonado con éxito.")
+            print(f"✅ Molde .env clonado con éxito para {user_mode}.")
         else:
-            print(f"⚠️ AVISO: No se encontró molde .env en {PLANTILLA_ENV}. Se creará uno vacío.")
-            f_var.touch() # Crea el archivo vacío para evitar errores de lectura
+            print(f"⚠️ AVISO: No se encontró molde .env en {PLANTILLA_ENV}.")
+            f_var.touch()
 
     # Clonación de symbols.csv
-    if not f_sym.exists():
+    if not f_sym.exists() or f_sym.stat().st_size == 0:
         if PLANTILLA_CSV.exists():
             shutil.copy(PLANTILLA_CSV, f_sym)
-            print(f"✅ Molde symbols.csv clonado con éxito.")
+            print(f"✅ Molde symbols.csv clonado con éxito para {user_mode}.")
         else:
-            print(f"⚠️ AVISO: No se encontró molde .csv en {PLANTILLA_CSV}. Se creará uno vacío.")
+            print(f"⚠️ AVISO: No se encontró molde .csv en {PLANTILLA_CSV}.")
             f_sym.touch()
 
     return {
@@ -106,7 +113,6 @@ def inicializar_configuracion_usuario(user_mode="invitado"):
         "fichero_historico": user_graph_dir / "resultados_historico.csv",
         "fichero_trades": user_results_dir / "trades_log.csv"
     }
-
 # ----------------------------------------------------------------------
 # --- PERSISTENCIA Y LECTURA ---
 # ----------------------------------------------------------------------
@@ -118,15 +124,26 @@ def read_config_with_metadata(fichero_variables_path):
 def guardar_parametros_a_env(parametros: dict, user_mode):
     rutas = inicializar_configuracion_usuario(user_mode)
     env_path = rutas['fichero_variables']
+    
+    # 1. Leemos los valores actuales para identificar cuáles son booleanos
     config_actual = dotenv_values(env_path)
     
-    for key in config_actual.keys():
-        if key in parametros:
-            valor_nuevo = str(parametros[key])
-            set_key(str(env_path), key, valor_nuevo)
-        else:
-            val_prev = config_actual[key].lower().replace("'", "").replace('"', "")
-            if val_prev in ['true', 'false', 'on', 'off']:
+    # 2. Primero, actualizamos con TODO lo que sí viene en el formulario
+    # (Esto cubre strings como el Email, números y switches en ON)
+    for key, valor_nuevo in parametros.items():
+        set_key(str(env_path), key, str(valor_nuevo))
+    
+    # 3. Lógica General para Switches Apagados (OFF):
+    # Recorremos el .env actual. Si una llave era booleana pero NO ha venido 
+    # en el POST, significa que el usuario ha movido el switch a OFF.
+    for key, val_prev in config_actual.items():
+        if key not in parametros:
+            # Comprobamos si el valor previo era un booleano
+            # (Limpiamos comillas por si acaso)
+            val_clean = str(val_prev).lower().strip().replace("'", "").replace('"', "")
+            
+            if val_clean in ['true', 'false', 'on', 'off']:
+                # Si era un booleano y no ha llegado en el POST, es que está en OFF
                 set_key(str(env_path), key, "False")
 
 # ----------------------------------------------------------------------
@@ -135,8 +152,17 @@ def guardar_parametros_a_env(parametros: dict, user_mode):
 
 def cargar_y_asignar_configuracion(user_mode="invitado"):
     rutas = inicializar_configuracion_usuario(user_mode)
-    load_dotenv(rutas['fichero_variables'], override=True)
-    config_data = dotenv_values(rutas['fichero_variables'])
+    
+    # Asegurarnos de que el archivo existe y tiene tamaño > 0 antes de leer
+    f_var = rutas['fichero_variables']
+    if f_var.exists() and f_var.stat().st_size > 0:
+        # override=True es vital para que no use valores antiguos de memoria
+        load_dotenv(f_var, override=True)
+        config_data = dotenv_values(f_var)
+    else:
+        config_data = {}
+        logger.warning(f"Archivo de variables vacío o no listo en: {f_var}")
+
     return asignar_parametros_a_system(config_data, rutas)
 
 def asignar_parametros_a_system(config_data: dict, rutas: dict):
@@ -164,6 +190,11 @@ def asignar_parametros_a_system(config_data: dict, rutas: dict):
     System.cash = get_param('cash', 10000, int)
     System.commission = get_param('commission', 0.0, float)
     System.stoploss_percentage_below_close = get_param('stoploss_percentage_below_close', 0.0, float)
+
+    # --- Opciones de Ejecución y Correo ---
+    System.usar_filtro_fundamental = get_param('usar_filtro_fundamental', False, bool)
+    System.enviar_mail = get_param('enviar_mail', False, bool)
+    System.destinatario_email = get_param('destinatario_email', 'juantxu@yahoo.com', str)
 
     # --- INDICADORES: EMA (Clave para que se vean las curvas) ---
     System.ema_active = get_param('ema_active', False, bool)

@@ -66,22 +66,32 @@ def ejecutar_backtest(config_dict: dict):
     """
     start_time = time.time()
     
-    # 🎯 PASO 1: Aseguramos que el Proceso Hijo tenga su propio LOGGING
-    # Si no, los mensajes del motor no saldrán en 'trading_app.log'
+    # 🎯 PASO 1: RE-CONFIGURACIÓN FORZADA DE LOGGING
     from .configuracion import PROJECT_ROOT
     log_path = PROJECT_ROOT / "trading_app.log"
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[logging.FileHandler(log_path, encoding='utf-8')]
-    )
-
-    # 🎯 PASO 2: Obtener rutas y RE-ASIGNAR parámetros a la clase System local del proceso
-    user_mode = config_dict.get('user_mode', 'invitado')
-    rutas_fisicas = inicializar_configuracion_usuario(user_mode)
     
-    # Esto inyecta los parámetros del .env de ESTE usuario en la clase System de ESTE proceso
-    parametros_generales_y_rutas = asignar_parametros_a_system(config_dict, rutas_fisicas)
+    # Obtenemos el logger raíz
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    # Evitamos duplicar handlers si ya existen
+    if not any(isinstance(h, logging.FileHandler) for h in root_logger.handlers):
+        file_handler = logging.FileHandler(log_path, encoding='utf-8')
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+    
+    # Log de prueba inicial
+    logging.info(f"--- NUEVO BACKTEST INICIADO POR USUARIO: {config_dict.get('user_mode')} ---")
+
+    # 🎯 PASO 2: Cargar la configuración REAL del usuario desde el disco
+    user_mode = config_dict.get('user_mode', 'invitado')
+    
+    # Importamos la función de carga que ya creamos en configuracion.py
+    from .configuracion import cargar_y_asignar_configuracion
+    
+    # Esto lee el .env de juan, lo aplica a System y nos da el diccionario con TODO (fechas incluidas)
+    parametros_generales_y_rutas = cargar_y_asignar_configuracion(user_mode)
 
     # 2. Extracción de Parámetros Generales y Rutas
     start_date = parametros_generales_y_rutas.get('start_date') 

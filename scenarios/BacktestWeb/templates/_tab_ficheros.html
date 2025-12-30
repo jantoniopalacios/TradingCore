@@ -1,40 +1,52 @@
 {% macro render_tree(tree, current_path="") %}
   <ul class="list-unstyled ms-3">
     {% for name, is_dir, children, date in tree %}
+      {# Construimos la ruta: si estamos en la raíz de 'Logs Sistema', path será 'logs/archivo.log' #}
       {% set item_path = (current_path + "/" + name) if current_path else name %}
-      <li class="mb-1">
-        {% if is_dir %}
-          <span class="folder" onclick="toggleFolder(this)" style="cursor: pointer; font-weight: bold; color: #f39c12;">
-            📁 <strong>{{ name }}</strong> 
-          </span>
-          <div class="nested" style="display: none;">
-            {{ render_tree(children, item_path) }}
-          </div>
-        {% else %}
-          <div class="d-flex justify-content-between align-items-center border-bottom pb-1" style="max-width: 600px;">
-            <div>
-                <a href="{{ url_for('main.view_file', path=item_path) }}" 
-                   onclick="this.href=this.href.split('?')[0] + '?t=' + new Date().getTime()" 
-                   target="_blank" class="me-2 text-decoration-none" style="color: #2980b9;">
-                    📄 {{ name }}
-                </a>
-                <small class="text-muted" style="font-size: 0.75rem; font-family: monospace;">{{ date }}</small>
+      
+      {# Filtro: Si es un log o la carpeta logs, solo el admin pasa #}
+      {% set is_log_related = (name.lower() == "trading_app.log" or name.lower() == "logs") %}
+      {% if not is_log_related or (is_log_related and session.get('user_mode') == 'admin') %}
+        
+        <li class="mb-1">
+          {% if is_dir %}
+            <span class="folder" onclick="toggleFolder(this)" style="cursor: pointer; font-weight: bold; color: #f39c12;">
+              📁 <strong>{{ name }}</strong> 
+            </span>
+            <div class="nested" style="display: none;">
+              {# Pasamos el item_path para que las subcarpetas funcionen #}
+              {{ render_tree(children, item_path) }}
             </div>
-            
-            <button type="button" class="btn btn-link text-danger p-0" title="Borrar archivo"
-                    onclick="confirmDelete('{{ url_for('main.delete_file', path=item_path) }}', '{{ name }}')">
-                <i class="bi bi-trash3-fill"></i>
-            </button>
-          </div>
-        {% endif %}
-      </li>
+          {% else %}
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-1" style="max-width: 600px;">
+              <div>
+                  <a href="{{ url_for('main.view_file', path=item_path) }}" 
+                     target="_blank" class="me-2 text-decoration-none" style="color: #2980b9;">
+                      📄 {{ name }}
+                  </a>
+                  <small class="text-muted" style="font-size: 0.75rem; font-family: monospace;">{{ date }}</small>
+              </div>
+              
+              <div class="d-flex gap-2 align-items-center">
+                  <a href="{{ url_for('main.view_file', path=item_path) }}" download="{{ name }}" class="btn btn-link text-primary p-0">
+                      <i class="bi bi-download"></i>
+                  </a>
+                  <button type="button" class="btn btn-link text-danger p-0" 
+                          onclick="confirmDelete('{{ url_for('main.delete_file', path=item_path) }}', '{{ name }}')">
+                      <i class="bi bi-trash3-fill"></i>
+                  </button>
+              </div>
+            </div>
+          {% endif %}
+        </li>
+      {% endif %}
     {% endfor %}
   </ul>
 {% endmacro %}
 
 <div id="file-viewer" class="mt-3 p-3 border rounded shadow-sm bg-light">
     <h5 class="border-bottom pb-2 mb-3 text-primary">
-        <i class="bi bi-hdd-rack me-2"></i>Estructura del Directorio: <span class="fw-bold">{{ backtesting_dir_name }}</span>
+        <i class="bi bi-hdd-rack me-2"></i>Explorador de Archivos: <span class="fw-bold">{{ session.get('user_mode') }}</span>
     </h5>
     
     {% if file_tree %}
@@ -43,7 +55,7 @@
         </div>
     {% else %}
         <div class="alert alert-warning">
-            ⚠️ La carpeta **{{ backtesting_dir_name }}** está vacía o no existe.
+            ⚠️ No se encontraron archivos para este usuario.
         </div>
     {% endif %}
 </div>

@@ -3,7 +3,7 @@
 import os
 import re
 import shutil 
-import datetime
+from datetime import datetime
 from pathlib import Path
 # Asumimos que PROJECT_ROOT se define en configuracion.py
 from .configuracion import PROJECT_ROOT 
@@ -37,31 +37,24 @@ def clean_run_results_dir(results_path):
         error_message = f"Error crítico al intentar limpiar el directorio '{results_path.name}': {e}"
         return False, error_message
 
-def get_directory_tree(root_path: Path):
+def get_directory_tree(path, is_admin=False): # <--- Añade is_admin=False aquí
     tree = []
-    if not root_path.is_dir():
+    if not path.exists():
         return tree
-
-    for item in root_path.iterdir():
-        if item.name.startswith('.'):
+    
+    for item in path.iterdir():
+        # Filtro de seguridad: si es el log y NO es admin, saltar
+        if item.name == "trading_app.log" and not is_admin:
             continue
             
-        is_dir = item.is_dir()
-        
-        # 🕒 Obtener fecha de modificación
-        mtime = item.stat().st_mtime
-        fecha_formateada = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')
-        
-        if is_dir:
-            children = get_directory_tree(item)
-            # Añadimos la fecha a la tupla (nombre, es_dir, hijos, fecha)
-            tree.append((item.name, True, children, fecha_formateada))
+        if item.is_dir():
+            tree.append((item.name, True, get_directory_tree(item, is_admin), "Folder"))
         else:
-            # Añadimos la fecha a la tupla (nombre, es_dir, None, fecha)
-            tree.append((item.name, False, None, fecha_formateada))
-            
-    tree.sort(key=lambda x: (not x[1], x[0])) 
-    return tree
+            dt = datetime.fromtimestamp(item.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
+            tree.append((item.name, False, [], dt))
+    
+    # Ordenar: carpetas primero, luego archivos
+    return sorted(tree, key=lambda x: (not x[1], x[0].lower()))
 
 # ----------------------------------------------------------------------
 # --- FUNCIONES DE CONFIGURACIÓN (.ENV) ---
@@ -125,32 +118,27 @@ def write_config(new_values, full_content, config_path):
     """
     
     new_content = full_content
+    
     for name, value in new_values.items():
-        # Expresión regular para encontrar la línea de la variable: inicia con NAME =, seguida de cualquier valor
         pattern = re.compile(rf'^\s*{re.escape(name)}\s*=\s*([^\n#]+)', re.MULTILINE)
         
-        # --- Lógica de Formateo de Valor ---
+        # Formateo de valor (Booleano o String con comillas)
         formatted_value = str(value).strip()
-        
-        # 1. Formateo de Booleanos (asegura mayúscula para T/F)
-        if isinstance(value, bool):
-            formatted_value = "True" if value else "False"
-        elif isinstance(value, str) and value.lower() in ('true', 'false'):
-            formatted_value = value.capitalize()
-            
-        # 2. Formateo de cadenas (añadir comillas si no es numérico ni booleano)
-        elif not (isinstance(value, (int, float)) or str(value).isnumeric() or re.match(r'^-?\d*\.?\d+$', formatted_value)):
-            if not (formatted_value.startswith('"') and formatted_value.endswith('"')) and \
-               not (formatted_value.startswith("'") and formatted_value.endswith("'")):
-                formatted_value = f'"{formatted_value}"'
+        if isinstance(value, bool) or str(value).lower() in ('true', 'false'):
+            formatted_value = "True" if str(value).lower() in ('true', 'on') else "False"
+        elif not (str(value).isnumeric() or re.match(r'^-?\d*\.?\d+$', formatted_value)):
+            formatted_value = f'"{formatted_value.strip(chr(34))}"'
 
-        # Reemplazar el valor antiguo.
+        # Intentar reemplazar
         new_content, count = pattern.subn(f'{name} = {formatted_value}', new_content)
-        # -----------------------------------------------------------
+        
+        # SI LA VARIABLE NO EXISTÍA (count == 0), la añadimos al final
+        if count == 0:
+            new_content += f"\n{name} = {formatted_value}"
 
     try:
         with open(config_path, 'w', encoding='utf-8') as f:
-            f.write(new_content)
+            f.write(new_content.strip() + "\n")
     except Exception as e:
         raise Exception(f"No se pudo escribir en el archivo {config_path}: {e}")
     

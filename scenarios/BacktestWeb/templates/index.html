@@ -3,126 +3,258 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configurador de Estrategia de Backtest</title>
+    <title>Configurador de Backtest - Sistema Profesional</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     
     <style>
-        .container { max-width: 1300px; margin-top: 20px; margin-bottom: 50px; }
-        .folder { cursor: pointer; font-weight: bold; color: #f39c12; }
-        .folder:hover { color: #e67e22; }
-        .text-muted { font-family: monospace; color: #6c757d !important; margin-right: 15px; }
-        .text-danger { opacity: 0.6; transition: opacity 0.2s; }
-        .text-danger:hover { opacity: 1; }
-        .nav-link { cursor: pointer; }
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        .container { max-width: 1400px; margin-top: 20px; margin-bottom: 50px; }
+        .card { border: none; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); }
+        .nav-tabs .nav-link { color: #495057; font-weight: 500; border: none; padding: 12px 20px; }
+        .nav-tabs .nav-link.active { color: #0d6efd; border-bottom: 3px solid #0d6efd; background: transparent; }
+        
+        /* ESTILOS DEL VISOR DE TABLAS CSV */
+        #fileContent { 
+            background: #1a1a1a; 
+            min-height: 500px; 
+            max-height: 80vh; 
+            overflow: auto; 
+            color: #e0e0e0;
+            border-radius: 0 0 5px 5px;
+        }
+
+        .csv-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-family: 'Consolas', 'Monaco', monospace; 
+            font-size: 0.85rem; 
+        }
+
+        .csv-table th { 
+            position: sticky; 
+            top: 0; 
+            background: #2d3436; 
+            color: #00d4ff; 
+            padding: 12px; 
+            border: 1px solid #444; 
+            z-index: 10;
+            text-align: left;
+            text-transform: uppercase;
+        }
+
+        .csv-table td { 
+            padding: 8px 12px; 
+            border: 1px solid #333; 
+            white-space: nowrap; 
+        }
+
+        .csv-table tr:nth-child(even) { background: #212121; }
+        .csv-table tr:hover { background: #2c3e50; }
+
+        .folder { cursor: pointer; color: #f39c12; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+        .nested { margin-left: 24px; border-left: 1px dashed #ccc; padding-left: 10px; }
+        .file-link { cursor: pointer; color: #0d6efd; text-decoration: none; }
+        .file-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1 class="mb-4 text-center">⚙️ Configuración del Backtest</h1>
-        
+<div class="container">
+    <div class="card bg-white p-4 rounded shadow">
+        <h2 class="mb-4 text-center text-primary"><i class="bi bi-cpu-fill"></i> Panel de Configuración Backtest</h2>
+
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="mt-3">
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                            {{ message | safe }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+                  {{ message|safe }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
         {% endwith %}
 
-        <form method="POST" action="{{ url_for('main.index') }}" id="configForm">
-            <ul class="nav nav-tabs" id="myTab" role="tablist">
-                <li class="nav-item"><button class="nav-link active" id="global-tab" data-bs-toggle="tab" data-bs-target="#global" type="button">🌎 Globales</button></li>
-                <li class="nav-item"><button class="nav-link" id="symbols-tab" data-bs-toggle="tab" data-bs-target="#symbols" type="button">🪙 Activos</button></li>
-                <li class="nav-item"><button class="nav-link" id="ema-tab" data-bs-toggle="tab" data-bs-target="#ema" type="button">📈 EMA</button></li>
-                <li class="nav-item"><button class="nav-link" id="rsi-tab" data-bs-toggle="tab" data-bs-target="#rsi" type="button">📊 RSI</button></li>
-                <li class="nav-item"><button class="nav-link" id="macd-tab" data-bs-toggle="tab" data-bs-target="#macd" type="button">📉 MACD</button></li>
-                <li class="nav-item"><button class="nav-link" id="stoch-tab" data-bs-toggle="tab" data-bs-target="#stoch" type="button">⚙️ Estocásticos</button></li>
-                <li class="nav-item"><button class="nav-link" id="bb-tab" data-bs-toggle="tab" data-bs-target="#bb" type="button"><i class="bi bi-graph-up me-2"></i>BB</button></li>
-                <li class="nav-item"><button class="nav-link" id="mosvolume-tab" data-bs-toggle="tab" data-bs-target="#mosvolume" type="button">💰 Margen / Volumen</button></li>
-                <li class="nav-item"><button class="nav-link" id="ficheros-tab" data-bs-toggle="tab" data-bs-target="#ficheros" type="button"><i class="bi bi-folder-fill me-2"></i>Ficheros</button></li>
+        <form method="POST" action="{{ url_for('main.index') }}" id="config-form">
+            
+            <ul class="nav nav-tabs mb-4" id="configTabs" role="tablist">
+                <li class="nav-item"><button class="nav-link active" id="tab-global" data-bs-toggle="tab" data-bs-target="#panel-global" type="button">Globales</button></li>
+                <li class="nav-item"><button class="nav-link" id="tab-symbols" data-bs-toggle="tab" data-bs-target="#panel-symbols" type="button">Activos</button></li>
+                <li class="nav-item"><button class="nav-link" id="tab-ema" data-bs-toggle="tab" data-bs-target="#panel-ema" type="button">EMA</button></li>
+                <li class="nav-item"><button class="nav-link" id="tab-rsi" data-bs-toggle="tab" data-bs-target="#panel-rsi" type="button">RSI</button></li>
+                <li class="nav-item"><button class="nav-link" id="tab-macd" data-bs-toggle="tab" data-bs-target="#panel-macd" type="button">MACD</button></li>
+                <li class="nav-item"><button class="nav-link" id="tab-stoch" data-bs-toggle="tab" data-bs-target="#panel-stoch" type="button">Estocástico</button></li>
+                <li class="nav-item"><button class="nav-link" id="tab-bb" data-bs-toggle="tab" data-bs-target="#panel-bb" type="button">B. Bollinger</button></li>
+                <li class="nav-item"><button class="nav-link" id="tab-volume" data-bs-toggle="tab" data-bs-target="#panel-volume" type="button">Volumen</button></li>
+                <li class="nav-item"><button class="nav-link fw-bold text-success" id="tab-files" data-bs-toggle="tab" data-bs-target="#panel-files" type="button"><i class="bi bi-folder2-open"></i> FICHEROS</button></li>
             </ul>
-            
-            <div class="tab-content border border-top-0 p-3" id="myTabContent">
-                <div class="tab-pane fade show active" id="global" role="tabpanel">{% include '_tab_global.html' %}</div>
-                <div class="tab-pane fade" id="symbols" role="tabpanel">{% include '_tab_symbols.html' %}</div>
-                <div class="tab-pane fade" id="ema" role="tabpanel">{% include '_tab_ema.html' %}</div>
-                <div class="tab-pane fade" id="rsi" role="tabpanel">{% include '_tab_rsi.html' %}</div>
-                <div class="tab-pane fade" id="macd" role="tabpanel">{% include '_tab_macd.html' %}</div>
-                <div class="tab-pane fade" id="bb" role="tabpanel">{% include '_tab_bb.html' %}</div>
-                <div class="tab-pane fade" id="stoch" role="tabpanel">{% include '_tab_stoch.html' %}</div>
-                <div class="tab-pane fade" id="mosvolume" role="tabpanel">{% include '_tab_mos_volume.html' %}</div>
-                <div class="tab-pane fade" id="ficheros" role="tabpanel">{% include '_tab_ficheros.html' %}</div>
-            </div>
-            
-            <div class="d-flex justify-content-between mt-4 mb-5">
-                <button type="submit" class="btn btn-success btn-lg">
-                    <i class="bi bi-save-fill me-2"></i> Guardar Configuración
-                </button>
 
-                <button type="button" id="btnLaunch" class="btn btn-primary btn-lg" onclick="launchBacktest()">
-                    <i class="bi bi-rocket-fill me-2"></i> Ejecutar Backtest
-                </button>
-                
-                <a href="{{ url_for('main.console') }}" target="_blank" class="btn btn-outline-dark">
-                    <i class="fas fa-terminal"></i> Abrir Consola Live
-                </a>
+            <div class="tab-content p-3 border rounded shadow-sm bg-light" id="configTabsContent">
+                <div class="tab-pane fade show active" id="panel-global">{% include '_tab_global.html' %}</div>
+                <div class="tab-pane fade" id="panel-symbols">{% include '_tab_symbols.html' %}</div>
+                <div class="tab-pane fade" id="panel-ema">{% include '_tab_ema.html' %}</div>
+                <div class="tab-pane fade" id="panel-rsi">{% include '_tab_rsi.html' %}</div>
+                <div class="tab-pane fade" id="panel-macd">{% include '_tab_macd.html' %}</div>
+                <div class="tab-pane fade" id="panel-stoch">{% include '_tab_stoch.html' %}</div>
+                <div class="tab-pane fade" id="panel-bb">{% include '_tab_bb.html' %}</div>
+                <div class="tab-pane fade" id="panel-volume">{% include '_tab_mos_volume.html' %}</div>
+                <div class="tab-pane fade" id="panel-files">{% include '_tab_ficheros.html' %}</div>
+            </div>
+
+            <div class="row mt-5 mb-5">
+                <div class="col-12 d-flex gap-3">
+                    <button type="submit" form="config-form" class="btn btn-success flex-fill py-3 shadow-sm fw-bold">
+                        <i class="bi bi-save"></i> Guardar Configuración
+                    </button>
+
+                    <a href="{{ url_for('main.logout') }}" class="btn btn-outline-secondary flex-fill py-3 shadow-sm d-flex align-items-center justify-content-center fw-bold">
+                        <i class="bi bi-box-arrow-left me-2"></i> Cerrar Sesión
+                    </a>
+
+                    <button type="button" onclick="lanzarEstrategia()" class="btn btn-primary flex-fill py-3 shadow-sm fw-bold">
+                        <i class="bi bi-play-fill"></i> Lanzar Backtest
+                    </button>
+                </div>
             </div>
         </form>
-
-        <form method="POST" action="{{ url_for('main.launch_strategy') }}" id="launchForm" style="display:none;"></form>
-        <form id="deleteFileForm" method="POST" style="display:none;"></form>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<div class="modal fade" id="csvViewerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="csvViewerTitle">Visualizador de Datos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="fileContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <script>
-    // 1. PERSISTENCIA DE PESTAÑAS (Mantiene la pestaña activa al recargar)
-    document.addEventListener('DOMContentLoaded', function() {
-        const activeTabId = localStorage.getItem('activeTab');
-        if (activeTabId) {
-            const tabTrigger = document.querySelector(`#${activeTabId}`);
-            if (tabTrigger) {
-                const tab = new bootstrap.Tab(tabTrigger);
-                tab.show();
-            }
+<form id="formDelete" method="POST" style="display:none;"></form>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // 1. LIMPIEZA DE DATOS Y PERSISTENCIA DE PESTAÑAS
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('input').forEach(input => {
+            if (input.value === "None") input.value = "";
+        });
+
+        const savedTab = localStorage.getItem('activeTabKey');
+        if (savedTab) {
+            const triggerEl = document.querySelector(`#${savedTab}`);
+            if (triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
         }
-        // Guardar pestaña al hacer clic
-        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(btn => {
-            btn.addEventListener('shown.bs.tab', e => localStorage.setItem('activeTab', e.target.id));
+
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tabBtn => {
+            tabBtn.addEventListener('shown.bs.tab', (e) => {
+                localStorage.setItem('activeTabKey', e.target.id);
+            });
         });
     });
 
-    // 2. INDICADOR DE CARGA (Spinner en el botón)
-    function launchBacktest() {
-        const btn = document.getElementById('btnLaunch');
-        btn.disabled = true;
-        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Ejecutando...`;
-        document.getElementById('launchForm').submit();
+    // 2. APERTURA DE ARCHIVOS
+    function openFile(url, filename) {
+        if (filename.toLowerCase().endsWith('.html')) {
+            window.open(url + '?cache=' + Date.now(), '_blank');
+            return;
+        }
+
+        const modalElement = document.getElementById('csvViewerModal');
+        const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
+        const displayArea = document.getElementById('fileContent');
+        
+        document.getElementById('csvViewerTitle').innerHTML = `<i class="bi bi-file-earmark-spreadsheet"></i> ${filename}`;
+        displayArea.innerHTML = '<div class="p-5 text-center text-info"><div class="spinner-border text-primary mb-2"></div><br>Construyendo tabla...</div>';
+        modalInstance.show();
+
+        fetch(url + '?nocache=' + Date.now())
+            .then(response => {
+                if (!response.ok) throw new Error("Error de carga");
+                return response.text();
+            })
+            .then(rawContent => {
+                if (filename.toLowerCase().endsWith('.csv')) {
+                    displayArea.innerHTML = buildHtmlTableFromCsv(rawContent);
+                } else {
+                    displayArea.innerHTML = `<pre class="p-4 m-0 text-white" style="font-size:12px;">${rawContent}</pre>`;
+                }
+            })
+            .catch(error => {
+                displayArea.innerHTML = `<div class="p-4 text-danger">Error: ${error.message}</div>`;
+            });
     }
 
-    // 3. FUNCIONES DEL EXPLORADOR DE ARCHIVOS
-    function toggleFolder(element) {
-        const nested = element.parentElement.querySelector(".nested");
-        if (nested) {
-            const isHidden = nested.style.display === "none";
-            nested.style.display = isHidden ? "block" : "none";
-            element.innerHTML = isHidden ? element.innerHTML.replace("📁", "📂") : element.innerHTML.replace("📂", "📁");
+    // 3. RENDER CSV
+    function buildHtmlTableFromCsv(text) {
+        const rows = text.trim().split(/\r?\n/);
+        if (rows.length === 0) return '<div class="p-4">Sin datos.</div>';
+        const delimiter = rows[0].includes(';') ? ';' : ',';
+        let tableHtml = '<table class="csv-table"><thead><tr>';
+        const headers = rows[0].split(delimiter);
+        headers.forEach(h => {
+            tableHtml += `<th>${h.replace(/["']/g, '').trim()}</th>`;
+        });
+        tableHtml += '</tr></thead><tbody>';
+        for (let i = 1; i < rows.length; i++) {
+            if (!rows[i].trim()) continue;
+            const cells = rows[i].split(delimiter);
+            tableHtml += '<tr>';
+            cells.forEach(c => {
+                tableHtml += `<td>${c.replace(/["']/g, '').trim()}</td>`;
+            });
+            tableHtml += '</tr>';
+        }
+        tableHtml += '</tbody></table>';
+        return tableHtml;
+    }
+
+    // 4. LANZAR ESTRATEGIA (BOTÓN AZUL)
+    function lanzarEstrategia() {
+        const launchBtn = document.querySelector('button[onclick="lanzarEstrategia()"]');
+        const originalHtml = launchBtn.innerHTML;
+        
+        launchBtn.disabled = true;
+        launchBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Ejecutando...';
+
+        fetch("{{ url_for('main.launch_strategy') }}", { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                alert("Motor: " + data.message);
+                if (data.status === 'success') {
+                    localStorage.setItem('activeTabKey', 'tab-files');
+                    location.reload();
+                }
+            })
+            .catch(() => alert("Error al contactar con el servidor."))
+            .finally(() => {
+                launchBtn.disabled = false;
+                launchBtn.innerHTML = originalHtml;
+            });
+    }
+
+    function toggleFolder(folderElement) {
+        const nestedDiv = folderElement.parentElement.querySelector(".nested");
+        if (nestedDiv) {
+            const isHidden = nestedDiv.style.display === "none";
+            nestedDiv.style.display = isHidden ? "block" : "none";
+            folderElement.innerHTML = isHidden ? folderElement.innerHTML.replace("📁", "📂") : folderElement.innerHTML.replace("📂", "📁");
         }
     }
 
-    function confirmDelete(url, fileName) {
-        if (confirm(`¿Estás seguro de que quieres borrar "${fileName}"?`)) {
-            const form = document.getElementById('deleteFileForm');
-            form.action = url;
-            form.submit();
+    function confirmDelete(deleteUrl, name) {
+        if (confirm(`¿Eliminar permanentemente "${name}"?`)) {
+            const formDel = document.getElementById('formDelete');
+            formDel.action = deleteUrl;
+            formDel.submit();
         }
     }
-    </script>
+</script>
+
 </body>
 </html>
