@@ -1,27 +1,27 @@
+import os
 import smtplib
+import logging
+from pathlib import Path
+from dotenv import load_dotenv
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-import os
-import logging
-from dotenv import load_dotenv
 
+# --- CONFIGURACIÓN DE RUTA FIJA ---
+# Definimos la ruta absoluta o relativa fija al servidor
+# Si el script se ejecuta desde la raíz del proyecto (TradingCore), esta ruta es:
+fichero_mail = Path("trading_engine/utils/Config/mail_setup.env")
 
-# Obtener la ruta del directorio del proyecto actual (Estrategias)
-project_dir = os.path.dirname(os.path.abspath(__file__))
+# Carga las variables de entorno desde la ubicación fija
+if fichero_mail.exists():
+    load_dotenv(fichero_mail)
+else:
+    # Si prefieres una ruta absoluta para total seguridad:
+    # fichero_mail = Path(r"C:\Users\juant\Proyectos\Python\TradingCore\trading_engine\utils\Config\mail_setup.env")
+    print(f"⚠️ Alerta: No se encontró el archivo en {fichero_mail.absolute()}")
 
-# --- Preparación de Directorios ---
-# --- Configuración de Rutas y Archivos ---
-config_dir = os.path.join(project_dir, "Config")
-os.makedirs(config_dir, exist_ok=True) 
-
-fichero_mail = os.path.join(config_dir, 'mail_setup.env')
-
-# Carga las variables de entorno una vez al inicio del módulo
-load_dotenv(fichero_mail)
-
-# Configuración básica de logging para el módulo
+# Configuración básica de logging
 logger = logging.getLogger(__name__)
 
 def send_email(subject, body, to_email, attachment_path=None):

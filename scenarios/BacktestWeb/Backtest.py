@@ -12,6 +12,7 @@ import logging
 import sys
 import os
 import time
+from datetime import datetime
 from pathlib import Path 
 
 # ----------------------------------------------------------------------
@@ -271,10 +272,43 @@ def ejecutar_backtest(config_dict: dict):
         except Exception as e:
             logger.error(f"Error al guardar ficheros: {e}")
             
-        # 10. Enviar Mail
-        if enviar_mail:
-             # send_email(...)
-             logger.info("Archivos enviados por mail.")
+        # ----------------------------------------------------------------------
+        # 🎯 PUNTO 10: ENVÍO DE EMAIL AUTOMÁTICO
+        # ----------------------------------------------------------------------
+
+        # 1. Verificamos si el usuario ha activado el switch en la web
+        if getattr(System, 'enviar_mail', False):
+            
+            # 2. Preparamos los datos del mensaje
+            asunto = f"📊 Resultados Backtest: {user_mode} - {datetime.now().strftime('%Y-%m-%d')}"
+            cuerpo = (
+                f"Hola {user_mode},\n\n"
+                f"La ejecución de la estrategia ha finalizado correctamente.\n"
+                f"Se adjunta el fichero de resultados con el detalle de las operaciones."
+            )
+            
+            # 3. Identificamos al destinatario
+            destinatario = System.destinatario_email
+            
+            # 4. Localizamos el archivo adjunto usando el nombre CORRECTO de la variable
+            # Cambiamos 'params' por 'parametros_generales_y_rutas'
+            adjunto = str(parametros_generales_y_rutas.get('fichero_resultados')) 
+
+            logger.info(f"📬 Intentando enviar reporte a: {destinatario}")
+
+            # 5. Llamada a la función maestra de trading_engine.utils.utils_mail
+            try:
+                send_email(
+                    subject=asunto,
+                    body=cuerpo,
+                    to_email=destinatario,
+                    attachment_path=adjunto
+                )
+                logger.info(f"✅ Email enviado correctamente a {destinatario}")
+            except Exception as e:
+                logger.error(f"❌ Error crítico en el envío de correo: {e}")
+        else:
+            logger.info("ℹ️ Envío de email saltado (desactivado por el usuario).")
     
     logger.info(f"Proceso de backtesting completado en {time.time() - start_time:.2f} segundos. 🎉")
     return None
