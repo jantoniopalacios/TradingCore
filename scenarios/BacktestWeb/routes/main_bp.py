@@ -168,10 +168,23 @@ def launch_strategy():
     config_web = request.form.to_dict()
     config_web['user_mode'] = session.get('user_mode')
     
+    # Iniciamos el hilo del backtest
     thread = threading.Thread(target=ejecutar_backtest, args=(config_web,))
     thread.start()
     
-    return jsonify({"status": "success", "message": f"Backtest iniciado para {config_web['user_mode']}"})
+    # --- CAMBIO CRÍTICO: Esperamos a que el proceso termine ---
+    thread.join() 
+    
+    # --- TIEMPO DE CORTESÍA ---
+    # Esperamos 2 segundos extra para asegurar que el explorador de archivos
+    # de Windows vea los nuevos ficheros antes de recargar la web.
+    import time
+    time.sleep(2) 
+    
+    return jsonify({
+        "status": "success", 
+        "message": "Backtest finalizado. Los archivos han sido actualizados."
+    })
 
 @main_bp.route('/file/<path:path>')
 def view_file(path):

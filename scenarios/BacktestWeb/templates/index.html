@@ -225,10 +225,17 @@
         fetch("{{ url_for('main.launch_strategy') }}", { method: 'POST' })
             .then(res => res.json())
             .then(data => {
-                alert("Motor: " + data.message);
                 if (data.status === 'success') {
+                    // Guardamos la pestaña de FICHEROS como activa para el refresco
                     localStorage.setItem('activeTabKey', 'tab-files');
+                    
+                    // Pequeña notificación antes de recargar
+                    alert("✅ " + data.message);
+                    
+                    // Refresco forzoso para leer nuevas fechas de archivos
                     location.reload();
+                } else {
+                    alert("❌ Error: " + data.message);
                 }
             })
             .catch(() => alert("Error al contactar con el servidor."))
