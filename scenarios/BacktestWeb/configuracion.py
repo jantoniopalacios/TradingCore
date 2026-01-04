@@ -35,6 +35,10 @@ def find_project_root(current_path):
 WEB_STRATEGY_DIR = Path(__file__).parent 
 PROJECT_ROOT = find_project_root(WEB_STRATEGY_DIR)
 
+# 🎯 CONFIGURACIÓN GLOBAL DE CORREO (Centralizada para todos los usuarios)
+# Ubicación: TradingCore/trading_engine/utils/Config/setup_mail.env
+MAIL_CONFIG_GLOBAL = PROJECT_ROOT / "trading_engine" / "utils" / "Config" / "setup_mail.env"
+
 # Ahora Backtesting está en la raíz: TradingCore/Backtesting
 BACKTESTING_BASE_DIR = PROJECT_ROOT / "Backtesting"
 
@@ -259,7 +263,8 @@ def asignar_parametros_a_system(config_data: dict, rutas: dict):
     resultado.update({
         'data_files_path': data_files_path,
         'fundamentals_path': fundamentals_path,
-        'full_ratio_path': full_ratio_path
+        'full_ratio_path': full_ratio_path,
+        'fichero_mail': MAIL_CONFIG_GLOBAL  # <--- Inyectamos la ruta global aquí
     })
-    
+
     return resultado

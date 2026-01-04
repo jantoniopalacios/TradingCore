@@ -68,7 +68,7 @@ def create_app(user_mode="invitado"):
     return app
 
 if __name__ == '__main__':
-    app = create_app(user_mode="invitado_web")
+    app = create_app(user_mode="invitado")
     
     try:
         local_ip = socket.gethostbyname(socket.gethostname())

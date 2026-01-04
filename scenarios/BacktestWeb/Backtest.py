@@ -50,7 +50,12 @@ except ImportError as e:
 # ----------------------------------------------------------------------
 # --- IMPORTACIONES LOCALES DEL ESCENARIO ---
 # ----------------------------------------------------------------------
-from .configuracion import asignar_parametros_a_system, inicializar_configuracion_usuario
+try:
+    # Intento de importación relativa (cuando se lanza desde app.py / Flask)
+    from .configuracion import asignar_parametros_a_system, inicializar_configuracion_usuario
+except (ImportError, ValueError):
+    # Intento de importación absoluta (cuando se lanza el script directamente)
+    from configuracion import asignar_parametros_a_system, inicializar_configuracion_usuario
 from .estrategia_system import System
 
 # Inicialización de logging (después de la gestión de rutas)
@@ -93,6 +98,9 @@ def ejecutar_backtest(config_dict: dict):
     
     # Esto lee el .env de juan, lo aplica a System y nos da el diccionario con TODO (fechas incluidas)
     parametros_generales_y_rutas = cargar_y_asignar_configuracion(user_mode)
+
+    # Extraemos la nueva ruta del mail que viene de configuracion.py
+    fichero_mail_setup = parametros_generales_y_rutas.get('fichero_mail')
 
     # 2. Extracción de Parámetros Generales y Rutas
     start_date = parametros_generales_y_rutas.get('start_date') 
@@ -278,8 +286,6 @@ def ejecutar_backtest(config_dict: dict):
 
         # 1. Verificamos si el usuario ha activado el switch en la web
         if getattr(System, 'enviar_mail', False):
-            
-            # 2. Preparamos los datos del mensaje
             asunto = f"📊 Resultados Backtest: {user_mode} - {datetime.now().strftime('%Y-%m-%d')}"
             cuerpo = (
                 f"Hola {user_mode},\n\n"
@@ -287,22 +293,19 @@ def ejecutar_backtest(config_dict: dict):
                 f"Se adjunta el fichero de resultados con el detalle de las operaciones."
             )
             
-            # 3. Identificamos al destinatario
             destinatario = System.destinatario_email
-            
-            # 4. Localizamos el archivo adjunto usando el nombre CORRECTO de la variable
-            # Cambiamos 'params' por 'parametros_generales_y_rutas'
             adjunto = str(parametros_generales_y_rutas.get('fichero_resultados')) 
 
             logger.info(f"📬 Intentando enviar reporte a: {destinatario}")
 
-            # 5. Llamada a la función maestra de trading_engine.utils.utils_mail
             try:
+                # 💡 PASO CLAVE: Inyectamos 'config_path'
                 send_email(
                     subject=asunto,
                     body=cuerpo,
                     to_email=destinatario,
-                    attachment_path=adjunto
+                    attachment_path=adjunto,
+                    config_path=fichero_mail_setup  # <--- Usamos la ruta calculada por el orquestador
                 )
                 logger.info(f"✅ Email enviado correctamente a {destinatario}")
             except Exception as e:

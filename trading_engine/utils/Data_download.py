@@ -190,13 +190,13 @@ def manage_fundamental_data(
     fundamentals_path: Path
 ) -> pd.DataFrame:
     """
-    Función : manage_fundamental_data
+    Función : manage_fundamental_data (Versión Optimizada)
 
-    Orquesta la gestión completa de los datos fundamentales. Ahora solo utiliza
-    Alpha Vantage para la construcción del histórico trimestral completo.
-
-    Implementa una lógica de FALLBACK: si la descarga de AV falla por límite de
-    tasa, carga el último archivo trimestral existente en caché.
+    Orquesta la gestión de fundamentales con lógica de "Último Disponible":
+    1. Busca cualquier archivo Q?_SYMBOL.csv existente.
+    2. Si el archivo del trimestre actual no existe, intenta descargar/actualizar.
+    3. Si la descarga falla (sin crédito), mantiene y usa el archivo del trimestre anterior.
+    4. Progresivamente actualiza la caché conforme hay éxito en las descargas.
     """
     
     logger.info("======================================================")
@@ -204,89 +204,77 @@ def manage_fundamental_data(
     logger.info("=======================================================")
 
     if not isinstance(simbolos_df, pd.DataFrame) or "Symbol" not in simbolos_df.columns:
-        logger.error("Error: El primer argumento debe ser un DataFrame de pandas con la columna 'Symbol'. Terminando la gestión.")
+        logger.error("Error: El DataFrame de símbolos es inválido.")
         return pd.DataFrame()
         
     symbols = simbolos_df["Symbol"].tolist()
-
     folder_path = Path(fundamentals_path)
     folder_path.mkdir(parents=True, exist_ok=True) 
 
-    # --- FASE 1: CONSTRUCCIÓN Y MANTENIMIENTO (AlphaV) ---
-    logger.info("[FASE 1: CONSTRUCCIÓN Y MANTENIMIENTO (AlphaV)]")
-    
+    # Determinamos el trimestre "ideal" para hoy
     current_quarter = (datetime.now().month - 1) // 3 + 1
     
-    # --- 1. Determinar si se necesita descarga ---
-    needs_download = False
+    # --- FASE 1: DETERMINAR NECESIDAD DE ACTUALIZACIÓN ---
+    # Revisamos si todos los símbolos tienen ya el archivo del trimestre actual
+    symbols_to_update = []
     for symbol in symbols:
-        required_file = fundamentals_path / f"Q{current_quarter}_{symbol}.csv"
-        # Si el archivo del trimestre actual NO existe, necesitamos descargar.
-        if not required_file.exists():
-            needs_download = True
-            logger.info(f"-> Símbolo {symbol} requiere DESCARGA: Falta el reporte Q{current_quarter}.")
-            break 
+        # Buscamos específicamente el archivo del trimestre actual
+        target_file = folder_path / f"Q{current_quarter}_{symbol}.csv"
+        
+        if not target_file.exists():
+            symbols_to_update.append(symbol)
     
+    needs_download = len(symbols_to_update) > 0
     df_consolidated = pd.DataFrame()
-    av_failed = False # Flag para rastrear el fallo de AV
+    av_failed = False
 
-    # --- 2. Ejecutar Descarga si es Necesario ---
+    # --- FASE 2: EJECUTAR ACTUALIZACIÓN (Si falta algún Q actual) ---
     if needs_download:
-        logger.info(f"-> Ejecutando download_fundamentals_AlphaV para construir/actualizar el histórico...")
-        # Llama a la función que intentará descargar el historial completo de AV
+        logger.info(f"-> Se detectaron {len(symbols_to_update)} símbolos que podrían actualizarse a Q{current_quarter}.")
+        # Llamamos a la descarga (la función de descarga ya gestionará el fallback internamente)
         df_consolidated = download_fundamentals_AlphaV(api_key_av, simbolos_df, folder_path)
         
-        # Comprobar si AV falló completamente (devuelve DataFrame vacío)
-        if df_consolidated.empty and not simbolos_df.empty: # Si la lista de símbolos no estaba vacía, pero el resultado sí
+        if df_consolidated.empty and not simbolos_df.empty:
             av_failed = True
-            logger.warning("¡ADVERTENCIA! La descarga de Alpha Vantage falló (posiblemente por límite de tasa) y devolvió un DataFrame vacío.")
-    
-    # --- 3. Lógica de Carga/Fallback ---
-    # Se ejecuta si: a) No se necesitaba descargar (needs_download=False), O
-    #               b) Se necesitaba descargar pero falló (av_failed=True).
+            logger.warning("-> La descarga de AV no devolvió datos nuevos. Activando Fallback sobre caché existente.")
+
+    # --- FASE 3: CONSOLIDACIÓN FINAL (Carga de lo que haya en disco) ---
+    # Si no hubo descarga o la descarga falló, recolectamos lo mejor que tengamos en disco
     if not needs_download or av_failed:
-        
-        if not needs_download:
-            logger.info("-> Cargando archivos del trimestre actual (Caché Fresca).")
-        else: # av_failed es True
-            logger.warning("-> Activando lógica de FALLBACK: Buscando el último reporte trimestral existente en caché.")
-            
+        logger.info("-> Consolidando datos desde la mejor caché disponible (Q actual o anteriores).")
         all_data_list = []
+        
         for symbol in symbols:
-            
-            # Buscamos todos los archivos QX_SYMBOL.csv y Q0_SYMBOL.csv (fallo)
-            existing_files = list(fundamentals_path.glob(f"Q?_{symbol}.csv"))
+            # Buscamos todos los archivos QX_SYMBOL.csv (Q1, Q2, Q3, Q4 y el especial Q0)
+            existing_files = list(folder_path.glob(f"Q?_{symbol}.csv"))
             
             if not existing_files:
-                logger.warning(f"No se encontró ninguna caché para {symbol}. Se saltará este símbolo.")
+                logger.warning(f"No se encontró NINGUNA caché (ni antigua ni nueva) para {symbol}.")
                 continue
                 
-            # Seleccionamos el archivo con el número de trimestre más alto (Q4 > Q3, pero Q0 es el menor)
-            # max() ordenará alfabéticamente/numéricamente.
+            # Seleccionamos el mejor archivo disponible (el nombre más alto: Q4 > Q1, etc.)
+            # Nota: Al ser cambio de año, Q4 de 2025 es "alfabéticamente" mayor que Q1 de 2026.
             best_file_path = max(existing_files) 
             
-            # Si estamos en modo fallo y el mejor archivo es solo el marcador Q0, lo saltamos.
-            if av_failed and 'Q0' in best_file_path.name:
-                logger.warning(f"Solo se encontró el marcador de fallo '{best_file_path.name}'. Saltando {symbol}.")
-                continue
+            # Evitamos cargar marcadores de fallo Q0 si hay otras opciones
+            if 'Q0' in best_file_path.name and len(existing_files) > 1:
+                existing_files = [f for f in existing_files if 'Q0' not in f.name]
+                best_file_path = max(existing_files)
 
-            logger.info(f"Cargando {best_file_path.name} para {symbol}.")
             try:
-                 data = pd.read_csv(best_file_path, sep=";")
-                 data['fiscalDateEnding'] = pd.to_datetime(data['fiscalDateEnding'], errors='coerce')
-                 data.set_index('fiscalDateEnding', inplace=True)
-                 all_data_list.append(data)
+                data = pd.read_csv(best_file_path, sep=";")
+                data['fiscalDateEnding'] = pd.to_datetime(data['fiscalDateEnding'], errors='coerce')
+                data.set_index('fiscalDateEnding', inplace=True)
+                all_data_list.append(data)
+                logger.info(f"Cargado para backtest: {best_file_path.name} (Último disponible)")
             except Exception as e:
-                logger.error(f"Error al cargar caché {best_file_path.name} para {symbol}: {e}")
+                logger.error(f"Error al cargar {best_file_path.name}: {e}")
                 
         if all_data_list:
             df_consolidated = pd.concat(all_data_list, axis=0)
             df_consolidated = df_consolidated.loc[:, ~df_consolidated.columns.duplicated()] 
             df_consolidated = df_consolidated.sort_index()
-        # Si all_data_list está vacío, df_consolidated sigue siendo el DataFrame vacío inicial o se sobrescribe aquí.
-        
-    # --- 4. Finalización ---
-   
+
     logger.info("========================================================")
     logger.info("===  ORQUESTACIÓN DE DATOS FUNDAMENTALES FINALIZADA  ===")
     logger.info("========================================================")
@@ -296,113 +284,123 @@ def manage_fundamental_data(
 def download_fundamentals_AlphaV(
     api_key: str, 
     simbolos_df: pd.DataFrame, 
-    fundamentals_path: Path # Se recibe por parámetro
+    fundamentals_path: Path
 ):
     """
-    Realiza la descarga de los datos fundamentales trimestrales (Alpha Vantage).
-    Incluye un retardo de 3 segundos para cumplir con el límite de 1 request per second
-    del plan gratuito y lógica de limpieza trimestral de caché.
+    Descarga datos de Alpha Vantage gestionando la caché de forma inteligente.
+    Mantiene un solo archivo 'Q' por símbolo y usa el anterior si la API falla.
     """
-    
-    # fd = FundamentalData(key=api_key, output_format="pandas") # Se moverá dentro del loop
+    import time
+    from datetime import datetime
+
     current_month = datetime.now().month
     current_quarter = (current_month - 1) // 3 + 1
     folder_path = Path(fundamentals_path)
     folder_path.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Directorio de caché fundamental: '{folder_path}'") 
+    
     all_data_list = [] 
     symbols = simbolos_df["Symbol"].tolist()
 
-    # Inicializar la clase FundamentalData una vez
     try:
+        # Inicialización de la API
+        from alpha_vantage.fundamentaldata import FundamentalData
         fd = FundamentalData(key=api_key, output_format="pandas")
     except Exception as e:
-        logger.error(f"Error al inicializar Alpha Vantage FundamentalData: {e}")
+        logger.error(f"Error al inicializar Alpha Vantage: {e}")
         return pd.DataFrame() 
 
     for symbol in symbols:
-        file_name = f"Q{current_quarter}_{symbol}.csv"
-        file_path = folder_path / file_name 
+        # --- PASO 1: BÚSQUEDA ELÁSTICA EN CACHÉ ---
+        # Buscamos cualquier archivo que empiece por Q (Q1, Q2, Q3, Q4 o Q0)
+        archivos_encontrados = list(folder_path.glob(f"Q?_{symbol}.csv"))
+        
+        # Seleccionamos el que tenga el nombre "mayor" (ej: Q4 > Q1 alfabéticamente)
+        file_path_latest = max(archivos_encontrados) if archivos_encontrados else None
+        
         data = pd.DataFrame()
+        needs_download = True
 
-        # 1. Búsqueda y Manejo de la caché existente para el trimestre actual
-        if file_path.is_file(): 
-            logger.info(f"Datos Q{current_quarter} ya guardados en {file_path}. Cargando datos locales...")
+        # --- PASO 2: CARGA DEL PLAN B (Fallback) ---
+        if file_path_latest:
             try:
-                data = pd.read_csv(file_path, sep=";", parse_dates=['fiscalDateEnding'])
+                data = pd.read_csv(file_path_latest, sep=";", parse_dates=['fiscalDateEnding'])
+                logger.info(f"Cargada caché previa para {symbol}: {file_path_latest.name}")
+                
+                # Si el archivo ya es del trimestre actual, no hace falta descargar
+                if f"Q{current_quarter}" in file_path_latest.name:
+                    logger.info(f"Caché de {symbol} al día (Q{current_quarter}). Saltando descarga.")
+                    needs_download = False
             except Exception as e:
-                logger.error(f"Error al cargar el archivo local {file_path}: {e}. Intentando descargar de nuevo.")
+                logger.error(f"Error leyendo caché {file_path_latest.name}: {e}")
+                data = pd.DataFrame() # Si falla, intentaremos descargar de cero
 
-        # 2. Descarga si la caché falla o no existe
-        if data.empty:
-            logger.info(f"Descargando datos de {symbol} de Alpha Vantage...")
+        # --- PASO 3: INTENTO DE DESCARGA ---
+        if needs_download:
+            logger.info(f"Intentando actualizar {symbol} al Q{current_quarter} via API...")
             try:
-                # Descarga de los 4 tipos de datos fundamentales
-                # NOTA: Cada una de estas es una petición, por lo que se consumen 4 peticiones por símbolo.
+                # Descargas (mantenemos las 4 peticiones originales por ahora)
                 balance_sheet, _ = fd.get_balance_sheet_quarterly(symbol)
+                time.sleep(0.5) 
                 income_statement, _ = fd.get_income_statement_quarterly(symbol)
+                time.sleep(0.5)
                 cash_flow, _ = fd.get_cash_flow_quarterly(symbol)
+                time.sleep(0.5)
                 earnings, _ = fd.get_earnings_quarterly(symbol)
 
-                # Procesamiento y Merge de DataFrames
-                data = pd.merge(balance_sheet, income_statement, on="fiscalDateEnding", how="outer")
-                data = pd.merge(data, cash_flow, on="fiscalDateEnding", how="outer")
-                data = pd.merge(data, earnings, on="fiscalDateEnding", how="outer")
-                data["Symbol"] = symbol
+                # Unión de datos
+                new_data = pd.merge(balance_sheet, income_statement, on="fiscalDateEnding", how="outer")
+                new_data = pd.merge(new_data, cash_flow, on="fiscalDateEnding", how="outer")
+                new_data = pd.merge(new_data, earnings, on="fiscalDateEnding", how="outer")
+                new_data["Symbol"] = symbol
                 
-                # Filtrado de columnas y renombrado
+                # Selección de columnas (tus columnas actuales)
                 columnas_necesarias = [
                     "fiscalDateEnding", "Symbol", "totalRevenue", "ebit", "operatingCashflow",
                     "capitalExpenditures", "netIncome_x", "totalShareholderEquity", 
                     "totalLiabilities", "goodwill", "netIncome_y", "reportedEPS"
                 ]
-                data = data[data.columns.intersection(columnas_necesarias)]
+                new_data = new_data[new_data.columns.intersection(columnas_necesarias)]
+                new_data = new_data.rename(columns={"netIncome_y": "Net Income", "reportedEPS": "Diluted EPS"})
                 
-                nuevos_nombres = {"netIncome_y": "Net Income", "reportedEPS": "Diluted EPS"}
-                data = data.rename(columns=nuevos_nombres)
-                data['fiscalDateEnding'] = pd.to_datetime(data['fiscalDateEnding'])
+                # --- PASO 4: GUARDADO NUEVO Y LIMPIEZA DEL VIEJO ---
+                new_file_name = f"Q{current_quarter}_{symbol}.csv"
+                new_file_path = folder_path / new_file_name
+                
+                new_data.to_csv(new_file_path, index=False, sep=";")
+                logger.info(f"Archivo {new_file_name} guardado correctamente.")
+                
+                # Si la descarga funcionó, el "plan B" ya no hace falta
+                # Borramos cualquier archivo Q antiguo que no sea el que acabamos de crear
+                for old_file in archivos_encontrados:
+                    if old_file != new_file_path and old_file.exists():
+                        old_file.unlink() # Borra el archivo
+                        logger.info(f"Eliminada caché antigua: {old_file.name}")
+                
+                # Actualizamos la variable data con los nuevos datos frescos
+                data = new_data
 
-                # 3. Guardado y Limpieza de Versiones Antiguas
-                data.to_csv(file_path, index=False, sep=";")
-                logger.info(f"Datos Q{current_quarter} guardados en {file_path}. **Buscando y borrando versiones anteriores.**")
-                
-                # Limpieza de cachés de trimestres anteriores (Qx-1)
-                pattern = f"Q?_{symbol}.csv"
-                for file_path_obj in folder_path.glob(pattern):
-                    if file_path_obj.name != file_name:
-                        try:
-                            os.remove(file_path_obj)
-                            logger.info(f"Archivo de caché obsoleto fundamental eliminado: {file_path_obj.name}")
-                        except Exception as e:
-                            logger.warning(f"No se pudo eliminar el archivo obsoleto {file_path_obj.name}: {e}")
-                
             except Exception as e:
-                logger.error(f"Error al descargar datos de AV para {symbol}: {e}.")
-                # Manejo de fallo de descarga
-                fail_file_name = f"Q0_{symbol}.csv" 
-                fail_file_path = folder_path / fail_file_name 
-                
-                empty_data = pd.DataFrame({"fiscalDateEnding": [pd.NaT], "Symbol": [symbol], "totalRevenue": [np.nan]})
-                empty_data.to_csv(fail_file_path, index=False, sep=";")
-                logger.warning(f"Marcador de fallo '{fail_file_name}' creado para {symbol}.")
+                # SI FALLA LA API: No borramos nada.
+                if not data.empty:
+                    logger.warning(f"API Falló para {symbol}. Usando caché {file_path_latest.name}. Motivo: {e}")
+                else:
+                    # Si no había ni caché ni API, creamos marcador Q0
+                    logger.error(f"Sin caché ni API para {symbol}. Creando marcador Q0.")
+                    q0_path = folder_path / f"Q0_{symbol}.csv"
+                    pd.DataFrame({"fiscalDateEnding": [pd.NaT], "Symbol": [symbol]}).to_csv(q0_path, index=False, sep=";")
 
-                # 🎯 CAMBIO CLAVE: Aumentar el retardo para cumplir con 1 request per second
-                time.sleep(3) 
-                continue 
+            # Delay para respetar el Rate Limit (ajusta según tu plan de AV)
+            time.sleep(12) 
 
+        # Añadir al listado final (venga de caché o de API)
         if not data.empty:
             all_data_list.append(data)
-            
-        # 🎯 CAMBIO CLAVE: Aumentar el retardo para cumplir con 1 request per second
-        time.sleep(3) 
 
+    # Consolidación final del DataFrame para el programa
     if all_data_list:
-        all_data = pd.concat(all_data_list, axis=0)
-        all_data['fiscalDateEnding'] = pd.to_datetime(all_data['fiscalDateEnding'], errors='coerce')
-        all_data.dropna(subset=['fiscalDateEnding'], inplace=True)
-        all_data.set_index("fiscalDateEnding", inplace=True)
-        # Aseguramos que solo exista un reporte por fecha/símbolo, tomando el primero (más probable de AV)
-        all_data = all_data.drop_duplicates(subset=all_data.columns.drop(['Symbol']), keep='first')
-        return all_data
-    else:
-        return pd.DataFrame()
+        df_final = pd.concat(all_data_list, axis=0)
+        df_final['fiscalDateEnding'] = pd.to_datetime(df_final['fiscalDateEnding'], errors='coerce')
+        df_final.dropna(subset=['fiscalDateEnding'], inplace=True)
+        return df_final
+    
+    return pd.DataFrame()

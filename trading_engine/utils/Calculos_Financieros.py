@@ -202,317 +202,104 @@ def calcular_fundamentales(ohlcv_data, financial_data):
 # ----------------------------------------------------------------------
 
 def calcular_fullratio_OHLCV(ohlcv_data: pd.DataFrame, financial_data: pd.DataFrame, output_path: str = None) -> pd.DataFrame:
-
     """
-    Función : calcular_fullratio_OHLCV
-
-    Descripción : 1. Calcula ratios avanzados (LTM, PER 5Y, Margen de Seguridad) a nivel trimestral.
-                  2. Propaga estos valores a la serie de tiempo diaria (OHLCV) usando JOIN + FFILL.
-                  3. Guarda el resultado diario consolidado.
-
-    Entrada :
-        - ohlcv_data: DataFrame con datos de cotizaciones (Price).
-        - financial_data: DataFrame con datos fundamentales.
-        
-    Salida : DataFrame con la serie temporal diaria con todos los ratios.
+    Versión con LOGS RESTAURADOS: Muestra una tabla resumen por símbolo.
     """
-   
     if ohlcv_data.empty or financial_data.empty:
-        print("Advertencia: Datos OHLCV o fundamentales vacíos. Imposible calcular Full Ratio.")
+        print("⚠️ Datos vacíos. Cancelando cálculo.")
         return pd.DataFrame()
-    
-    # --- GESTIÓN DE RUTAS DESVINCULADA ---
+
+    # 1. Rutas
     consolidated_file = None
     if output_path:
         output_folder = Path(output_path)
-        # Creamos la carpeta de forma segura (solo si se proporciona ruta)
         output_folder.mkdir(parents=True, exist_ok=True)
         consolidated_file = output_folder / "FR_diario.csv"
-    
-    # 1. Asegurar que los DataFrames estén bien indexados por fecha y ordenados
 
-    # --- Manejo de OHLCV Data ---
-    # Capturar el nombre del índice actual para un manejo robusto
-    original_ohlcv_idx_name = ohlcv_data.index.name
+    # 2. Estandarización de Precios
+    df_ohlcv = ohlcv_data.copy()
+    if df_ohlcv.index.name == 'Date' or 'Date' not in df_ohlcv.columns:
+        df_ohlcv = df_ohlcv.reset_index()
+    date_col = 'Date' if 'Date' in df_ohlcv.columns else df_ohlcv.columns[0]
+    df_ohlcv.rename(columns={date_col: "Date"}, inplace=True)
+    df_ohlcv["Date"] = pd.to_datetime(df_ohlcv["Date"]).dt.tz_localize(None)
+    df_ohlcv = df_ohlcv.sort_values(["Symbol", "Date"])
 
-    if original_ohlcv_idx_name != "Date":
-        # Si el índice no es 'Date', lo reseteamos para convertirlo en columna
-        ohlcv_data.reset_index(inplace=True)
+    # 3. Estandarización de Fundamentales
+    df_fin = financial_data.copy()
+    if df_fin.index.name == 'fiscalDateEnding' or 'fiscalDateEnding' not in df_fin.columns:
+        df_fin = df_fin.reset_index()
+    fin_date_col = 'fiscalDateEnding' if 'fiscalDateEnding' in df_fin.columns else df_fin.columns[0]
+    df_fin.rename(columns={fin_date_col: "fiscalDateEnding"}, inplace=True)
+    df_fin["fiscalDateEnding"] = pd.to_datetime(df_fin["fiscalDateEnding"]).dt.tz_localize(None)
+    df_fin["Diluted EPS"] = pd.to_numeric(df_fin["Diluted EPS"], errors="coerce")
+    df_fin = df_fin.dropna(subset=["Diluted EPS"]).sort_values("fiscalDateEnding")
 
-        # Ahora, necesitamos asegurarnos de que la columna de fechas se llame 'Date'.
-        # Si el índice original no tenía nombre (ej. RangeIndex), reset_index() crea 'index'.
-        # Si tenía un nombre diferente a 'Date', reset_index() usa ese nombre.
-        if "Date" not in ohlcv_data.columns:
-            # Intentamos renombrar la columna que probablemente contiene las fechas
-            if original_ohlcv_idx_name is None and "index" in ohlcv_data.columns:
-                ohlcv_data.rename(columns={"index": "Date"}, inplace=True)
-            elif (
-                original_ohlcv_idx_name is not None
-                and original_ohlcv_idx_name in ohlcv_data.columns
-            ):
-                ohlcv_data.rename(
-                    columns={original_ohlcv_idx_name: "Date"}, inplace=True
-                )
-            else:
-                raise KeyError(
-                    "No se pudo encontrar la columna 'Date' en ohlcv_data "
-                    "después de resetear el índice. Asegúrate de que los datos OHLCV "
-                    "contengan una columna 'Date' o que el índice se llame 'Date'."
-                )
+    # 4. Cálculos Trimestrales y LOG por Símbolo
+    all_symbol_fundamentals = []
+    for symbol in df_fin["Symbol"].unique():
+        symbol_q = df_fin[df_fin["Symbol"] == symbol].copy()
+        
+        # Ratios LTM
+        symbol_q["LTM EPS_Q"] = symbol_q["Diluted EPS"].rolling(window=4, min_periods=1).sum().round(2)
+        symbol_q["LTM EPS %_Q"] = (symbol_q["LTM EPS_Q"].pct_change() * 100).round(2)
 
-        # Convertir la columna 'Date' a datetime, forzando errores a NaT
-        ohlcv_data["Date"] = pd.to_datetime(ohlcv_data["Date"], errors="coerce")
-
-        # Establecer 'Date' como el nuevo índice
-        ohlcv_data.set_index("Date", inplace=True)
-    else:  # Si ohlcv_data.index.name ES 'Date'
-        # El índice ya se llama 'Date', solo asegurarnos de que sea tipo DatetimeIndex
-        if not isinstance(ohlcv_data.index, pd.DatetimeIndex):
-            ohlcv_data.index = pd.to_datetime(ohlcv_data.index, errors="coerce")
-
-    # Ordenar el DataFrame por índice (fecha) y eliminar filas con índice NaT
-    ohlcv_data = ohlcv_data.sort_index()
-    ohlcv_data = ohlcv_data[
-        ohlcv_data.index.notna()
-    ]  # Correcto: filtrar el DataFrame por índice NaT
-
-    # ESTANDARIZAR ZONA HORARIA OHLCV 🌟
-    # Si el índice tiene zona horaria (tz-aware), la eliminamos (tz-naive).
-    if ohlcv_data.index.tz is not None:
-        ohlcv_data.index = ohlcv_data.index.tz_localize(None)
-
-    # --- Manejo de Financial Data ---
-    original_fin_idx_name = financial_data.index.name
-    if original_fin_idx_name != "fiscalDateEnding":
-        financial_data.reset_index(inplace=True)
-
-        # Asegurar que la columna de fechas fiscales se llame 'fiscalDateEnding'
-        if "fiscalDateEnding" not in financial_data.columns:
-            if original_fin_idx_name is None and "index" in financial_data.columns:
-                financial_data.rename(
-                    columns={"index": "fiscalDateEnding"}, inplace=True
-                )
-            elif (
-                original_fin_idx_name is not None
-                and original_fin_idx_name in financial_data.columns
-            ):
-                financial_data.rename(
-                    columns={original_fin_idx_name: "fiscalDateEnding"}, inplace=True
-                )
-            else:
-                raise KeyError(
-                    "No se pudo encontrar la columna 'fiscalDateEnding' en financial_data "
-                    "después de resetear el índice. Asegúrate de que los datos financieros "
-                    "contengan una columna 'fiscalDateEnding' o que el índice se llame 'fiscalDateEnding'."
-                )
-
-        financial_data["fiscalDateEnding"] = pd.to_datetime(
-            financial_data["fiscalDateEnding"], errors="coerce"
-        )
-        financial_data.set_index("fiscalDateEnding", inplace=True)
-    else:
-        # El índice ya se llama 'fiscalDateEnding', solo asegurar que sea tipo DatetimeIndex
-        if not isinstance(financial_data.index, pd.DatetimeIndex):
-            financial_data.index = pd.to_datetime(financial_data.index, errors="coerce")
-
-    # Ordenar el DataFrame por índice (fecha) y eliminar filas con índice NaT
-    financial_data = financial_data.sort_index()
-    financial_data = financial_data[
-        financial_data.index.notna()
-    ]  # Correcto: filtrar el DataFrame por índice NaT
-
-    # ESTANDARIZAR ZONA HORARIA FINANCIALS 🌟
-    # Si el índice tiene zona horaria (tz-aware), la eliminamos (tz-naive).
-    if financial_data.index.tz is not None:
-        financial_data.index = financial_data.index.tz_localize(None)
-
-
-    # Convertir 'Diluted EPS' a numérico, manejando errores (NaN para no numéricos)
-    financial_data["Diluted EPS"] = pd.to_numeric(
-        financial_data["Diluted EPS"], errors="coerce"
-    )
-    # Eliminar filas donde 'Diluted EPS' es NaN, ya que es crucial para los cálculos de LTM EPS
-    financial_data.dropna(subset=["Diluted EPS"], inplace=True)
-
-    # 2. Inicializar las nuevas columnas en una copia de ohlcv_data para los resultados diarios
-    ohlcv_con_full_ratio = ohlcv_data.copy()
-    ohlcv_con_full_ratio["LTM EPS"] = np.nan
-    ohlcv_con_full_ratio["PER"] = np.nan
-    ohlcv_con_full_ratio["PER M5Y"] = np.nan
-    ohlcv_con_full_ratio["LTM EPS %"] = np.nan
-    ohlcv_con_full_ratio["% PER vs PER M5Y"] = np.nan
-    ohlcv_con_full_ratio["Margen de seguridad"] = (np.nan)
-    ohlcv_con_full_ratio["Full Ratio"] = (np.nan)
-        # Nombre de columna que tú utilizas
-
-    for symbol in financial_data["Symbol"].unique():
-        print(f"Calculando indicadores diarios para: {symbol}")
-
-        # 3. Filtrar datos financieros y OHLCV para el símbolo actual
-        symbol_financials_q = financial_data[financial_data["Symbol"] == symbol].copy()
-        symbol_ohlcv_d = ohlcv_con_full_ratio[
-            ohlcv_con_full_ratio["Symbol"] == symbol
-        ].copy()
-
-        # Crear un DataFrame temporal con el índice diario del OHLCV del símbolo
-        temp_daily_data = pd.DataFrame(index=symbol_ohlcv_d.index)
-        temp_daily_data["Close"] = symbol_ohlcv_d["Close"].round(
-            2
-        )  # Precio de cierre diario
-
-        # --- Cálculos de Métricas Trimestrales (que luego se propagarán a diario) ---
-
-        # Calcular LTM EPS trimestral (suma de los últimos 4 trimestres de Diluted EPS)
-        symbol_financials_q["LTM EPS_Q"] = (
-            symbol_financials_q["Diluted EPS"]
-            .rolling(window=4, min_periods=1)
-            .sum()
-            .round(2)
-        )
-
-        # Calcular Variación % del LTM EPS respecto al periodo anterior trimestral
-        symbol_financials_q["LTM EPS %_Q"] = (
-            symbol_financials_q["LTM EPS_Q"].pct_change() * 100
-        ).round(2)
-
-        # Para calcular PER M5Y_Q, necesitamos el PER Trimestral (PER_Q) primero.
-        # Para PER_Q, necesitamos el precio de cierre en la fecha fiscal (o el más cercano).
-        symbol_financials_q["Precio_at_FiscalDate"] = symbol_ohlcv_d["Close"].reindex(
-            symbol_financials_q.index, method="bfill"
-        )
-
-        # Calcular PER Trimestral (PER_Q)
-        symbol_financials_q["PER_Q"] = (
-            symbol_financials_q["Precio_at_FiscalDate"]
-            / symbol_financials_q["LTM EPS_Q"]
-        ).round(2)
-        # Manejar casos donde LTM EPS_Q es cero o negativo (PER no válido)
-        symbol_financials_q.loc[
-            symbol_financials_q["LTM EPS_Q"].fillna(0) <= 0, "PER_Q"
-        ] = np.nan
-
-        # Calcular PER M5Y_Q (media móvil de 5 años, que son 20 trimestres)
-        per_window_quarters = 5 * 4
-        symbol_financials_q["PER M5Y_Q"] = (
-            symbol_financials_q["PER_Q"]
-            .rolling(window=per_window_quarters, min_periods=1)
-            .mean()
-            .round(2)
-        )
-
-        # --- Propagar Métricas Trimestrales a Escala Diaria y Calcular Métricas Diarias ---
-
-        # Unir las métricas trimestrales calculadas (LTM EPS_Q, LTM EPS %_Q, PER M5Y_Q)
-        # a las fechas diarias del OHLCV. Esto crea NaNs en las fechas sin informe.
-        """
-        temp_daily_data = temp_daily_data.merge(
-            symbol_financials_q[["LTM EPS_Q", "LTM EPS %_Q", "PER M5Y_Q"]],
-            left_index=True,
-            right_index=True,
-            how="left",
-        )
-        """
-        # 2.2. Realiza la unión usando pd.merge_asof()
-        # Usaremos el índice de temp_daily_data para la unión (left_on)
-        # Y el índice de symbol_financials_q para buscar coincidencias (right_on)
-        # 'direction="backward"' significa que buscará la fecha más cercana *anterior o igual* en el DataFrame derecho.
-        # Esto es lo que queremos: para cada viernes, queremos los datos del último informe trimestral publicado.
-        temp_daily_data = pd.merge_asof(
-            temp_daily_data, # Este es el DataFrame de la izquierda
-            symbol_financials_q[["LTM EPS_Q", "LTM EPS %_Q", "PER M5Y_Q"]], # Este es el DataFrame de la derecha (columnas seleccionadas)
-            left_index=True,
-            right_index=True,
+        # Precio para PER histórico
+        symbol_prices = df_ohlcv[df_ohlcv["Symbol"] == symbol][["Date", "Close"]].sort_values("Date")
+        symbol_q = pd.merge_asof(
+            symbol_q.sort_values("fiscalDateEnding"),
+            symbol_prices,
+            left_on="fiscalDateEnding",
+            right_on="Date",
             direction="backward"
         )
-        # Propagar los valores trimestrales hacia adelante (ffill) para rellenar los días intermedios.
-        temp_daily_data["LTM EPS"] = temp_daily_data["LTM EPS_Q"].ffill()
-        temp_daily_data["LTM EPS %"] = temp_daily_data["LTM EPS %_Q"].ffill()
-        temp_daily_data["PER M5Y"] = temp_daily_data["PER M5Y_Q"].ffill()
-
-        # Obtener la fecha del primer informe financiero disponible para el símbolo
-        first_report_date = None
-        if not symbol_financials_q.empty:
-            first_report_date = symbol_financials_q.index.min()
-
-        # Solo aplicar el ajuste si tenemos una fecha de primer informe válida (Timestamp)
-        if pd.notna(first_report_date):
-            # Eliminar los valores propagados que estén antes de la primera fecha de informe real
-            temp_daily_data.loc[
-                temp_daily_data.index < first_report_date,
-                ["LTM EPS", "LTM EPS %", "PER M5Y"],
-            ] = np.nan
-
-        # Manejar casos donde LTM EPS propagado es cero o negativo en el día a día
-        temp_daily_data.loc[temp_daily_data["LTM EPS"].fillna(0) <= 0, "LTM EPS"] = (
-            np.nan
-        )
-
-        # Calcular PER diario (Precio de cierre diario / LTM EPS diario propagado)
-        temp_daily_data["PER"] = (
-            temp_daily_data["Close"] / temp_daily_data["LTM EPS"]
-        ).round(2)
-        temp_daily_data.loc[temp_daily_data["LTM EPS"].fillna(0) <= 0, "PER"] = (
-            np.nan
-        )  # PER inválido si LTM EPS es 0 o negativo
-
-        # Calcular % PER vs PER M5Y diario (usando la fórmula que tú proporcionaste: / PER actual)
-        temp_daily_data["% PER vs PER M5Y"] = np.nan  # Inicializar con NaN
-        # Evitar división por cero o NaN en el denominador 'PER'
-        valid_per_idx = temp_daily_data["PER"].fillna(0) != 0
-        temp_daily_data.loc[valid_per_idx, "% PER vs PER M5Y"] = (
-            100
-            * (temp_daily_data["PER"] - temp_daily_data["PER M5Y"])
-            / temp_daily_data["PER"]
-        ).round(2)
-
-        # Calcular Margen de seguridad (tu 'FULL RATIO') diario
-        # Usando la fórmula que tú proporcionaste: (LTM EPS % - % PER vs PER M5Y)
-        temp_daily_data["Margen de seguridad"] = (
-            temp_daily_data["LTM EPS %"] - temp_daily_data["% PER vs PER M5Y"]
-        ).round(2)
+        symbol_q["PER_Q"] = (symbol_q["Close"] / symbol_q["LTM EPS_Q"]).round(2)
+        symbol_q.loc[symbol_q["LTM EPS_Q"] <= 0, "PER_Q"] = np.nan
+        symbol_q["PER M5Y_Q"] = symbol_q["PER_Q"].rolling(window=20, min_periods=1).mean().round(2)
         
-        # Calcular Full Ratio diario (tu 'FULL RATIO') diario
-        temp_daily_data["Full Ratio"] = (
-            temp_daily_data["Margen de seguridad"] / temp_daily_data["LTM EPS"]
-        ).round(2)
+        all_symbol_fundamentals.append(symbol_q)
 
-        # 7. Asignar los resultados calculados al DataFrame principal ohlcv_con_full_ratio
-        # Asegurarse de asignar solo a las filas correspondientes al símbolo actual
-        columns_to_update = [
-            "LTM EPS",
-            "PER",
-            "PER M5Y",
-            "LTM EPS %",
-            "% PER vs PER M5Y",
-            "Margen de seguridad",
-            "Full Ratio",
-        ]
-        ohlcv_con_full_ratio.loc[
-            ohlcv_con_full_ratio["Symbol"] == symbol, columns_to_update
-        ] = temp_daily_data[columns_to_update]
+    df_fin_calc = pd.concat(all_symbol_fundamentals)
 
-        # Mostrar los ratios
-        print(ohlcv_con_full_ratio)
-
-    # --- GUARDADO CONDICIONAL ---
-    # Solo guarda si se pasó un output_path explícito
-    if consolidated_file:
-        ohlcv_con_full_ratio.to_csv(consolidated_file, sep=";")
-        print(f"Datos consolidados guardados en: {consolidated_file}")
-
-    # Eliminar las columnas temporales con sufijo '_Q' que se crearon en el proceso intermedio
-    ohlcv_con_full_ratio.drop(
-        columns=[col for col in ohlcv_con_full_ratio.columns if "_Q" in col],
-        inplace=True,
-        errors="ignore",
+    # 5. Cruce Diario por Símbolo
+    stocks_data = pd.merge_asof(
+        df_ohlcv.sort_values("Date"),
+        df_fin_calc[["fiscalDateEnding", "Symbol", "LTM EPS_Q", "LTM EPS %_Q", "PER M5Y_Q"]].sort_values("fiscalDateEnding"),
+        left_on="Date",
+        right_on="fiscalDateEnding",
+        by="Symbol",
+        direction="backward"
     )
 
-    # La llamada a 'dibujar_graficos' aquí debe ser adaptada si quieres usar el DataFrame diario.
-    # Por ejemplo, la función 'dibujar_graficos' necesitaría un parámetro 'symbol' para filtrar
-    # el DataFrame diario y mostrar el gráfico de un símbolo específico.
-    # dibujar_graficos(ohlcv_con_full_ratio)
+    # 6. Ratios Diarios
+    stocks_data["PER"] = (stocks_data["Close"] / stocks_data["LTM EPS_Q"]).round(2)
+    valid_per = (stocks_data["PER"].notna()) & (stocks_data["PER"] != 0)
+    stocks_data["% PER vs PER M5Y"] = np.nan
+    stocks_data.loc[valid_per, "% PER vs PER M5Y"] = (
+        100 * (stocks_data["PER"] - stocks_data["PER M5Y_Q"]) / stocks_data["PER"]
+    ).round(2)
+    stocks_data["Margen de seguridad"] = (stocks_data["LTM EPS %_Q"] - stocks_data["% PER vs PER M5Y"]).round(2)
+    stocks_data["Full Ratio"] = (stocks_data["Margen de seguridad"] / stocks_data["PER"]).round(2)
 
-    return ohlcv_con_full_ratio
+    # --- 🌟 BLOQUE DE LOGS RESTAURADO ---
+    for symbol in stocks_data["Symbol"].unique():
+        print(f"\n📊 MUESTRA DE RATIOS CALCULADOS PARA: {symbol}")
+        # Tomamos las últimas 5 filas calculadas para mostrar en el log
+        print(stocks_data[stocks_data["Symbol"] == symbol][
+            ["Date", "Close", "LTM EPS_Q", "PER", "PER M5Y_Q", "Margen de seguridad", "Full Ratio"]
+        ].tail(5).to_string(index=False))
+        print("-" * 80)
+
+    # 7. Limpieza y guardado
+    stocks_data.rename(columns={"LTM EPS_Q": "LTM EPS", "LTM EPS %_Q": "LTM EPS %", "PER M5Y_Q": "PER M5Y"}, inplace=True)
+    stocks_data.drop(columns=["fiscalDateEnding", "Date_y"], inplace=True, errors="ignore")
+    stocks_data.set_index("Date", inplace=True)
+
+    if consolidated_file:
+        stocks_data.to_csv(consolidated_file, sep=";")
+        print(f"✅ Full Ratio guardado en: {consolidated_file}")
+
+    return stocks_data
 
 
 # ----------------------------------------------------------------------
