@@ -192,32 +192,39 @@ def view_file(path):
     user_mode = session.get('user_mode')
     paths = get_user_paths(user_mode)
     
-    # Seguridad: Bloqueo de logs para no-admins
+    # Bloqueo de logs para no-admins
     if "logs" in path.lower() and user_mode != 'admin':
         abort(403)
 
-    # Definir carpetas de búsqueda
+    # Obtenemos solo el nombre del archivo (ej: FR_diario.csv)
+    filename = os.path.basename(path)
+
+    # Carpetas donde buscar
     search_folders = [paths['results_dir'], paths['graph_dir']]
     if user_mode == 'admin':
         search_folders.append(paths['logs_dir'])
 
     target = None
-    filename = path.split('/')[-1]
 
+    # --- NUEVA LÓGICA DE BÚSQUEDA RECURSIVA ---
     for base in search_folders:
-        # Intentar ruta completa o nombre de archivo directo
-        posible = base / filename
-        if posible.exists() and not posible.is_dir():
-            target = posible
-            break
+        # Buscamos el nombre del archivo en cualquier subnivel de la carpeta base
+        # rglob '*' busca en todas las subcarpetas de forma eficiente
+        for posible in base.rglob(filename):
+            if posible.is_file():
+                target = posible
+                break
+        if target: break
 
-    if not target: abort(404)
+    if not target: 
+        current_app.logger.error(f"❌ Archivo no encontrado en el servidor: {filename}")
+        abort(404)
 
+    # Manejo de visualización según extensión
     if target.suffix.lower() == '.html':
         return send_from_directory(target.parent, target.name)
     
     try:
-        # Tratamiento especial para logs (últimas 2000 líneas)
         if target.suffix.lower() == '.log':
             with open(target, 'r', encoding='utf-8', errors='replace') as f:
                 contenido = "".join(deque(f, maxlen=2000))
