@@ -48,3 +48,6 @@ __pycache__/
 **/*.env
 # Excepto el ejemplo que sirve de guía
 !Backtesting/Config/variables_setup.env.example
+
+# Ignorar archivos de datos
+*.csv

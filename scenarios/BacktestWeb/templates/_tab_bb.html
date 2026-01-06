@@ -1,109 +1,74 @@
-<div id="bb-tab-content">
-    <div class="row">
-        <div class="col-md-12">
-            <h3>Bandas de Bollinger (BB)</h3>
-            <p class="text-muted">Utilizadas para detectar reversiones desde extremos (bandas) y potencial inicio/fin de tendencia (SMA).</p>
-            <hr>
-        </div>
-    </div>
+<h2 class="mb-3">Bandas de Bollinger (BB)</h2>
+<p class="text-muted">Utilizadas para detectar reversiones desde extremos (bandas) y potencial inicio/fin de tendencia (SMA).</p>
+<hr>
 
-    <div class="form-group row mb-3 align-items-center">
-        <label class="col-sm-6 col-form-label" for="bb_active">
-            <span data-toggle="tooltip" title="{{ comments.bb_active }}">
-                <i class="fas fa-question-circle"></i> Activar Bollinger Bands
-            </span>
+<div class="row row-control align-items-center mb-4">
+    <div class="col-7">
+        <label for="bb_active" class="form-check-label fw-bold">
+            Activar Bollinger Bands:
         </label>
-        <div class="col-sm-6">
-            <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="bb_active" name="bb_active" value="True"
-                       {% if config.bb_active == 'True' %}checked{% endif %}>
-            </div>
+    </div>
+    <div class="col-3">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="bb_active" name="bb_active" value="True"
+                   {% if config.bb_active == 'True' %}checked{% endif %}>
         </div>
     </div>
-    
-    <div class="card card-body mb-4" id="bb_config_base">
-        <h5>Configuración del Indicador</h5>
-        
-        <div class="form-group row mb-3">
-            <label class="col-sm-6 col-form-label" for="bb_window">
-                <span data-toggle="tooltip" title="{{ comments.bb_window }}">
-                    <i class="fas fa-question-circle"></i> Periodo (Window)
-                </span>
-            </label>
-            <div class="col-sm-6">
-                <input type="number" class="form-control" id="bb_window" name="bb_window" 
-                        value="{{ config.bb_window if config.bb_window is defined else strategy.bb_window }}" min="5" max="100">
-            </div>
-        </div>
-
-        <div class="form-group row mb-3">
-            <label class="col-sm-6 col-form-label" for="bb_num_std">
-                <span data-toggle="tooltip" title="{{ comments.bb_num_std }}">
-                    <i class="fas fa-question-circle"></i> Desviaciones Estándar (σ)
-                </span>
-            </label>
-            <div class="col-sm-6">
-                <input type="number" class="form-control" id="bb_num_std" name="bb_num_std" 
-                        value="{{ config.bb_num_std if config.bb_num_std is defined else strategy.bb_num_std }}" min="1.0" max="3.0" step="0.1">
-            </div>
-        </div>
+    <div class="col-2">
+        <span class="text-muted small">{% if comments.bb_active %}<a href="#" title="{{ comments.bb_active }}">?</a>{% endif %}</span>
     </div>
+</div>
 
-    <div class="card card-info card-outline">
-        <div class="card-header">
-            <h5 class="card-title">Lógica de Señales (Cruce de Bandas)</h5>
-        </div>
-        <div class="card-body">
+<div class="row">
+    <div class="col-6 border-end">
+        <div class="card card-body bg-light">
+            <h5 class="mb-3 text-primary">Configuración Base</h5>
             
-            <div class="form-group row mb-3 align-items-center">
-                <label class="col-sm-6 col-form-label" for="bb_buy_crossover">
-                    <span data-toggle="tooltip" title="{{ comments.bb_buy_crossover }}">
-                        <i class="fas fa-question-circle"></i> 🟢 Compra: Cruce Banda Inferior (Reversión)
-                    </span>
-                </label>
-                <div class="col-sm-6">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" role="switch" id="bb_buy_crossover" name="bb_buy_crossover" value="True"
-                               {% if config.bb_buy_crossover == 'True' %}checked{% endif %}>
-                    </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold" for="bb_window">Periodo (Window):</label>
+                <div class="input-group input-group-sm">
+                    <input type="number" class="form-control" id="bb_window" name="bb_window" 
+                           value="{{ config.bb_window }}" min="5" max="100">
+                    <span class="input-group-text">Velas</span>
                 </div>
             </div>
 
-            <div class="form-group row mb-3 align-items-center">
-                <label class="col-sm-6 col-form-label" for="bb_sell_crossover">
-                    <span data-toggle="tooltip" title="{{ comments.bb_sell_crossover }}">
-                        <i class="fas fa-question-circle"></i> 🔴 Venta: Cruce Banda Superior (Cierre Técnico)
-                    </span>
-                </label>
-                <div class="col-sm-6">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" role="switch" id="bb_sell_crossover" name="bb_sell_crossover" value="True"
-                               {% if config.bb_sell_crossover == 'True' %}checked{% endif %}>
-                    </div>
-                </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold" for="bb_num_std">Desviaciones (σ):</label>
+                <input type="number" class="form-control form-control-sm" id="bb_num_std" name="bb_num_std" 
+                       value="{{ config.bb_num_std }}" min="1.0" max="3.0" step="0.1">
             </div>
 
+            <div class="mb-0">
+                <label class="form-label small fw-bold" for="bb_window_state">Ventana de Estado (Volatilidad):</label>
+                <input type="number" class="form-control form-control-sm" id="bb_window_state" name="bb_window_state" 
+                       value="{{ config.bb_window_state }}" min="10" max="200">
+            </div>
         </div>
     </div>
-    
-    <div class="card card-secondary card-outline mt-4">
-        <div class="card-header">
-            <h5 class="card-title">Configuración Avanzada de Estado (Volatilidad)</h5>
-        </div>
-        <div class="card-body">
-            <p class="text-muted">Ajusta el período de referencia para detectar extremos de volatilidad (Squeeze/Expansion).</p>
 
-            <div class="form-group row mb-3">
-                <label class="col-sm-6 col-form-label" for="bb_window_state">
-                    <span data-toggle="tooltip" title="{{ comments.bb_window_state }}">
-                        <i class="fas fa-question-circle"></i> Ventana de Estado (Barras)
-                    </span>
+    <div class="col-6">
+        <div class="card card-body">
+            <h5 class="mb-3 text-dark">Lógica de Señales</h5>
+            
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="bb_buy_crossover" name="bb_buy_crossover" value="True"
+                       {% if config.bb_buy_crossover == 'True' %}checked{% endif %}>
+                <label class="form-check-label small" for="bb_buy_crossover">
+                    🟢 Compra: Cruce Banda Inferior
                 </label>
-                <div class="col-sm-6">
-                    <input type="number" class="form-control" id="bb_window_state" name="bb_window_state" 
-                            value="{{ config.bb_window_state if config.bb_window_state is defined else strategy.bb_window_state }}" min="10" max="200">
-                </div>
+            </div>
+
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" id="bb_sell_crossover" name="bb_sell_crossover" value="True"
+                       {% if config.bb_sell_crossover == 'True' %}checked{% endif %}>
+                <label class="form-check-label small" for="bb_sell_crossover">
+                    🔴 Venta: Cruce Banda Superior
+                </label>
             </div>
         </div>
+        <p class="text-muted small mt-3 italic">
+            <i class="fas fa-info-circle"></i> El cruce de la banda inferior sugiere agotamiento de ventas (reversión), mientras que el superior sugiere toma de beneficios.
+        </p>
     </div>
 </div>

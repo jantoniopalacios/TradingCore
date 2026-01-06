@@ -1,176 +1,135 @@
 <h2 class="mb-3">Parámetros del Estocástico (STOCH)</h2>
 
 <div class="table-responsive">
-         <table class="table table-bordered table-striped align-middle">
-                  <thead class="table-dark">
-                           <tr>
-                                    <th scope="col" style="width: 40%;">Parámetro / Lógica</th>
-                                    <th scope="col" class="text-center">RÁPIDO</th>
-                                    <th scope="col" class="text-center">MEDIO</th>
-                                    <th scope="col" class="text-center">LENTO</th>
-                           </tr>
-                  </thead>
-                  <tbody>
-                           
-                           <tr>
-                                    <th scope="row" class="fw-bold text-primary">ACTIVACIÓN</th>
-                                    <td class="text-center">
-                                             <div class="form-check form-switch d-inline-block">
-                                                      <input class="form-check-input" type="checkbox" role="switch" id="stoch_fast" name="stoch_fast" value="True" {% if config.stoch_fast == 'True' %}checked{% endif %}>
-                                                      <label class="form-check-label" for="stoch_fast">Activar</label>
-                                             </div>
-                                    </td>
-                                    <td class="text-center">
-                                             <div class="form-check form-switch d-inline-block">
-                                                      <input class="form-check-input" type="checkbox" role="switch" id="stoch_mid" name="stoch_mid" value="True" {% if config.stoch_mid == 'True' %}checked{% endif %}>
-                                                      <label class="form-check-label" for="stoch_mid">Activar</label>
-                                             </div>
-                                    </td>
-                                    <td class="text-center">
-                                             <div class="form-check form-switch d-inline-block">
-                                                      <input class="form-check-input" type="checkbox" role="switch" id="stoch_slow" name="stoch_slow" value="True" {% if config.stoch_slow == 'True' %}checked{% endif %}>
-                                                      <label class="form-check-label" for="stoch_slow">Activar</label>
-                                             </div>
-                                    </td>
-                           </tr>
+    <table class="table table-bordered table-striped align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th scope="col" style="width: 40%;">Parámetro / Lógica</th>
+                <th scope="col" class="text-center">RÁPIDO</th>
+                <th scope="col" class="text-center">MEDIO</th>
+                <th scope="col" class="text-center">LENTO</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <th scope="row" class="fw-bold text-primary">ACTIVACIÓN</th>
+                <td class="text-center">
+                    <div class="form-check form-switch d-inline-block">
+                        <input class="form-check-input" type="checkbox" role="switch" id="stoch_fast" name="stoch_fast" value="True" {% if config.stoch_fast == 'True' %}checked{% endif %}>
+                        <label class="form-check-label" for="stoch_fast">Activar</label>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <div class="form-check form-switch d-inline-block">
+                        <input class="form-check-input" type="checkbox" role="switch" id="stoch_mid" name="stoch_mid" value="True" {% if config.stoch_mid == 'True' %}checked{% endif %}>
+                        <label class="form-check-label" for="stoch_mid">Activar</label>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <div class="form-check form-switch d-inline-block">
+                        <input class="form-check-input" type="checkbox" role="switch" id="stoch_slow" name="stoch_slow" value="True" {% if config.stoch_slow == 'True' %}checked{% endif %}>
+                        <label class="form-check-label" for="stoch_slow">Activar</label>
+                    </div>
+                </td>
+            </tr>
 
-                           <tr>
-                                    <th scope="row" class="text-secondary">Período %K</th>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_fast_period" min="1" value="{{ config.stoch_fast_period | default(3) }}"></td>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_mid_period" min="1" value="{{ config.stoch_mid_period | default(5) }}"></td>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_slow_period" min="1" value="{{ config.stoch_slow_period | default(89) }}"></td>
-                           </tr>
+            <tr>
+                <th scope="row" class="text-secondary">Período %K</th>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_fast_period" min="1" value="{{ config.stoch_fast_period }}"></td>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_mid_period" min="1" value="{{ config.stoch_mid_period }}"></td>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_slow_period" min="1" value="{{ config.stoch_slow_period }}"></td>
+            </tr>
 
-                           <tr>
-                                    <th scope="row" class="text-secondary">Período Suavizado (D/Smooth)</th>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_fast_smooth" min="1" value="{{ config.stoch_fast_smooth | default(2) }}"></td>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_mid_smooth" min="1" value="{{ config.stoch_mid_smooth | default(3) }}"></td>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_slow_smooth" min="1" value="{{ config.stoch_slow_smooth | default(45) }}"></td>
-                           </tr>
+            <tr>
+                <th scope="row" class="text-secondary">Período Suavizado (D/Smooth)</th>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_fast_smooth" min="1" value="{{ config.stoch_fast_smooth }}"></td>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_mid_smooth" min="1" value="{{ config.stoch_mid_smooth }}"></td>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_slow_smooth" min="1" value="{{ config.stoch_slow_smooth }}"></td>
+            </tr>
 
-                           <tr>
-                                    <th scope="row" class="text-success">Nivel Bajo (Low Level)</th>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_fast_low_level" min="0" max="50" value="{{ config.stoch_fast_low_level | default(20) }}"></td>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_mid_low_level" min="0" max="50" value="{{ config.stoch_mid_low_level | default(20) }}"></td>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_slow_low_level" min="0" max="50" value="{{ config.stoch_slow_low_level | default(30) }}"></td>
-                           </tr>
+            <tr>
+                <th scope="row" class="text-success">Nivel Bajo (Low Level)</th>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_fast_low_level" min="0" max="50" value="{{ config.stoch_fast_low_level }}"></td>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_mid_low_level" min="0" max="50" value="{{ config.stoch_mid_low_level }}"></td>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_slow_low_level" min="0" max="50" value="{{ config.stoch_slow_low_level }}"></td>
+            </tr>
 
-                           <tr>
-                                    <th scope="row" class="text-danger">Nivel Alto (High Level)</th>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_fast_high_level" min="50" max="100" value="{{ config.stoch_fast_high_level | default(50) }}"></td>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_mid_high_level" min="50" max="100" value="{{ config.stoch_mid_high_level | default(70) }}"></td>
-                                    <td><input type="number" class="form-control form-control-sm" name="stoch_slow_high_level" min="50" max="100" value="{{ config.stoch_slow_high_level | default(70) }}"></td>
-                           </tr>
+            <tr>
+                <th scope="row" class="text-danger">Nivel Alto (High Level)</th>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_fast_high_level" min="50" max="100" value="{{ config.stoch_fast_high_level }}"></td>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_mid_high_level" min="50" max="100" value="{{ config.stoch_mid_high_level }}"></td>
+                <td><input type="number" class="form-control form-control-sm" name="stoch_slow_high_level" min="50" max="100" value="{{ config.stoch_slow_high_level }}"></td>
+            </tr>
 
-                           <tr><td colspan="4" class="fw-bold text-center table-success">SEÑAL DE COMPRA (Lógica Exclusiva OR)</td></tr>
-                           
-                           <tr>
-                                    <th scope="row" class="text-success">Mínimo / Creciente</th>
-                                    <td class="text-center">
-                                             <div class="btn-group" role="group">
-                                                      <input type="radio" class="btn-check" name="stoch_fast_buy_logic" id="stoch_fast_minimo" value="stoch_fast_minimo" 
-                                                               {% if config.stoch_fast_buy_logic == 'stoch_fast_minimo' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-success btn-sm" for="stoch_fast_minimo" title="Señal de mínimo en vela anterior">Min</label>
-                                                      
-                                                      <input type="radio" class="btn-check" name="stoch_fast_buy_logic" id="stoch_fast_ascendente" value="stoch_fast_ascendente" 
-                                                               {% if config.stoch_fast_buy_logic == 'stoch_fast_ascendente' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-success btn-sm" for="stoch_fast_ascendente" title="El indicador está creciendo">Asc</label>
+            <tr><td colspan="4" class="fw-bold text-center table-success">SEÑAL DE COMPRA (Lógica Exclusiva)</td></tr>
+            <tr>
+                <th scope="row" class="text-success">Mínimo / Creciente</th>
+                <td class="text-center">
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="stoch_fast_buy_logic" id="sf_min" value="stoch_fast_minimo" {% if config.stoch_fast_buy_logic == 'stoch_fast_minimo' %}checked{% endif %}>
+                        <label class="btn btn-outline-success btn-sm" for="sf_min">Min</label>
+                        <input type="radio" class="btn-check" name="stoch_fast_buy_logic" id="sf_asc" value="stoch_fast_ascendente" {% if config.stoch_fast_buy_logic == 'stoch_fast_ascendente' %}checked{% endif %}>
+                        <label class="btn btn-outline-success btn-sm" for="sf_asc">Asc</label>
+                        <input type="radio" class="btn-check" name="stoch_fast_buy_logic" id="sf_none" value="None" {% if config.stoch_fast_buy_logic == 'None' %}checked{% endif %}>
+                        <label class="btn btn-outline-secondary btn-sm" for="sf_none">N/A</label>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="stoch_mid_buy_logic" id="sm_min" value="stoch_mid_minimo" {% if config.stoch_mid_buy_logic == 'stoch_mid_minimo' %}checked{% endif %}>
+                        <label class="btn btn-outline-success btn-sm" for="sm_min">Min</label>
+                        <input type="radio" class="btn-check" name="stoch_mid_buy_logic" id="sm_asc" value="stoch_mid_ascendente" {% if config.stoch_mid_buy_logic == 'stoch_mid_ascendente' %}checked{% endif %}>
+                        <label class="btn btn-outline-success btn-sm" for="sm_asc">Asc</label>
+                        <input type="radio" class="btn-check" name="stoch_mid_buy_logic" id="sm_none" value="None" {% if config.stoch_mid_buy_logic == 'None' %}checked{% endif %}>
+                        <label class="btn btn-outline-secondary btn-sm" for="sm_none">N/A</label>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="stoch_slow_buy_logic" id="ss_min" value="stoch_slow_minimo" {% if config.stoch_slow_buy_logic == 'stoch_slow_minimo' %}checked{% endif %}>
+                        <label class="btn btn-outline-success btn-sm" for="ss_min">Min</label>
+                        <input type="radio" class="btn-check" name="stoch_slow_buy_logic" id="ss_asc" value="stoch_slow_ascendente" {% if config.stoch_slow_buy_logic == 'stoch_slow_ascendente' %}checked{% endif %}>
+                        <label class="btn btn-outline-success btn-sm" for="ss_asc">Asc</label>
+                        <input type="radio" class="btn-check" name="stoch_slow_buy_logic" id="ss_none" value="None" {% if config.stoch_slow_buy_logic == 'None' %}checked{% endif %}>
+                        <label class="btn btn-outline-secondary btn-sm" for="ss_none">N/A</label>
+                    </div>
+                </td>
+            </tr>
 
-                                                      <input type="radio" class="btn-check" name="stoch_fast_buy_logic" id="stoch_fast_buy_none" value="None" 
-                                                               {% if config.stoch_fast_buy_logic == 'None' or config.stoch_fast_buy_logic == '' or config.stoch_fast_buy_logic is none %}checked{% endif %}>
-                                                      <label class="btn btn-outline-secondary btn-sm" for="stoch_fast_buy_none">Ninguna</label>
-                                             </div>
-                                    </td>
-                                    <td class="text-center">
-                                             <div class="btn-group" role="group">
-                                                      <input type="radio" class="btn-check" name="stoch_mid_buy_logic" id="stoch_mid_minimo" value="stoch_mid_minimo" 
-                                                               {% if config.stoch_mid_buy_logic == 'stoch_mid_minimo' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-success btn-sm" for="stoch_mid_minimo">Min</label>
-                                                      
-                                                      <input type="radio" class="btn-check" name="stoch_mid_buy_logic" id="stoch_mid_ascendente" value="stoch_mid_ascendente" 
-                                                               {% if config.stoch_mid_buy_logic == 'stoch_mid_ascendente' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-success btn-sm" for="stoch_mid_ascendente">Asc</label>
-                                                      
-                                                      <input type="radio" class="btn-check" name="stoch_mid_buy_logic" id="stoch_mid_buy_none" value="None" 
-                                                               {% if config.stoch_mid_buy_logic == 'None' or config.stoch_mid_buy_logic == '' or config.stoch_mid_buy_logic is none %}checked{% endif %}>
-                                                      <label class="btn btn-outline-secondary btn-sm" for="stoch_mid_buy_none">Ninguna</label>
-                                             </div>
-                                    </td>
-                                    <td class="text-center">
-                                             <div class="btn-group" role="group">
-                                                      <input type="radio" class="btn-check" name="stoch_slow_buy_logic" id="stoch_slow_minimo" value="stoch_slow_minimo" 
-                                                               {% if config.stoch_slow_buy_logic == 'stoch_slow_minimo' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-success btn-sm" for="stoch_slow_minimo">Min</label>
-                                                      
-                                                      <input type="radio" class="btn-check" name="stoch_slow_buy_logic" id="stoch_slow_ascendente" value="stoch_slow_ascendente" 
-                                                               {% if config.stoch_slow_buy_logic == 'stoch_slow_ascendente' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-success btn-sm" for="stoch_slow_ascendente">Asc</label>
-
-                                                      <input type="radio" class="btn-check" name="stoch_slow_buy_logic" id="stoch_slow_buy_none" value="None" 
-                                                               {% if config.stoch_slow_buy_logic == 'None' or config.stoch_slow_buy_logic == '' or config.stoch_slow_buy_logic is none %}checked{% endif %}>
-                                                      <label class="btn btn-outline-secondary btn-sm" for="stoch_slow_buy_none">Ninguna</label>
-                                             </div>
-                                    </td>
-                           </tr>
-
-                           <tr><td colspan="4" class="fw-bold text-center table-danger">BLOQUEO/VENTA (Lógica Exclusiva OR)</td></tr>
-                           
-                           <tr>
-                                    <th scope="row" class="text-danger">Máximo / Decreciente</th>
-                                    <td class="text-center">
-                                             <div class="btn-group" role="group">
-                                                      <input type="radio" class="btn-check" name="stoch_fast_sell_logic" id="stoch_fast_maximo" value="stoch_fast_maximo" 
-                                                               {% if config.stoch_fast_sell_logic == 'stoch_fast_maximo' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-danger btn-sm" for="stoch_fast_maximo" title="Señal de máximo en vela anterior">Max</label>
-                                                      
-                                                      <input type="radio" class="btn-check" name="stoch_fast_sell_logic" id="stoch_fast_descendente" value="stoch_fast_descendente" 
-                                                               {% if config.stoch_fast_sell_logic == 'stoch_fast_descendente' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-danger btn-sm" for="stoch_fast_descendente" title="El indicador está decreciendo">Desc</label>
-                                                      
-                                                      <input type="radio" class="btn-check" name="stoch_fast_sell_logic" id="stoch_fast_sell_none" value="None" 
-                                                               {% if config.stoch_fast_sell_logic == 'None' or config.stoch_fast_sell_logic == '' or config.stoch_fast_sell_logic is none %}checked{% endif %}>
-                                                      <label class="btn btn-outline-secondary btn-sm" for="stoch_fast_sell_none">Ninguna</label>
-                                             </div>
-                                    </td>
-                                    <td class="text-center">
-                                             <div class="btn-group" role="group">
-                                                      <input type="radio" class="btn-check" name="stoch_mid_sell_logic" id="stoch_mid_maximo" value="stoch_mid_maximo" 
-                                                               {% if config.stoch_mid_sell_logic == 'stoch_mid_maximo' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-danger btn-sm" for="stoch_mid_maximo">Max</label>
-                                                      
-                                                      <input type="radio" class="btn-check" name="stoch_mid_sell_logic" id="stoch_mid_descendente" value="stoch_mid_descendente" 
-                                                               {% if config.stoch_mid_sell_logic == 'stoch_mid_descendente' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-danger btn-sm" for="stoch_mid_descendente">Desc</label>
-                                                      
-                                                      <input type="radio" class="btn-check" name="stoch_mid_sell_logic" id="stoch_mid_sell_none" value="None" 
-                                                               {% if config.stoch_mid_sell_logic == 'None' or config.stoch_mid_sell_logic == '' or config.stoch_mid_sell_logic is none %}checked{% endif %}>
-                                                      <label class="btn btn-outline-secondary btn-sm" for="stoch_mid_sell_none">Ninguna</label>
-                                             </div>
-                                    </td>
-                                    <td class="text-center">
-                                             <div class="btn-group" role="group">
-                                                      <input type="radio" class="btn-check" name="stoch_slow_sell_logic" id="stoch_slow_maximo" value="stoch_slow_maximo" 
-                                                               {% if config.stoch_slow_sell_logic == 'stoch_slow_maximo' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-danger btn-sm" for="stoch_slow_maximo">Max</label>
-                                                      
-                                                      <input type="radio" class="btn-check" name="stoch_slow_sell_logic" id="stoch_slow_descendente" value="stoch_slow_descendente" 
-                                                               {% if config.stoch_slow_sell_logic == 'stoch_slow_descendente' %}checked{% endif %}>
-                                                      <label class="btn btn-outline-danger btn-sm" for="stoch_slow_descendente">Desc</label>
-
-                                                      <input type="radio" class="btn-check" name="stoch_slow_sell_logic" id="stoch_slow_sell_none" value="None" 
-                                                               {% if config.stoch_slow_sell_logic == 'None' or config.stoch_slow_sell_logic == '' or config.stoch_slow_sell_logic is none %}checked{% endif %}>
-                                                      <label class="btn btn-outline-secondary btn-sm" for="stoch_slow_sell_none">Ninguna</label>
-                                             </div>
-                                    </td>
-                           </tr>
-
-                           <tr>
-                                    <th scope="row" class="text-muted">Nivel de Sobreventa (No Usado)</th>
-                                    <td><input type="number" class="form-control form-control-sm" value="{{ config.stoch_fast_oversold | default(0) }}" disabled></td>
-                                    <td><input type="number" class="form-control form-control-sm" value="{{ config.stoch_mid_oversold | default(50) }}" disabled></td>
-                                    <td><input type="number" class="form-control form-control-sm" value="{{ config.stoch_slow_oversold | default(50) }}" disabled></td>
-                           </tr>
-
-                  </tbody>
-         </table>
+            <tr><td colspan="4" class="fw-bold text-center table-danger">BLOQUEO/VENTA (Lógica Exclusiva)</td></tr>
+            <tr>
+                <th scope="row" class="text-danger">Máximo / Decreciente</th>
+                <td class="text-center">
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="stoch_fast_sell_logic" id="sf_max" value="stoch_fast_maximo" {% if config.stoch_fast_sell_logic == 'stoch_fast_maximo' %}checked{% endif %}>
+                        <label class="btn btn-outline-danger btn-sm" for="sf_max">Max</label>
+                        <input type="radio" class="btn-check" name="stoch_fast_sell_logic" id="sf_desc" value="stoch_fast_descendente" {% if config.stoch_fast_sell_logic == 'stoch_fast_descendente' %}checked{% endif %}>
+                        <label class="btn btn-outline-danger btn-sm" for="sf_desc">Desc</label>
+                        <input type="radio" class="btn-check" name="stoch_fast_sell_logic" id="sfs_none" value="None" {% if config.stoch_fast_sell_logic == 'None' %}checked{% endif %}>
+                        <label class="btn btn-outline-secondary btn-sm" for="sfs_none">N/A</label>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="stoch_mid_sell_logic" id="sm_max" value="stoch_mid_maximo" {% if config.stoch_mid_sell_logic == 'stoch_mid_maximo' %}checked{% endif %}>
+                        <label class="btn btn-outline-danger btn-sm" for="sm_max">Max</label>
+                        <input type="radio" class="btn-check" name="stoch_mid_sell_logic" id="sm_desc" value="stoch_mid_descendente" {% if config.stoch_mid_sell_logic == 'stoch_mid_descendente' %}checked{% endif %}>
+                        <label class="btn btn-outline-danger btn-sm" for="sm_desc">Desc</label>
+                        <input type="radio" class="btn-check" name="stoch_mid_sell_logic" id="sms_none" value="None" {% if config.stoch_mid_sell_logic == 'None' %}checked{% endif %}>
+                        <label class="btn btn-outline-secondary btn-sm" for="sms_none">N/A</label>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="stoch_slow_sell_logic" id="ss_max" value="stoch_slow_maximo" {% if config.stoch_slow_sell_logic == 'stoch_slow_maximo' %}checked{% endif %}>
+                        <label class="btn btn-outline-danger btn-sm" for="ss_max">Max</label>
+                        <input type="radio" class="btn-check" name="stoch_slow_sell_logic" id="ss_desc" value="stoch_slow_descendente" {% if config.stoch_slow_sell_logic == 'stoch_slow_descendente' %}checked{% endif %}>
+                        <label class="btn btn-outline-danger btn-sm" for="ss_desc">Desc</label>
+                        <input type="radio" class="btn-check" name="stoch_slow_sell_logic" id="sss_none" value="None" {% if config.stoch_slow_sell_logic == 'None' %}checked{% endif %}>
+                        <label class="btn btn-outline-secondary btn-sm" for="sss_none">N/A</label>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
 </div>

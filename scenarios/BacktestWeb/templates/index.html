@@ -56,6 +56,10 @@
         .nested { margin-left: 24px; border-left: 1px dashed #ccc; padding-left: 10px; }
         .file-link { cursor: pointer; color: #0d6efd; text-decoration: none; }
         .file-link:hover { text-decoration: underline; }
+
+        /* Estilo adicional para la tabla de historial */
+        .table-historial { font-size: 0.9rem; }
+        .badge-sql { font-size: 0.75rem; vertical-align: middle; }
     </style>
 </head>
 <body>
@@ -87,6 +91,7 @@
                 <li class="nav-item"><button class="nav-link" id="tab-bb" data-bs-toggle="tab" data-bs-target="#panel-bb" type="button">B. Bollinger</button></li>
                 <li class="nav-item"><button class="nav-link" id="tab-volume" data-bs-toggle="tab" data-bs-target="#panel-volume" type="button">Volumen</button></li>
                 <li class="nav-item"><button class="nav-link fw-bold text-success" id="tab-files" data-bs-toggle="tab" data-bs-target="#panel-files" type="button"><i class="bi bi-folder2-open"></i> FICHEROS</button></li>
+                <li class="nav-item"><button class="nav-link fw-bold text-primary" id="tab-historial" data-bs-toggle="tab" data-bs-target="#panel-historial" type="button"><i class="bi bi-database-fill-check"></i> HISTORIAL SQL</button></li>
             </ul>
 
             <div class="tab-content p-3 border rounded shadow-sm bg-light" id="configTabsContent">
@@ -99,6 +104,7 @@
                 <div class="tab-pane fade" id="panel-bb">{% include '_tab_bb.html' %}</div>
                 <div class="tab-pane fade" id="panel-volume">{% include '_tab_mos_volume.html' %}</div>
                 <div class="tab-pane fade" id="panel-files">{% include '_tab_ficheros.html' %}</div>
+                <div class="tab-pane fade" id="panel-historial">{% include '_tab_historial.html' %}</div>
             </div>
 
             <div class="row mt-5 mb-5">
@@ -226,13 +232,10 @@
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'success') {
-                    // Guardamos la pestaña de FICHEROS como activa para el refresco
-                    localStorage.setItem('activeTabKey', 'tab-files');
+                    // Al terminar con éxito, mostramos la pestaña de historial para ver el nuevo registro SQL
+                    localStorage.setItem('activeTabKey', 'tab-historial');
                     
-                    // Pequeña notificación antes de recargar
                     alert("✅ " + data.message);
-                    
-                    // Refresco forzoso para leer nuevas fechas de archivos
                     location.reload();
                 } else {
                     alert("❌ Error: " + data.message);

@@ -1,20 +1,16 @@
-# file_handler.py (CÓDIGO REFACTORIZADO Y MODULAR)
-
 import os
 import re
-import shutil 
+import shutil
+import csv
 from datetime import datetime
 from pathlib import Path
-# Asumimos que PROJECT_ROOT se define en configuracion.py
-from .configuracion import PROJECT_ROOT 
+# Asumimos que PROJECT_ROOT y BACKTESTING_BASE_DIR se definen en configuracion.py
+from .configuracion import PROJECT_ROOT, BACKTESTING_BASE_DIR
 
 # ----------------------------------------------------------------------
 # --- CONSTANTES DE RUTA CENTRALIZADAS ---
 # ----------------------------------------------------------------------
 
-from .configuracion import BACKTESTING_BASE_DIR
-
-# Y sustituye cualquier ruta manual por:
 BACKTESTING_DIR = BACKTESTING_BASE_DIR
 
 # ----------------------------------------------------------------------
@@ -22,57 +18,72 @@ BACKTESTING_DIR = BACKTESTING_BASE_DIR
 # ----------------------------------------------------------------------
 
 def clean_run_results_dir(results_path): 
-    """
-    Elimina y recrea el directorio Run_results. 
-    Recibe la ruta de resultados desde el módulo de configuración.
-    Devuelve (éxito, mensaje).
-    """
+    """Elimina y recrea el directorio de resultados."""
     try:
-        # results_path debería ser un objeto Path
         if results_path.exists():
             shutil.rmtree(results_path) 
         results_path.mkdir(parents=True, exist_ok=True)
-        return True, f"El directorio '{results_path.name}' ha sido limpiado y recreado correctamente."
+        return True, f"El directorio '{results_path.name}' ha sido limpiado."
     except Exception as e:
-        error_message = f"Error crítico al intentar limpiar el directorio '{results_path.name}': {e}"
-        return False, error_message
+        return False, f"Error crítico al limpiar '{results_path.name}': {e}"
 
-def get_directory_tree(path, is_admin=False): # <--- Añade is_admin=False aquí
+def get_directory_tree(path, is_admin=False):
+    """Genera el árbol de directorios para el explorador web en formato de diccionario."""
+    # Si recibimos una lista de paths, los procesamos recursivamente
+    if isinstance(path, list):
+        combined_tree = []
+        for p in path:
+            combined_tree.extend(get_directory_tree(p, is_admin))
+        return combined_tree
+
     tree = []
     if not path.exists():
         return tree
     
-    for item in path.iterdir():
-        # Filtro de seguridad: si es el log y NO es admin, saltar
-        if item.name == "trading_app.log" and not is_admin:
-            continue
-            
-        if item.is_dir():
-            tree.append((item.name, True, get_directory_tree(item, is_admin), "Folder"))
-        else:
-            dt = datetime.fromtimestamp(item.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
-            tree.append((item.name, False, [], dt))
+    try:
+        for item in path.iterdir():
+            # Filtro de seguridad para logs
+            if item.name == "trading_app.log" and not is_admin:
+                continue
+                
+            if item.is_dir():
+                # Formato diccionario para compatibilidad con el frontend
+                tree.append({
+                    "name": item.name,
+                    "is_dir": True,
+                    "children": get_directory_tree(item, is_admin),
+                    "type": "Folder",
+                    "path": item.name
+                })
+            else:
+                dt = datetime.fromtimestamp(item.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
+                tree.append({
+                    "name": item.name,
+                    "is_dir": False,
+                    "children": [],
+                    "type": "File",
+                    "date": dt,
+                    "path": item.name
+                })
+    except Exception as e:
+        print(f"Error al acceder a {path}: {e}")
     
-    # Ordenar: carpetas primero, luego archivos
-    return sorted(tree, key=lambda x: (not x[1], x[0].lower()))
+    # Ordenar: primero carpetas, luego archivos, ambos alfabéticamente
+    return sorted(tree, key=lambda x: (not x["is_dir"], x["name"].lower()))
 
 # ----------------------------------------------------------------------
 # --- FUNCIONES DE CONFIGURACIÓN (.ENV) ---
 # ----------------------------------------------------------------------
 
 def read_config_with_metadata(config_path):
-    """
-    Lee el archivo de configuración (.env) y extrae variables, comentarios y el contenido completo.
-    """
+    """Lee el archivo .env extrayendo variables y sus comentarios previos."""
     variables = {}
     comments = {}
-    # Captura VAR = VALOR, ignorando el resto de la línea, incluyendo comentarios de fin de línea.
     var_regex = re.compile(r'^\s*(\w+)\s*=\s*([^\n#]+)', re.MULTILINE)
     
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             content = f.read()
-            # Guardamos el contenido completo para preservación de comentarios/estructura
             variables['__full_content__'] = content 
             
             lines = content.split('\n')
@@ -83,23 +94,15 @@ def read_config_with_metadata(config_path):
                 match = var_regex.match(line)
                 
                 if trimmed_line.startswith('#'):
-                    # Si es una línea de comentario, la guardamos
                     if trimmed_line.replace('#', '').strip() != '---':
                         current_comment_block.append(trimmed_line.lstrip('#').strip())
                 elif match:
-                    # Si es una línea de variable
                     name = match.group(1).strip()
-                    # Limpiamos el valor de posibles comillas (simples o dobles)
                     value = match.group(2).strip().strip('"').strip("'")
-                    
                     variables[name] = value
-                    # Asignamos el comentario recopilado
-                    comments[name] = "\n".join(current_comment_block) if current_comment_block else "Sin documentación específica."
-                    
-                    # Reiniciamos el bloque de comentarios para la siguiente variable
+                    comments[name] = "\n".join(current_comment_block) if current_comment_block else "Sin documentación."
                     current_comment_block = []
                 else:
-                    # Líneas de contenido que no son ni comentario ni variable activa
                     if trimmed_line == '' and not current_comment_block:
                         pass
                     elif current_comment_block:
@@ -108,31 +111,22 @@ def read_config_with_metadata(config_path):
     except FileNotFoundError:
         return None, None 
     except Exception as e:
-        raise Exception(f"Error al leer el archivo de configuración ({config_path}): {e}")
+        raise Exception(f"Error al leer .env ({config_path}): {e}")
         
     return variables, comments
 
 def write_config(new_values, full_content, config_path):
-    """
-    Reescribe el archivo de configuración (.env) con los nuevos valores, preservando la estructura.
-    """
-    
+    """Escribe los nuevos valores en el .env preservando comentarios."""
     new_content = full_content
-    
     for name, value in new_values.items():
         pattern = re.compile(rf'^\s*{re.escape(name)}\s*=\s*([^\n#]+)', re.MULTILINE)
-        
-        # Formateo de valor (Booleano o String con comillas)
         formatted_value = str(value).strip()
         if isinstance(value, bool) or str(value).lower() in ('true', 'false'):
             formatted_value = "True" if str(value).lower() in ('true', 'on') else "False"
         elif not (str(value).isnumeric() or re.match(r'^-?\d*\.?\d+$', formatted_value)):
             formatted_value = f'"{formatted_value.strip(chr(34))}"'
 
-        # Intentar reemplazar
         new_content, count = pattern.subn(f'{name} = {formatted_value}', new_content)
-        
-        # SI LA VARIABLE NO EXISTÍA (count == 0), la añadimos al final
         if count == 0:
             new_content += f"\n{name} = {formatted_value}"
 
@@ -140,18 +134,15 @@ def write_config(new_values, full_content, config_path):
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(new_content.strip() + "\n")
     except Exception as e:
-        raise Exception(f"No se pudo escribir en el archivo {config_path}: {e}")
-    
+        raise Exception(f"Error al escribir en {config_path}: {e}")
     return True
 
 # ----------------------------------------------------------------------
-# --- FUNCIONES DE MANEJO CSV (RAW) ---
+# --- FUNCIONES DE MANEJO CSV (RAW Y MÉTRICAS) ---
 # ----------------------------------------------------------------------
 
 def read_symbols_raw(symbols_path):
-    """
-    Lee el archivo symbols.csv y devuelve su contenido como una cadena de texto sin procesar.
-    """
+    """Lee el archivo de símbolos como texto plano."""
     try:
         with open(symbols_path, mode='r', encoding='utf-8') as file:
             return file.read()
@@ -161,23 +152,46 @@ def read_symbols_raw(symbols_path):
         raise Exception(f"Error al leer {symbols_path}: {e}")
 
 def write_symbols_raw(content, symbols_path): 
-    """
-    Escribe una cadena de texto directamente en el archivo symbols.csv.
-    """
+    """Escribe el contenido de símbolos asegurando formato CSV."""
     try:
-        # 1. Limpieza de líneas vacías
         lines = [line.strip() for line in content.splitlines() if line.strip()]
-        
-        # 2. Reúne las líneas
         content_to_write = "\n".join(lines)
-        
-        # 3. Asegura un único salto de línea final para un formato CSV estándar
         if content_to_write:
             content_to_write += "\n"
-            
         with open(symbols_path, mode='w', newline='', encoding='utf-8') as file:
             file.write(content_to_write)
-            
         return True
     except Exception as e:
-        raise Exception(f"No se pudo escribir en el archivo {symbols_path}: {e}")
+        raise Exception(f"Error al escribir en {symbols_path}: {e}")
+
+def extraer_metricas_backtest(ruta_csv):
+    """Extrae métricas finales de resultados_estrategia.csv."""
+    metricas = {
+        'beneficio_neto': 0.0,
+        'drawdown_max': 0.0,
+        'num_operaciones': 0,
+        'win_rate': 0.0
+    }
+
+    path = Path(ruta_csv)
+    if not path.exists():
+        return metricas
+
+    try:
+        with open(path, mode='r', encoding='utf-8') as f:
+            reader = list(csv.DictReader(f))
+            if not reader:
+                return metricas
+
+            ultima_fila = reader[-1]
+            metricas['beneficio_neto'] = float(ultima_fila.get('Net Profit', 0))
+            metricas['drawdown_max'] = float(ultima_fila.get('Max DD', 0))
+            metricas['num_operaciones'] = int(float(ultima_fila.get('Total Trades', 0)))
+            
+            wr = str(ultima_fila.get('Win Rate', '0')).replace('%', '').strip()
+            metricas['win_rate'] = float(wr)
+
+    except Exception as e:
+        print(f"DEBUG: Error procesando métricas del CSV {path.name}: {e}")
+
+    return metricas

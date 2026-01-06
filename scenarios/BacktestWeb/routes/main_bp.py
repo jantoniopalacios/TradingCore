@@ -4,266 +4,214 @@ import csv
 from pathlib import Path
 from flask import (
     Blueprint, render_template, request, redirect, url_for, 
-    flash, send_from_directory, current_app, abort, session, jsonify, Response
+    flash, session, jsonify, Response, send_from_directory, abort
 )
 from collections import deque
 
-# --- IMPORTACIONES DE LA ARQUITECTURA ---
-from ..file_handler import ( 
-    read_symbols_raw, write_symbols_raw,
-    get_directory_tree
-)
-
+# --- IMPORTACIONES ORIGINALES ---
+from ..file_handler import read_symbols_raw, write_symbols_raw, get_directory_tree
 from ..configuracion import (
-    guardar_parametros_a_env,
-    inicializar_configuracion_usuario,
-    cargar_y_asignar_configuracion,
-    System,
-    BACKTESTING_BASE_DIR
+    guardar_parametros_a_env, inicializar_configuracion_usuario,
+    cargar_y_asignar_configuracion, System, BACKTESTING_BASE_DIR
 ) 
-
 from trading_engine.core.constants import VARIABLE_COMMENTS
 from ..Backtest import ejecutar_backtest 
 
-# --- CONFIGURACIÓN Y BLUEPRINT ---
 main_bp = Blueprint('main', __name__) 
 
-# --- HELPERS ---
-
+# --- FUNCIONES DE SOPORTE (Manteniendo tu lógica de usuarios) ---
 def obtener_usuarios_registrados():
-    """Lee la lista de usuarios desde Backtesting/users.csv"""
     usuarios = {}
     ruta_usuarios = BACKTESTING_BASE_DIR / "users.csv"
-    
-    if not ruta_usuarios.exists():
-        current_app.logger.warning(f"⚠️ users.csv no encontrado en {ruta_usuarios}")
-        return {"admin": "trading"} # Backup de emergencia
-        
+    if not ruta_usuarios.exists(): return {"admin": "trading"} 
     try:
         with open(ruta_usuarios, mode='r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                user = row['username'].strip().lower()
-                pwd = row['password'].strip()
-                usuarios[user] = pwd
-    except Exception as e:
-        current_app.logger.error(f"Error leyendo users.csv: {e}")
-        
+                usuarios[row['username'].strip().lower()] = row['password'].strip()
+    except: pass
     return usuarios
 
 def get_user_paths(username):
-    """Calcula las rutas físicas usando la lógica maestra"""
     rutas = inicializar_configuracion_usuario(username)
-    
     return {
-        'fichero_variables': rutas['fichero_variables'],
-        'fichero_simbolos': rutas['fichero_simbolos'],
         'results_dir': rutas['results_dir'],
         'graph_dir': rutas['graph_dir'],
-        'logs_dir': BACKTESTING_BASE_DIR / "logs"  # Ruta centralizada solicitada
+        'logs_dir': BACKTESTING_BASE_DIR / "logs",
+        'fichero_simbolos': rutas['fichero_simbolos']
     }
 
-# --- RUTAS DE AUTENTICACIÓN ---
-
-@main_bp.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user = request.form.get('username', '').lower().strip()
-        password = request.form.get('password', '').strip()
-
-        usuarios_permitidos = obtener_usuarios_registrados()
-
-        if user in usuarios_permitidos and usuarios_permitidos[user] == password:
-            session.clear()
-            session['logged_in'] = True
-            session['user_mode'] = user
-            
-            inicializar_configuracion_usuario(user)
-            flash(f"✅ Bienvenido, {user.capitalize()}", "success")
-            return redirect(url_for('main.index'))
-        
-        flash("❌ Usuario o contraseña incorrectos", "danger")
-    
-    return render_template('login.html')
-
-@main_bp.route('/logout')
-def logout():
-    session.clear()
-    flash("Sesión cerrada.", "info")
-    return redirect(url_for('main.login'))
-
-# --- RUTA PRINCIPAL ---
-
+# --- RUTA PRINCIPAL (INDEX) ---
 @main_bp.route('/', methods=['GET', 'POST'])
 def index():
     if not session.get('logged_in'):
         return redirect(url_for('main.login'))
-    
-    user_mode = session.get('user_mode')
-    paths = get_user_paths(user_mode)
 
-    # --- 1. MANEJO DEL POST (GUARDAR CONFIGURACIÓN) ---
+    user_mode = session.get('user_mode')
+    rutas = inicializar_configuracion_usuario(user_mode)
+
     if request.method == 'POST':
-        form_data = dict(request.form)
-        symbols_content = form_data.pop('symbols_content', None) 
+        form_data = request.form.to_dict()
         
-        try:
-            if symbols_content is not None:
-                write_symbols_raw(symbols_content, str(paths['fichero_simbolos']))
-            
-            guardar_parametros_a_env(form_data, user_mode) 
-            cargar_y_asignar_configuracion(user_mode)
-            flash(f"✅ Configuración actualizada con éxito.", 'success')
-        except Exception as e:
-            flash(f"❌ Error al guardar: {e}", 'danger')
-            
+        # 1. Guardar Símbolos (symbols_content)
+        if 'symbols_content' in form_data:
+            write_symbols_raw(form_data['symbols_content'], rutas['fichero_simbolos'])
+        
+        # 2. Configuración (.env)
+        env_config = {k: v for k, v in form_data.items() if k != 'symbols_content'}
+
+        # GESTIÓN DE SWITCHES (Booleanos)
+        for attr in dir(System):
+            if not attr.startswith("__"):
+                val_original = getattr(System, attr)
+                if isinstance(val_original, bool):
+                    # En Flask/HTML, si el checkbox no se marca, no llega en form_data
+                    env_config[attr] = "True" if attr in form_data else "False"
+
+        guardar_parametros_a_env(env_config, user_mode)
+        cargar_y_asignar_configuracion(user_mode)
+        
+        flash("✅ Configuración guardada correctamente.", "success")
         return redirect(url_for('main.index'))
 
-    # --- 2. MANEJO DEL GET (VISUALIZAR) ---
-    config_completa = cargar_y_asignar_configuracion(user_mode)
+    # --- FLUJO GET (Renderizado de pestañas) ---
+    cargar_y_asignar_configuracion(user_mode)
+    
+    # NORMALIZACIÓN PARA HTML:
+    config_web = {}
+    for attr in dir(System):
+        if not attr.startswith("__"):
+            val = getattr(System, attr)
+            config_web[attr] = str(val).strip() if val is not None else "None"
 
-    # Normalización de booleanos para la UI
-    if isinstance(config_completa, dict):
-        for key, value in config_completa.items():
-            if isinstance(value, bool):
-                config_completa[key] = "True" if value else "False"
-
-    symbols_content_data = read_symbols_raw(str(paths['fichero_simbolos']))
-
-    # --- CONSTRUCCIÓN DEL ÁRBOL DE ARCHIVOS ---
+    # --- CONSTRUCCIÓN DEL ÁRBOL DE ARCHIVOS (Formato Diccionario) ---
     file_tree = []
     
-    # Determinamos si es admin una sola vez para pasarlo
-    es_administrador = (user_mode == 'admin')
+    # 1. Carpeta de Resultados
+    if rutas['results_dir'].exists():
+        file_tree.append({
+            "name": "Resultados",
+            "is_dir": True,
+            "children": get_directory_tree(rutas['results_dir'], user_mode == 'admin'),
+            "type": "Folder",
+            "path": "Resultados"
+        })
 
-    # Logs (Solo Admin)
-    if es_administrador and paths['logs_dir'].exists():
-        # Pasamos True a get_directory_tree
-        file_tree.append(("Sistema Logs 🛡️", True, get_directory_tree(paths['logs_dir'], is_admin=True), "Folder"))
-
-    # Resultados y Gráficos
-    if paths['results_dir'].exists():
-        file_tree.append(("Resultados", True, get_directory_tree(paths['results_dir'], is_admin=es_administrador), "Folder"))
+    # 2. Carpeta de Gráficos
+    if rutas['graph_dir'].exists():
+        file_tree.append({
+            "name": "Gráficos",
+            "is_dir": True,
+            "children": get_directory_tree(rutas['graph_dir'], user_mode == 'admin'),
+            "type": "Folder",
+            "path": "Gráficos"
+        })
     
-    if paths['graph_dir'].exists():
-        file_tree.append(("Gráficos", True, get_directory_tree(paths['graph_dir'], is_admin=es_administrador), "Folder"))
+    # 3. Logs de Sistema (Solo para Admin)
+    if user_mode == 'admin':
+        logs_p = BACKTESTING_BASE_DIR / "logs"
+        if logs_p.exists():
+            file_tree.append({
+                "name": "Logs Sistema",
+                "is_dir": True,
+                "children": get_directory_tree(logs_p, True),
+                "type": "Folder",
+                "path": "Logs"
+            })
+
+    # Historial de Resultados (Base de Datos)
+    registros = []
+    try:
+        from ..database import Usuario, ResultadoBacktest
+        u = Usuario.query.filter_by(username=user_mode).first()
+        if u:
+            registros = ResultadoBacktest.query.filter_by(usuario_id=u.id).order_by(ResultadoBacktest.fecha_ejecucion.desc()).limit(20).all()
+    except Exception as e:
+        print(f"Error al cargar historial SQL: {e}")
 
     return render_template(
-        'index.html', 
-        config=config_completa, 
-        comments=VARIABLE_COMMENTS, 
-        symbols_content=symbols_content_data,
+        'index.html',
+        system=System,
+        strategy=System,
+        config=config_web,
+        symbols_content=read_symbols_raw(rutas['fichero_simbolos']) if rutas['fichero_simbolos'].exists() else "",
         file_tree=file_tree,
-        backtesting_dir_name=user_mode,
-        strategy=System
+        registros=registros,
+        comments=VARIABLE_COMMENTS
     )
 
-# --- RUTAS DE ARCHIVOS Y EJECUCIÓN ---
+# --- ACCIONES Y VISOR (Todas las funciones restauradas) ---
 
 @main_bp.route('/launch_strategy', methods=['POST'])
 def launch_strategy():
-    if not session.get('logged_in'):
-        return jsonify({"status": "error", "message": "No autorizado"}), 401
-
+    if not session.get('logged_in'): return jsonify({"status": "error"}), 401
     config_web = request.form.to_dict()
     config_web['user_mode'] = session.get('user_mode')
-    
-    # Iniciamos el hilo del backtest
-    thread = threading.Thread(target=ejecutar_backtest, args=(config_web,))
-    thread.start()
-    
-    # --- CAMBIO CRÍTICO: Esperamos a que el proceso termine ---
-    thread.join() 
-    
-    # --- TIEMPO DE CORTESÍA ---
-    # Esperamos 2 segundos extra para asegurar que el explorador de archivos
-    # de Windows vea los nuevos ficheros antes de recargar la web.
-    import time
-    time.sleep(2) 
-    
-    return jsonify({
-        "status": "success", 
-        "message": "Backtest finalizado. Los archivos han sido actualizados."
-    })
+    # Ejecutar el motor de backtest en segundo plano
+    threading.Thread(target=ejecutar_backtest, args=(config_web,)).start()
+    return jsonify({"status": "success", "message": "Backtest iniciado."})
 
 @main_bp.route('/file/<path:path>')
 def view_file(path):
     if not session.get('logged_in'): abort(401)
     user_mode = session.get('user_mode')
     paths = get_user_paths(user_mode)
-    
-    # Bloqueo de logs para no-admins
-    if "logs" in path.lower() and user_mode != 'admin':
-        abort(403)
-
-    # Obtenemos solo el nombre del archivo (ej: FR_diario.csv)
     filename = os.path.basename(path)
-
-    # Carpetas donde buscar
-    search_folders = [paths['results_dir'], paths['graph_dir']]
-    if user_mode == 'admin':
-        search_folders.append(paths['logs_dir'])
-
+    
+    # Búsqueda recursiva para encontrar archivos en subcarpetas de resultados/gráficos
     target = None
+    search_dirs = [paths['results_dir'], paths['graph_dir']]
+    if user_mode == 'admin': search_dirs.append(paths['logs_dir'])
 
-    # --- NUEVA LÓGICA DE BÚSQUEDA RECURSIVA ---
-    for base in search_folders:
-        # Buscamos el nombre del archivo en cualquier subnivel de la carpeta base
-        # rglob '*' busca en todas las subcarpetas de forma eficiente
-        for posible in base.rglob(filename):
-            if posible.is_file():
-                target = posible
-                break
+    for folder in search_dirs:
+        for p in folder.rglob(filename):
+            if p.is_file():
+                target = p; break
         if target: break
 
-    if not target: 
-        current_app.logger.error(f"❌ Archivo no encontrado en el servidor: {filename}")
-        abort(404)
-
-    # Manejo de visualización según extensión
+    if not target: abort(404)
+    
     if target.suffix.lower() == '.html':
         return send_from_directory(target.parent, target.name)
     
-    try:
-        if target.suffix.lower() == '.log':
-            with open(target, 'r', encoding='utf-8', errors='replace') as f:
-                contenido = "".join(deque(f, maxlen=2000))
-        else:
-            with open(target, 'r', encoding='utf-8', errors='replace') as f:
-                contenido = f.read()
-        
-        return Response(contenido, mimetype='text/plain')
-    except Exception as e:
-        return f"Error leyendo archivo: {e}", 500
+    # Lectura de archivos de texto / logs (últimas 2000 líneas para logs)
+    with open(target, 'r', encoding='utf-8', errors='replace') as f:
+        contenido = "".join(deque(f, maxlen=2000)) if target.suffix.lower() == '.log' else f.read()
+    return Response(contenido, mimetype='text/plain')
 
 @main_bp.route('/delete-file/<path:path>', methods=['POST'])
 def delete_file(path):
     if not session.get('logged_in'): abort(401)
-    
     user_mode = session.get('user_mode')
     paths = get_user_paths(user_mode)
     filename = os.path.basename(path)
     
-    # No permitir que nadie (ni admin por accidente) borre el log activo fácilmente
-    if "trading_app.log" in filename and request.form.get('confirm') != 'true':
-        flash("El log del sistema no debe borrarse mientras el servidor está activo.", "warning")
-        return redirect(url_for('main.index'))
-
-    target = None
-    search_folders = [paths['results_dir'], paths['graph_dir']]
-    if user_mode == 'admin': search_folders.append(paths['logs_dir'])
-
-    for base in search_folders:
-        posible = base / filename
-        if posible.exists():
-            target = posible
-            break
-
-    if target and target.exists():
-        try:
+    for folder in [paths['results_dir'], paths['graph_dir']]:
+        target = folder / filename
+        if target.exists():
             os.remove(target)
-            flash(f"🗑️ '{filename}' eliminado.", "success")
-        except Exception as e:
-            flash(f"❌ Error al eliminar: {e}", "danger")
-    
+            flash(f"Archivo {filename} eliminado.", "info")
+            break
     return redirect(url_for('main.index'))
+
+# --- AUTENTICACIÓN ---
+
+@main_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user = request.form.get('username', '').lower().strip()
+        pwd = request.form.get('password', '').strip()
+        users = obtener_usuarios_registrados()
+        
+        if user in users and users[user] == pwd:
+            session.clear()
+            session['logged_in'] = True
+            session['user_mode'] = user
+            return redirect(url_for('main.index'))
+        flash("❌ Usuario o contraseña incorrectos", "danger")
+    return render_template('login.html')
+
+@main_bp.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('main.login'))

@@ -276,6 +276,64 @@ def ejecutar_backtest(config_dict: dict):
             logger.info(f"Actualizando el histórico detallado: {fichero_historico}")
             # Asumo que guardar_historico ahora maneja la lógica de append/creación
             guardar_historico(resultados_df, fichero_historico, COLUMNAS_HISTORICO)
+
+            # ... (Dentro de ejecutar_backtest, después de guardar_historico)
+
+            if not resultados_df.empty:
+                try:
+                    from .database import db, ResultadoBacktest, Trade, Usuario
+                    from flask import current_app
+                    from datetime import datetime
+
+                    with current_app.app_context():
+                        user_obj = Usuario.query.filter_by(username=user_mode).first()
+                        if not user_obj:
+                            logger.error(f"❌ DB: Usuario {user_mode} no encontrado.")
+                            return None
+
+                        for _, row in resultados_df.iterrows():
+                            # Mapeo exacto según tu CSV de ejemplo
+                            nuevo_bt = ResultadoBacktest(
+                                usuario_id=user_obj.id,
+                                symbol=str(row.get('Symbol', 'N/A')),
+                                sharpe_ratio=float(row.get('Sharpe Ratio', 0) or 0),
+                                max_drawdown=float(row.get('Max Drawdown [%]', 0) or 0),
+                                profit_factor=float(row.get('Profit Factor', 0) or 0),
+                                return_pct=float(row.get('Return [%]', 0) or 0),
+                                total_trades=int(row.get('Total Trades', 0) or 0),
+                                win_rate=float(row.get('Win Rate [%]', 0) or 0),
+                                
+                                # Datos temporales
+                                fecha_ejecucion=datetime.now(),
+                                fecha_inicio_datos=str(start_date),
+                                fecha_fin_datos=str(end_date),
+                                intervalo=str(intervalo)
+                            )
+                            db.session.add(nuevo_bt)
+                            db.session.flush() 
+
+                            # Guardar Trades si existen
+                            if not trades_df.empty:
+                                # Filtramos trades por el símbolo actual (ej: NVDA)
+                                trades_simbolo = trades_df[trades_df['Symbol'] == row.get('Symbol')]
+                                for _, t_row in trades_simbolo.iterrows():
+                                    nuevo_trade = Trade(
+                                        backtest_id=nuevo_bt.id,
+                                        tipo=str(t_row.get('Type', 'N/A')),
+                                        fecha=str(t_row.get('Entry_Date', t_row.get('Date', ''))),
+                                        precio_entrada=float(t_row.get('Entry_Price', 0) or 0),
+                                        precio_salida=float(t_row.get('Exit_Price', 0) or 0),
+                                        pnl_absoluto=float(t_row.get('PnL', 0) or 0),
+                                        retorno_pct=float(t_row.get('Return [%]', 0) or 0)
+                                    )
+                                    db.session.add(nuevo_trade)
+
+                        db.session.commit()
+                        logger.info(f"✅ SQL: Guardado exitoso en base de datos para {user_mode}")
+
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"❌ Error SQL Crítico: {e}")
             
         except Exception as e:
             logger.error(f"Error al guardar ficheros: {e}")
