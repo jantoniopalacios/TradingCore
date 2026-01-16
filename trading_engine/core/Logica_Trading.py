@@ -303,20 +303,15 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
         # Registro en trades_list
         strategy_self.trades_list.append({
             "Symbol": strategy_self.ticker, 
-            "Tipo": "COMPRA",
-            "Fecha": "N/A", 
-            "Precio_Entrada": "N/A", 
-            "Stop_Loss_Inicial": "N/A", 
+            "Tipo": "COMPRA", 
+            "Descripcion": descripcion_compra,
+            "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
+            "Precio_Entrada": round(strategy_self.data.Close[-1], 2), 
+            "Stop_Loss_Inicial": round(strategy_self.my_stop_loss, 2), 
             "Precio_Salida": "N/A", 
-            "Resultado": "N/A",
             "PnL_Absoluto": "N/A", 
             "Retorno_Pct": "N/A", 
-            "Comision_Total": "N/A", 
-            "Descripcion": descripcion_compra, 
-            "Fecha de operacion": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
-            "Precio": round(strategy_self.data.Close[-1], 2), 
-            "Stop_loss": round(strategy_self.my_stop_loss, 2), 
-            "Nuevo_SL": "N/A",
+            "Comision_Total": "N/A",
         })
 
 # ----------------------------------------------------------------------
@@ -349,6 +344,8 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
         
     # 1. CALCULAR Y ACTUALIZAR ESTADOS
     _actualizar_estados_indicadores(strategy_self)
+
+    final_stop_loss = strategy_self.my_stop_loss
 
     close_position = False
     descripcion_cierre = "N/A"
@@ -436,20 +433,15 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
             # 🌟 REGISTRO DE VENTA TÉCNICA 🌟
             strategy_self.trades_list.append({
                 "Symbol": strategy_self.ticker, 
-                "Tipo": descripcion_cierre, 
+                "Tipo": "VENTA",
+                "Descripcion": descripcion_cierre, 
                 "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
                 "Precio_Entrada": round(trade_obj.entry_price, 4) if trade_obj and trade_obj.entry_price is not None else "N/A",
-                "Stop_Loss_Inicial": "N/A", 
+                "Stop_Loss_Inicial": round(final_stop_loss, 2) if final_stop_loss else "N/A", 
                 "Precio_Salida": round(trade_obj.exit_price, 4) if trade_obj and trade_obj.exit_price is not None else round(strategy_self.data.Close[-1], 4),
-                "Resultado": "Cerrada",
                 "PnL_Absoluto": round(trade_obj.pl, 2) if trade_obj and trade_obj.pl is not None else "N/A", 
                 "Retorno_Pct": round(trade_obj.pl_pct * 100, 2) if trade_obj and trade_obj.pl_pct is not None else "N/A", 
                 "Comision_Total": round(trade_obj._commissions, 2) if trade_obj and trade_obj._commissions is not None else "N/A",
-                "Descripcion": "Cierre tecnico", 
-                "Fecha de operacion": "N/A", 
-                "Precio": "N/A", 
-                "Stop_loss": "N/A", 
-                "Nuevo_SL": "N/A",
             })
             
             return 
@@ -470,15 +462,15 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
         old_stop_loss = strategy_self.my_stop_loss
         strategy_self.my_stop_loss = new_stop_loss
         
-        # Registrar la actualización del SL
-        _log_trade_action_sl_update(strategy_self, old_stop_loss, new_stop_loss)
+        # Registrar la actualización del SL (comentada para evitar logs excesivos)
+        # _log_trade_action_sl_update(strategy_self, old_stop_loss, new_stop_loss)
 
     # 4. Cierre por Stop Loss
     if strategy_self.my_stop_loss is not None and strategy_self.data.Close[-1] < strategy_self.my_stop_loss:
         
         strategy_self.position.close()
         
-        final_stop_loss = strategy_self.my_stop_loss
+
         trade_obj = strategy_self.trades[-1] if strategy_self.trades else None
         
         # Reseteo de variables de la estrategia
@@ -488,18 +480,13 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
         # 🌟 REGISTRO DE VENTA POR STOP LOSS 🌟
         strategy_self.trades_list.append({
             "Symbol": strategy_self.ticker, 
-            "Tipo": "VENTA StopLoss", 
+            "Tipo": "VENTA",
+            "Descripcion": "StopLoss", 
             "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
             "Precio_Entrada": round(trade_obj.entry_price, 4) if trade_obj and trade_obj.entry_price is not None else "N/A",
             "Stop_Loss_Inicial": round(final_stop_loss, 2) if final_stop_loss else "N/A", 
             "Precio_Salida": round(trade_obj.exit_price, 4) if trade_obj and trade_obj.exit_price is not None else round(strategy_self.data.Close[-1], 4),
-            "Resultado": "Cerrada",
             "PnL_Absoluto": round(trade_obj.pl, 2) if trade_obj and trade_obj.pl is not None else "N/A", 
             "Retorno_Pct": round(trade_obj.pl_pct * 100, 2) if trade_obj and trade_obj.pl_pct is not None else "N/A", 
             "Comision_Total": round(trade_obj._commissions, 2) if trade_obj and trade_obj._commissions is not None else "N/A",
-            "Descripcion": "N/A", 
-            "Fecha de operacion": "N/A", 
-            "Precio": "N/A", 
-            "Stop_loss": "N/A", 
-            "Nuevo_SL": "N/A",
         })

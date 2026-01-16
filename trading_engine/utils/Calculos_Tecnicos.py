@@ -19,43 +19,27 @@ SeriesOrList = Union[pd.Series, np.ndarray, List[float]]
 
 def es_ascendente(serie: SeriesOrList, periodo: int = 3) -> bool:
     """
-    Determina si la serie de datos tiene una tendencia local ascendente 
-    en el periodo especificado (la última vela debe ser la más alta).
-
-    :param serie: Serie de tiempo (indicador, precio, etc.).
-    :param periodo: Número de puntos a revisar (incluyendo el actual).
-    :return: True si la serie es ascendente en el periodo.
+    Determina si la serie es ascendente comparando el valor actual 
+    con el valor del inicio del periodo (más robusto ante mesetas).
     """
     if len(serie) < periodo:
         return False
     
-    # Tomamos el slice más reciente
-    ultimos_puntos = serie[-periodo:]
-    
-    # Comprobamos si cada punto es mayor que el anterior
-    # [10, 11, 12] -> True
-    return all(ultimos_puntos[i] < ultimos_puntos[i+1] for i in range(periodo - 1))
+    # Compara el último punto con el primero del bloque
+    return serie[-1] > serie[-periodo]
 
 
 def es_descendente(serie: SeriesOrList, periodo: int = 3) -> bool:
     """
-    Determina si la serie de datos tiene una tendencia local descendente 
-    en el periodo especificado (la última vela debe ser la más baja).
-
-    :param serie: Serie de tiempo (indicador, precio, etc.).
-    :param periodo: Número de puntos a revisar (incluyendo el actual).
-    :return: True si la serie es descendente en el periodo.
+    Determina si la serie es descendente comparando el valor actual 
+    con el valor del inicio del periodo.
     """
     if len(serie) < periodo:
         return False
         
-    # Tomamos el slice más reciente
-    ultimos_puntos = serie[-periodo:]
-
-    # Comprobamos si cada punto es menor que el anterior
-    # [12, 11, 10] -> True
-    return all(ultimos_puntos[i] > ultimos_puntos[i+1] for i in range(periodo - 1))
-
+    # Compara el último punto con el primero del bloque
+    # Esto detectará la caída en MSFT aunque haya velas planas entre medias
+    return serie[-1] < serie[-periodo]
 
 # ----------------------------------------------------------------------
 # --- FUNCIONES DE ANÁLISIS DE ESTADO (Mínimos y Máximos Locales) ---

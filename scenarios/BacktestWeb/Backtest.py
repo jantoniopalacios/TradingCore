@@ -15,6 +15,12 @@ import time
 from datetime import datetime
 from pathlib import Path 
 
+from bokeh.embed import file_html
+from bokeh.resources import CDN
+
+import json
+from .database import db, ResultadoBacktest, Trade
+
 # ----------------------------------------------------------------------
 # --- SOLUCIÓN DE RUTA SIMPLIFICADA (Para trading_engine a nivel de raíz) ---
 # ----------------------------------------------------------------------
@@ -130,11 +136,11 @@ def ejecutar_backtest(config_dict: dict):
         simbolos_df = pd.read_csv(fichero_simbolos)
     except FileNotFoundError:
         logger.error(f"Error: No se pudo encontrar el archivo '{fichero_simbolos}'.")
-        return pd.DataFrame() 
+        return None, None, {} 
     
     if "Symbol" not in simbolos_df.columns:
         logger.error("Error: El archivo debe contener una columna llamada 'Symbol'.")
-        return pd.DataFrame() 
+        return None, None, {} 
 
     # 3. Descarga de Datos OHLCV 
     stocks_data = descargar_datos_YF(
@@ -147,7 +153,7 @@ def ejecutar_backtest(config_dict: dict):
     
     if stocks_data.empty:
         logger.error("No se pudieron descargar datos históricos para ningún símbolo en el rango especificado.")
-        return pd.DataFrame() 
+        return None, None, {} 
 
     # 4. Gestión de Datos FUNDAMENTALES y Cálculo de Ratios
     api_key = "60NPBW4583RN0HSB" 
@@ -198,7 +204,7 @@ def ejecutar_backtest(config_dict: dict):
     # Verificar la robustez del DataFrame antes de iterar
     if stocks_data.empty or "Symbol" not in stocks_data.columns:
         logger.error("❌ Error de robustez: Los datos consolidados están vacíos o les falta la columna 'Symbol'. Cancelando backtest.")
-        return pd.DataFrame()
+        return None, None, {}
 
     # Si todo es correcto, creamos el diccionario de datos
     stocks_data_dict = {
@@ -216,27 +222,42 @@ def ejecutar_backtest(config_dict: dict):
         logger
     )
     
-    # ----------------------------------------------------------------------
-    # 🎯 PASO 8: Guardado de Gráficos usando Pathlib (Más robusto)
+    # 🎯 PASO 8: Guardado de Gráficos (Específico para backtesting.lib)
     graph_dir = Path(parametros_generales_y_rutas.get('graph_dir'))
-    for symbol, bt_obj in backtest_objects.items():
+    diccionario_graficos_html = {} 
+
+    for symbol, bt_results in backtest_objects.items():
+        # bt_results es el objeto que devuelve bt.run()
         graph_file = graph_dir / f"{symbol}_backtest.html"
         try:
-            if bt_obj:
-                # Convertimos Path a string porque algunas librerías de plotting no aceptan objetos Path
-                bt_obj.plot(filename=str(graph_file), open_browser=False) 
-                logger.info(f"✅ Gráfico guardado para {symbol} en {user_mode}")
+            if bt_results is not None:
+                # 1. Guardar en disco usando el método nativo del objeto de resultados
+                # No hace falta importar 'plot', el objeto resultados ya tiene el método .plot()
+                bt_results.plot(filename=str(graph_file), open_browser=False)
+                logger.info(f"✅ Gráfico guardado en disco para {symbol}")
+                
+                # 2. CAPTURA PARA DB: Leemos el archivo generado
+                if graph_file.exists():
+                    with open(graph_file, 'r', encoding='utf-8') as f:
+                        diccionario_graficos_html[symbol] = f.read()
+                
         except Exception as e:
             logger.error(f"❌ Error gráfico {symbol}: {e}")
 
-    # Consolidación de Parámetros
+    # Consolidación de Parámetros (REPARADO)
     parametros_completos = {}
     
     try:
+        # IMPORTANTE: Primero cargamos lo que se leyó del .env 
+        # (Ahí es donde viven los periodos de los indicadores)
+        parametros_completos.update(parametros_generales_y_rutas)
+        
+        # Luego lo que vino por la web (para sobreescribir si hubo cambios)
         parametros_completos.update(config_dict)
         
         fecha_ejecucion = time.strftime("%Y-%m-%d %H:%M:%S")
         
+        # Parámetros de control
         parametros_completos.update({
             'Fecha_Ejecucion': fecha_ejecucion,
             'Fecha_Inicio_Datos': start_date,
@@ -250,18 +271,23 @@ def ejecutar_backtest(config_dict: dict):
 
         if not resultados_df.empty:
             for col in COLUMNAS_HISTORICO:
+                # Buscamos el valor en nuestro diccionario unificado
                 if col in parametros_completos:
                     resultados_df[col] = parametros_completos[col]
+                # Si no está en el diccionario, vemos si es un atributo de System
+                elif hasattr(System, col):
+                    resultados_df[col] = getattr(System, col)
+                # Si sigue sin aparecer, marcamos como NA
                 elif col not in resultados_df.columns:
                     resultados_df[col] = pd.NA 
             
-            columnas_existentes_en_df = [col for col in COLUMNAS_HISTORICO if col in resultados_df.columns]
-            resultados_df = resultados_df[columnas_existentes_en_df]
+            # Ahora sí, filtramos para que el CSV tenga el orden de constants.py
+            resultados_df = resultados_df[[c for c in COLUMNAS_HISTORICO if c in resultados_df.columns]]
             
     except Exception as e:
         logger.error(f"Error al consolidar y/o inyectar parámetros: {e}")
         
-    # 9. Guardar Resultados y Histórico
+    # PASO 9. Guardar Resultados y Histórico
     if not trades_df.empty:
         os.makedirs(os.path.dirname(fichero_trades), exist_ok=True)
         trades_df.to_csv(fichero_trades, index=False, encoding='utf-8')
@@ -276,68 +302,86 @@ def ejecutar_backtest(config_dict: dict):
             logger.info(f"Actualizando el histórico detallado: {fichero_historico}")
             # Asumo que guardar_historico ahora maneja la lógica de append/creación
             guardar_historico(resultados_df, fichero_historico, COLUMNAS_HISTORICO)
-
-            # ... (Dentro de ejecutar_backtest, después de guardar_historico)
-
-            if not resultados_df.empty:
-                try:
-                    from .database import db, ResultadoBacktest, Trade, Usuario
-                    from flask import current_app
-                    from datetime import datetime
-
-                    with current_app.app_context():
-                        user_obj = Usuario.query.filter_by(username=user_mode).first()
-                        if not user_obj:
-                            logger.error(f"❌ DB: Usuario {user_mode} no encontrado.")
-                            return None
-
-                        for _, row in resultados_df.iterrows():
-                            # Mapeo exacto según tu CSV de ejemplo
-                            nuevo_bt = ResultadoBacktest(
-                                usuario_id=user_obj.id,
-                                symbol=str(row.get('Symbol', 'N/A')),
-                                sharpe_ratio=float(row.get('Sharpe Ratio', 0) or 0),
-                                max_drawdown=float(row.get('Max Drawdown [%]', 0) or 0),
-                                profit_factor=float(row.get('Profit Factor', 0) or 0),
-                                return_pct=float(row.get('Return [%]', 0) or 0),
-                                total_trades=int(row.get('Total Trades', 0) or 0),
-                                win_rate=float(row.get('Win Rate [%]', 0) or 0),
-                                
-                                # Datos temporales
-                                fecha_ejecucion=datetime.now(),
-                                fecha_inicio_datos=str(start_date),
-                                fecha_fin_datos=str(end_date),
-                                intervalo=str(intervalo)
-                            )
-                            db.session.add(nuevo_bt)
-                            db.session.flush() 
-
-                            # Guardar Trades si existen
-                            if not trades_df.empty:
-                                # Filtramos trades por el símbolo actual (ej: NVDA)
-                                trades_simbolo = trades_df[trades_df['Symbol'] == row.get('Symbol')]
-                                for _, t_row in trades_simbolo.iterrows():
-                                    nuevo_trade = Trade(
-                                        backtest_id=nuevo_bt.id,
-                                        tipo=str(t_row.get('Type', 'N/A')),
-                                        fecha=str(t_row.get('Entry_Date', t_row.get('Date', ''))),
-                                        precio_entrada=float(t_row.get('Entry_Price', 0) or 0),
-                                        precio_salida=float(t_row.get('Exit_Price', 0) or 0),
-                                        pnl_absoluto=float(t_row.get('PnL', 0) or 0),
-                                        retorno_pct=float(t_row.get('Return [%]', 0) or 0)
-                                    )
-                                    db.session.add(nuevo_trade)
-
-                        db.session.commit()
-                        logger.info(f"✅ SQL: Guardado exitoso en base de datos para {user_mode}")
-
-                except Exception as e:
-                    db.session.rollback()
-                    logger.error(f"❌ Error SQL Crítico: {e}")
-            
         except Exception as e:
-            logger.error(f"Error al guardar ficheros: {e}")
+            logger.error(f"Error al guardar ficheros físicos: {e}")
+
+    # 🎯 Guardado en Base de Datos SQL
+    if not resultados_df.empty:
+        try:
+            # LIMPIEZA DE PARÁMETROS PARA JSON
+            params_limpios = {}
+            for k, v in parametros_completos.items():
+                # Convertimos Paths a string y saltamos objetos complejos
+                if isinstance(v, Path):
+                    params_limpios[k] = str(v)
+                elif isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                    params_limpios[k] = v
+                else:
+                    params_limpios[k] = str(v) # Convertir cualquier otra cosa a texto
+
+            params_json = json.dumps(params_limpios)
+            current_user_id = config_dict.get('user_id', 1)
+
+            for _, row in resultados_df.iterrows():
+                ticker = row['Symbol']
+                
+                # Función auxiliar para limpiar valores NaN que rompen SQL
+                def clean(val, type_func):
+                    try:
+                        if pd.isna(val): return None
+                        return type_func(val)
+                    except: return None
+
+                nuevo_res = ResultadoBacktest(
+                    usuario_id=int(current_user_id),
+                    id_estrategia=int(config_dict.get('tanda_id', 0)),
+                    symbol=str(ticker),
+                    
+                    # Métricas con limpieza de tipos
+                    sharpe_ratio=clean(row.get('Sharpe Ratio'), float),
+                    max_drawdown=clean(row.get('Max Drawdown [%]'), float),
+                    profit_factor=clean(row.get('Profit Factor'), float),
+                    return_pct=clean(row.get('Return [%]'), float),
+                    total_trades=clean(row.get('Total Trades'), int) or 0,
+                    win_rate=clean(row.get('Win Rate [%]'), float),
+                    
+                    fecha_inicio_datos=str(start_date),
+                    fecha_fin_datos=str(end_date),
+                    intervalo=str(intervalo),
+                    cash_inicial=float(cash),
+                    comision=float(commission),
+                    enviar_mail=bool(enviar_mail),
+                    
+                    params_tecnicos=params_json,
+                    grafico_html=diccionario_graficos_html.get(ticker),
+                    notas=str(config_dict.get('observaciones', ""))
+                )
+                db.session.add(nuevo_res)
+
+                # Guardar los trades de este símbolo específico en SQL
+                if not trades_df.empty:
+                    # Filtramos los trades que pertenecen a este ticker
+                    trades_ticker = trades_df[trades_df['Symbol'] == ticker]
+                    
+                    for _, t_row in trades_ticker.iterrows():
+                        nuevo_trade = Trade(
+                            backtest=nuevo_res, # Relación automática con el resultado que acabamos de crear
+                            tipo=str(t_row.get('Size', 'N/A')), # O la columna que uses para Buy/Sell
+                            fecha=str(t_row.get('EntryTime', t_row.name)),
+                            precio_entrada=float(t_row.get('EntryPrice', 0)),
+                            precio_salida=float(t_row.get('ExitPrice', 0)),
+                            pnl_absoluto=float(t_row.get('PnL', 0)),
+                            retorno_pct=float(t_row.get('ReturnPct', 0))
+                        )
+                        db.session.add(nuevo_trade)
             
+            db.session.commit()
+            logger.info("💾 Historial guardado en SQL con éxito.")
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Error crítico al guardar en Base de Datos: {e}")
+
         # ----------------------------------------------------------------------
         # 🎯 PUNTO 10: ENVÍO DE EMAIL AUTOMÁTICO
         # ----------------------------------------------------------------------
@@ -372,8 +416,7 @@ def ejecutar_backtest(config_dict: dict):
             logger.info("ℹ️ Envío de email saltado (desactivado por el usuario).")
     
     logger.info(f"Proceso de backtesting completado en {time.time() - start_time:.2f} segundos. 🎉")
-    return None
-
+    return resultados_df, trades_df, diccionario_graficos_html
 
 
 # ======================================================================

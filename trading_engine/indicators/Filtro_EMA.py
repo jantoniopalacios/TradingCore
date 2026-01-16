@@ -3,6 +3,8 @@ Módulo para la lógica de la Media Móvil Exponencial (EMA).
 
 Contiene funciones delegadas para la actualización del estado dinámico (ascendente/descendente/mínimo/máximo) 
 de la EMA Lenta, y la generación de señales de compra/venta basadas en cruces y tendencia.
+
+
 """
 
 from backtesting.lib import crossover
@@ -142,7 +144,7 @@ def check_ema_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
     """
     Revisa la señal de venta de cierre técnico basada en el estado de la EMA Lenta.
 
-    La señal de venta se activa si la EMA Lenta pasa a un estado de tendencia descendente, 
+    La señal de venta se activa si la EMA Lenta pasa a un estado de tendencia descendente o mñaximo,
     sirviendo como filtro de salida de tendencia.
 
     Parameters
@@ -156,9 +158,18 @@ def check_ema_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
         - bool: True si la señal de venta está activa.
         - Optional[str]: Descripción del cierre para el log, o None.
     """
-    # La señal de venta se activa si el usuario habilitó la intención descendente
-    # Y si el estado dinámico actual es realmente descendente.
-    if strategy_self.ema_slow_descendente and strategy_self.ema_slow_descendente_STATE: 
-        return True, "VENTA EMA Lenta Descendente (Filtro)"
+ 
+    """Verifica si el botón 'Decreciente' de la web debe cerrar la posición."""
     
+    # 1. Comprobar si el usuario seleccionó 'Decreciente' (valor: ema_slow_descendente)
+    if strategy_self.ema_sell_logic == 'ema_slow_descendente':
+        # 2. Si el cálculo técnico (de los extremos) confirma que baja
+        if strategy_self.ema_slow_descendente_STATE:
+            return True, "VENTA: EMA Lenta Descendente"
+            
+    # Si eligió 'Máximo'
+    if strategy_self.ema_sell_logic == 'ema_slow_maximo':
+        if strategy_self.ema_slow_maximo_STATE:
+            return True, "VENTA: Máximo en EMA Lenta"
+
     return False, None

@@ -38,14 +38,7 @@
         /* Explorador de archivos */
         .folder { cursor: pointer; color: #f39c12; font-weight: bold; display: flex; align-items: center; gap: 8px; }
         .nested { margin-left: 20px; border-left: 1px dashed #cbd5e1; padding-left: 10px; display: none; }
-
-        /* Animación para el desplegable de Tandas */
-        .toggle-icon { transition: transform 0.3s; display: inline-block; }
-        tr[aria-expanded="true"] .toggle-icon { transform: rotate(90deg); }
-        .bg-tanda { background-color: #f1f5f9 !important; border-left: 4px solid #2563eb; }
-        .sub-table-container { background: white; padding: 15px; border-radius: 0 0 8px 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
     </style>
-
 </head>
 <body>
 
@@ -66,7 +59,7 @@
         <button type="button" onclick="lanzarEstrategia()" class="btn btn-primary w-100 fw-bold mb-3 shadow-sm">
             <i class="bi bi-play-fill me-1"></i> LANZAR BACKTEST
         </button>
-        <button type="submit" form="config-form" name="action" value="save_config" class="btn btn-outline-light btn-sm w-100 opacity-75 mb-4">
+        <button type="submit" form="config-form" class="btn btn-outline-light btn-sm w-100 opacity-75 mb-4">
             <i class="bi bi-save me-1"></i> GUARDAR CONFIG
         </button>
         
@@ -246,60 +239,6 @@
             f.action = url;
             f.submit();
         }
-    }
-
-    function verTrades(backtestId, symbol) {
-
-    const displayArea = document.getElementById('fileContent');
-    const modalElement = document.getElementById('csvViewerModal');
-    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
-    
-    document.getElementById('csvViewerTitle').innerHTML = `<i class="bi bi-database"></i> Operaciones Detalladas: ${symbol}`;
-    displayArea.innerHTML = '<div class="p-5 text-center"><div class="spinner-border text-primary"></div><p>Cargando trades desde SQL...</p></div>';
-    modalInstance.show();
-
-    // Llamada a la API de Flask
-    fetch(`/get_trades/${backtestId}`)
-        .then(res => res.json())
-        .then(trades => {
-            if (trades.length === 0) {
-                displayArea.innerHTML = '<div class="alert alert-warning m-3">No hay operaciones registradas para este activo.</div>';
-                return;
-            }
-
-            let html = `
-                <table class="csv-table">
-                    <thead>
-                        <tr>
-                            <th>TIPO</th>
-                            <th>FECHA</th>
-                            <th>ENTRADA</th>
-                            <th>SALIDA</th>
-                            <th>PnL ABS</th>
-                            <th>RETORNO %</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-            
-            trades.forEach(t => {
-                const pnlClass = t.retorno >= 0 ? 'text-success' : 'text-danger';
-                html += `
-                    <tr>
-                        <td><span class="badge ${t.tipo == 'Long' ? 'bg-success' : 'bg-danger'}">${t.tipo}</span></td>
-                        <td>${t.fecha}</td>
-                        <td>${t.entrada.toFixed(2)}</td>
-                        <td>${t.salida.toFixed(2)}</td>
-                        <td class="${pnlClass}">${t.pnl.toFixed(2)}</td>
-                        <td class="${pnlClass}">${t.retorno.toFixed(2)}%</td>
-                    </tr>`;
-            });
-
-            html += '</tbody></table>';
-            displayArea.innerHTML = html;
-        })
-        .catch(err => {
-            displayArea.innerHTML = `<div class="alert alert-danger m-3">Error al cargar datos: ${err}</div>`;
-        });
     }
 </script>
 </body>

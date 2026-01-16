@@ -67,17 +67,21 @@ def inicializar_configuracion_usuario(user_mode="invitado"):
     f_sym = user_config_dir / "symbols.csv"
 
     # Clonación de moldes
+
     if not f_var.exists() or f_var.stat().st_size == 0:
         if PLANTILLA_ENV.exists():
             shutil.copy(PLANTILLA_ENV, f_var)
         else:
-            f_var.touch()
+            # En lugar de .touch(), podrías poner valores por defecto mínimos si quisieras
+            f_var.touch() 
 
     if not f_sym.exists() or f_sym.stat().st_size == 0:
         if PLANTILLA_CSV.exists():
             shutil.copy(PLANTILLA_CSV, f_sym)
         else:
-            f_sym.touch()
+            # CAMBIO CLAVE: Escribimos el encabezado mínimo indispensable
+            with open(f_sym, 'w', encoding='utf-8') as f:
+                f.write("Symbol\n")
 
     return {
         "user_mode": user_mode,
