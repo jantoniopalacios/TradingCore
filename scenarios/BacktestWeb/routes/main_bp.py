@@ -62,19 +62,22 @@ def index():
         form_data = request.form.to_dict()
         
         # 1. Guardar Símbolos
-        # Dentro de la ruta index, en el bloque de POST:
         if 'symbols_content' in form_data:
             contenido = form_data['symbols_content']
             
-            # 1. Limpiamos: convertimos "AAPL; MSFT, TSLA" en ["AAPL", "MSFT", "TSLA"]
-            import pandas as pd
-            lista_activos = [a.strip().upper() for a in contenido.replace(';', ',').split(',') if a.strip()]
+            # Limpieza básica de retornos de carro de Windows (\r) para evitar líneas dobles
+            contenido_limpio = contenido.replace('\r\n', '\n').strip()
             
-            # 2. Creamos un DataFrame con la columna 'Symbol' que pide el motor
-            df_para_guardar = pd.DataFrame(lista_activos, columns=['Symbol'])
+            ruta_csv = rutas['fichero_simbolos']
             
-            # 3. Guardamos en la ruta del usuario
-            df_para_guardar.to_csv(rutas['fichero_simbolos'], index=False, encoding='utf-8')
+            try:
+                # Usamos modo 'w' para borrar lo anterior y escribir de cero
+                with open(ruta_csv, 'w', encoding='utf-8', newline='') as f:
+                    f.write(contenido_limpio + '\n')
+                
+                print(f"✅ Archivo guardado tal cual por {user_mode} en: {ruta_csv}")
+            except Exception as e:
+                print(f"❌ Error al escribir el archivo: {e}")
         
         # 2. Configuración (.env)
         env_config = {k: v for k, v in form_data.items() if k not in ['symbols_content', 'action']}
