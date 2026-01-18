@@ -50,9 +50,27 @@
 <body>
 
 <div class="sidebar d-flex flex-column">
-    <div class="mb-5 px-1 d-flex align-items-center">
+    <div class="mb-4 px-1 d-flex align-items-center">
         <i class="bi bi-lightning-charge-fill text-primary fs-4 me-2"></i>
         <h5 class="fw-bold text-white mb-0">TRADINGCORE <span class="text-primary">PRO</span></h5>
+    </div>
+
+    <div class="mx-1 mb-4 p-2 rounded-3 border border-secondary border-opacity-25" style="background: rgba(255,255,255,0.03);">
+        <div class="d-flex align-items-center">
+            <div class="position-relative">
+                <i class="bi bi-person-circle fs-3 {{ 'text-info' if session.get('user_mode') == 'admin' else 'text-secondary' }}"></i>
+                <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-dark rounded-circle" style="width: 10px; height: 10px;"></span>
+            </div>
+            <div class="ms-2 overflow-hidden">
+                <p class="text-muted mb-0 fw-bold" style="font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase;">Sesión Activa</p>
+                <p class="text-white mb-0 small text-truncate fw-medium" title="{{ session.get('user_name', 'Invitado') }}">
+                    {{ session.get('user_mode', 'Invitado') }}
+                    {% if session.get('user_mode') == 'admin' %}
+                        <i class="bi bi-patch-check-fill text-info ms-1" title="Administrador"></i>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
     </div>
     
     <div class="nav flex-column nav-sidebar" id="mainTab" role="tablist">
