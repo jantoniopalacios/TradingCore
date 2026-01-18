@@ -126,40 +126,26 @@ def index():
             val = getattr(System, attr)
             config_web[attr] = str(val).strip() if val is not None else "None"
 
-    # --- CONSTRUCCIÓN DEL ÁRBOL DE ARCHIVOS (Formato Diccionario) ---
+    # --- CONSTRUCCIÓN DEL ÁRBOL DE ARCHIVOS (En EXPLORADOR ) ---
+
     file_tree = []
     
-    # 1. Carpeta de Resultados
-    if rutas['results_dir'].exists():
-        file_tree.append({
-            "name": "Resultados",
-            "is_dir": True,
-            "children": get_directory_tree(rutas['results_dir'], user_mode == 'admin'),
-            "type": "Folder",
-            "path": "Resultados"
-        })
-
-    # 2. Carpeta de Gráficos
-    if rutas['graph_dir'].exists():
-        file_tree.append({
-            "name": "Gráficos",
-            "is_dir": True,
-            "children": get_directory_tree(rutas['graph_dir'], user_mode == 'admin'),
-            "type": "Folder",
-            "path": "Gráficos"
-        })
-    
-    # 3. Logs de Sistema (Solo para Admin)
+    # 1. Logs de Sistema (SOLO PARA ADMIN)
+    # Ya no mostramos Resultados ni Gráficos porque están en la DB
     if user_mode == 'admin':
         logs_p = BACKTESTING_BASE_DIR / "logs"
         if logs_p.exists():
             file_tree.append({
-                "name": "Logs Sistema",
+                "name": "Logs del Servidor",
                 "is_dir": True,
                 "children": get_directory_tree(logs_p, True),
                 "type": "Folder",
                 "path": "Logs"
             })
+
+    # 2. Datos de Usuario (Opcional)
+    # Si quieres que el usuario vea sus archivos de configuración o caché OHLCV
+    # podrías añadirlo aquí, de lo contrario, deja el file_tree vacío para usuarios.
 
     # --- Historial de Resultados (Agrupado por Tanda) ---
     registros_agrupados = {}
@@ -224,6 +210,35 @@ def index():
 
 # --- ACCIONES Y VISOR (Todas las funciones restauradas) ---
 
+#-- RUTA PARA OBTENER PARÁMETROS DE LA ESTRATEGIA EN FORMATO JSON --
+@main_bp.route('/get_strategy_params/<int:reg_id>')
+def get_strategy_params(reg_id):
+    from ..database import ResultadoBacktest
+    import json
+    
+    res = ResultadoBacktest.query.get_or_404(reg_id)
+    if not res.params_tecnicos:
+        return jsonify({"error": "Sin parámetros"}), 404
+    
+    try:
+        raw_data = json.loads(res.params_tecnicos)
+        # Filtramos solo lo que sea legible (números, texto, booleanos)
+        clean_params = {k: v for k, v in raw_data.items() 
+                        if isinstance(v, (str, int, float, bool)) or v is None}
+        
+        # Añadimos los valores fijos de la tabla para que la vista sea completa
+        clean_params.update({
+            "Cash_Inicial": res.cash_inicial,
+            "Comision": res.comision,
+            "Fecha_Inicio": res.fecha_inicio_datos,
+            "Fecha_Fin": res.fecha_fin_datos,
+            "Intervalo": res.intervalo
+        })
+        return jsonify(clean_params)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+#-- FUNCIÓN PARA EJECUTAR BACKTEST EN HILO SEPARADO --
 def run_backtest_and_save(app_instance, config_web, user_mode):
     """Ejecuta el motor. El guardado en SQL (incluyendo el gráfico) ya ocurre dentro de Backtest.py"""
     with app_instance.app_context():
@@ -243,7 +258,7 @@ def run_backtest_and_save(app_instance, config_web, user_mode):
             import traceback
             traceback.print_exc()
 
-# --- RUTA DE LANZAMIENTO ACTUALIZADA ---
+#-- RUTA PARA LANZAR BACKTEST (POST) --
 @main_bp.route('/launch_strategy', methods=['POST'])
 def launch_strategy():
     if not session.get('logged_in'): 
@@ -277,52 +292,54 @@ def launch_strategy():
 
     return jsonify({"status": "success", "message": f"Tanda #{config_web['tanda_id']} iniciada para {user_mode}."})
 
+#-- RUTA PARA VER ARCHIVOS DE LOGS --
 @main_bp.route('/file/<path:path>')
 def view_file(path):
     if not session.get('logged_in'): abort(401)
     user_mode = session.get('user_mode')
-    paths = get_user_paths(user_mode)
+    
+    # Los resultados y gráficos ahora se ven vía /backtest/ver_grafico/ 
+    # Esta ruta queda solo para visualizar Logs del sistema (Admin)
+    if user_mode != 'admin': abort(403)
+
     filename = os.path.basename(path)
-    
-    # Búsqueda recursiva para encontrar archivos en subcarpetas de resultados/gráficos
-    target = None
-    search_dirs = [paths['results_dir'], paths['graph_dir']]
-    if user_mode == 'admin': search_dirs.append(paths['logs_dir'])
+    logs_dir = BACKTESTING_BASE_DIR / "logs"
+    target = logs_dir / filename
 
-    for folder in search_dirs:
-        for p in folder.rglob(filename):
-            if p.is_file():
-                target = p; break
-        if target: break
-
-    if not target: abort(404)
+    if not target.exists(): abort(404)
     
-    if target.suffix.lower() == '.html':
-        return send_from_directory(target.parent, target.name)
-    
-    # Lectura de archivos de texto / logs (últimas 2000 líneas para logs)
+    # Lectura segura de logs (últimas 2000 líneas)
     with open(target, 'r', encoding='utf-8', errors='replace') as f:
-        contenido = "".join(deque(f, maxlen=2000)) if target.suffix.lower() == '.log' else f.read()
+        contenido = "".join(deque(f, maxlen=2000))
     return Response(contenido, mimetype='text/plain')
 
+#-- RUTA PARA ELIMINAR ARCHIVOS DE LOGS --
 @main_bp.route('/delete-file/<path:path>', methods=['POST'])
 def delete_file(path):
     if not session.get('logged_in'): abort(401)
     user_mode = session.get('user_mode')
-    paths = get_user_paths(user_mode)
-    filename = os.path.basename(path)
     
-    for folder in [paths['results_dir'], paths['graph_dir']]:
-        target = folder / filename
-        if target.exists():
+    # Solo permitimos borrar archivos de la carpeta Logs y solo si es Admin
+    if user_mode != 'admin':
+        flash("No tienes permiso para eliminar archivos del servidor.", "danger")
+        return redirect(url_for('main.index'))
+
+    filename = os.path.basename(path)
+    logs_dir = BACKTESTING_BASE_DIR / "logs"
+    target = logs_dir / filename
+
+    if target.exists() and target.is_file():
+        try:
             os.remove(target)
-            flash(f"Archivo {filename} eliminado.", "info")
-            break
+            flash(f"Archivo de log {filename} eliminado.", "info")
+        except Exception as e:
+            flash(f"Error al eliminar: {e}", "danger")
+    else:
+        flash("El archivo no existe o no es un log.", "warning")
+
     return redirect(url_for('main.index'))
 
-# --- RUTAS PARA TRADES Y EXPORTACIÓN ---
-#-- RUTA PARA OBTENER TRADES EN FORMATO JSON ---
-
+#-- RUTA PARA OBTENER TRADES EN FORMATO JSON --
 @main_bp.route('/get_trades/<int:backtest_id>')
 def get_trades(backtest_id):
     """Devuelve los trades de un activo específico en formato JSON para el modal."""
@@ -332,6 +349,9 @@ def get_trades(backtest_id):
     try:
         # Buscamos los trades asociados al ID único del ResultadoBacktest
         trades = Trade.query.filter_by(backtest_id=backtest_id).all()
+
+        # TIP: Si ves ceros en la web, mira este log:
+        print(f"DEBUG: Enviando {len(trades)} trades para el ID {backtest_id}")
         
         return jsonify([{
             'tipo': t.tipo,
@@ -345,8 +365,7 @@ def get_trades(backtest_id):
         print(f"Error al obtener trades: {e}")
         return jsonify([]), 500
 
-#-- RUTA PARA EXPORTAR TODOS LOS TRADES DE UNA TANDA COMPLETA --
-# -- EXPORTAR SOLO MI TANDA (Para todos, incluido Admin) --
+# -- EXPORTAR TANDA A CSV --
 @main_bp.route('/export_tanda/<int:tanda_id>')
 def export_tanda(tanda_id):
     if not session.get('logged_in'): return "No autorizado", 401
@@ -381,7 +400,7 @@ def export_tanda(tanda_id):
     except Exception as e:
         return f"Error: {e}", 500
 
-# -- EXPORTAR TODO (Solo accesible por Admin) --
+# -- EXPORTAR TODOS LOS TRADES (ADMIN) --
 @main_bp.route('/export_todo_admin')
 def export_todo_admin():
     if session.get('user_mode') != 'admin':
@@ -413,6 +432,7 @@ def export_todo_admin():
     except Exception as e:
         return f"Error en exportación global: {e}", 500
     
+# -- RUTA PARA ELIMINAR BACKTESTS DE UNA TANDA --
 @main_bp.route('/eliminar_backtest/<int:id_estrategia>/<int:usuario_id>', methods=['POST'])
 def eliminar_backtest(id_estrategia, usuario_id):
     try:
@@ -464,6 +484,7 @@ def ver_grafico_completo(reg_id):
     
 # --- AUTENTICACIÓN ---
 
+#-- RUTA DE LOGIN --
 @main_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -479,6 +500,7 @@ def login():
         flash("❌ Usuario o contraseña incorrectos", "danger")
     return render_template('login.html')
 
+#-- RUTA DE LOGOUT --
 @main_bp.route('/logout')
 def logout():
     session.clear()

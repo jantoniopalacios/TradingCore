@@ -56,10 +56,21 @@
     </div>
     
     <div class="nav flex-column nav-sidebar" id="mainTab" role="tablist">
-        <button class="nav-link active" id="tab-master-config" data-bs-toggle="tab" data-bs-target="#pane-config" type="button"><i class="bi bi-sliders me-2"></i> CONFIGURACIÓN</button>
-        <button class="nav-link" id="tab-master-symbols" data-bs-toggle="tab" data-bs-target="#pane-symbols" type="button"><i class="bi bi-list-stars me-2"></i> LISTA ACTIVOS</button>
-        <button class="nav-link" id="tab-master-files" data-bs-toggle="tab" data-bs-target="#pane-files" type="button"><i class="bi bi-folder2-open me-2"></i> EXPLORADOR</button>
-        <button class="nav-link text-info fw-bold" id="tab-historial" data-bs-toggle="tab" data-bs-target="#pane-sql" type="button"><i class="bi bi-database me-2"></i> HISTORIAL SQL</button>
+        <button class="nav-link active" id="btn-nav-config" data-bs-toggle="tab" data-bs-target="#pane-config" type="button">
+            <i class="bi bi-sliders me-2"></i> CONFIGURACIÓN
+        </button>
+        
+        <button class="nav-link" id="btn-nav-symbols" data-bs-toggle="tab" data-bs-target="#pane-symbols" type="button">
+            <i class="bi bi-list-stars me-2"></i> LISTA ACTIVOS
+        </button>
+        
+        <button class="nav-link" id="tab-master-files" data-bs-toggle="tab" data-bs-target="#pane-files" type="button">
+            <i class="bi bi-folder2-open me-2"></i> EXPLORADOR
+        </button>
+        
+        <button class="nav-link text-info fw-bold" id="tab-historial" data-bs-toggle="tab" data-bs-target="#pane-sql" type="button">
+            <i class="bi bi-database me-2"></i> HISTORIAL SQL
+        </button>
     </div>
 
     <div class="mt-auto pt-4 border-top border-secondary">
@@ -240,13 +251,18 @@
         }
     }
 
-    function confirmDelete(url, name) {
-        if (confirm(`¿Eliminar "${name}"?`)) {
-            const f = document.getElementById('formDelete');
-            f.action = url;
-            f.submit();
-        }
+    function confirmDelete(event, url, name) {
+    if (event) {
+        event.stopPropagation(); // Detiene el despliegue de la fila
+        event.preventDefault();
     }
+    
+    if (confirm(`¿Eliminar "${name}"?`)) {
+        const f = document.getElementById('formDelete');
+        f.action = url;
+        f.submit();
+    }
+}
 
     function verTrades(backtestId, symbol) {
 

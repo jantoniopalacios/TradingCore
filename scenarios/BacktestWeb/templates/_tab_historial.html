@@ -31,7 +31,7 @@
                 <td class="fw-medium text-dark">{{ datos.fecha }}</td>
                 
                 {% if session.get('user_mode') == 'admin' %}
-                    <td class="text-primary fw-bold">{{ datos.usuario }}</td>
+                    <td class="text-primary fw-bold">{{ datos.usuario_nombre }}</td>
                 {% endif %}
 
                 <td>
@@ -49,25 +49,19 @@
                 <td class="text-end">
                     <div class="btn-group">
                         <button type="button" class="btn btn-sm btn-outline-primary" 
-                                onclick="event.stopPropagation(); verConfiguracion('{{ tanda_id }}')">
+                                onclick="event.stopPropagation(); verConfiguracion('{{ tanda_id }}', '{{ datos.activos[0].id }}')">
                             <i class="bi bi-gear-fill"></i>
                         </button>
                         
                         <a href="{{ url_for('main.export_tanda', tanda_id=tanda_id) }}" 
-                        class="btn btn-sm btn-outline-secondary" 
-                        onclick="event.stopPropagation();">
+                           class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();">
                             <i class="bi bi-download"></i>
                         </a>
 
                         <button type="button" class="btn btn-sm btn-danger" 
-                                onclick="event.stopPropagation(); event.preventDefault(); if(confirm('¿Eliminar tanda #{{ tanda_id }}?')) { document.getElementById('form-del-{{ tanda_id }}').submit(); }">
+                                onclick="confirmDelete(event, '{{ url_for('main.eliminar_backtest', id_estrategia=datos.id_tanda, usuario_id=datos.usuario_id) }}', 'Tanda #{{ tanda_id }}')">
                             <i class="bi bi-trash"></i>
                         </button>
-                        
-                        <form id="form-del-{{ tanda_id }}" 
-                            action="{{ url_for('main.eliminar_backtest', id_estrategia=datos.id_tanda, usuario_id=datos.usuario_id) }}" 
-                            method="POST" style="display:none;">
-                        </form>
                     </div>
                 </td>
             </tr>
@@ -114,9 +108,7 @@
                                             
                                             {% if r.grafico_html %}
                                             <a href="{{ url_for('main.ver_grafico_completo', reg_id=r.id) }}" 
-                                               target="_blank"
-                                               class="btn btn-sm btn-outline-info border-0 ms-auto" 
-                                               title="Ver Gráfico Interactivo">
+                                               target="_blank" class="btn btn-sm btn-outline-info border-0 ms-auto">
                                                 <i class="bi bi-graph-up"></i>
                                             </a>
                                             {% endif %}
@@ -135,16 +127,16 @@
 </div>
 
 <div class="modal fade" id="modalConfig" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-md">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white py-2">
-                <h6 class="modal-title"><i class="bi bi-gear-wide-connected me-2"></i>Parámetros</h6>
+    <div class="modal-dialog modal-xl modal-dialog-scrollable"> <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white py-2">
+                <h6 class="modal-title small"><i class="bi bi-ui-checks-grid me-2"></i>DESGLOSE DE CONFIGURACIÓN POR CATEGORÍAS</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div id="bodyConfig" class="modal-body"></div>
-            <div class="modal-footer bg-light p-2">
-                <button type="button" class="btn btn-primary btn-sm w-100" onclick="cargarEstrategia()">
-                    Cargar en Formulario
+            <div id="bodyConfig" class="modal-body" style="background: #f1f5f9;">
+                </div>
+            <div class="modal-footer bg-white p-2">
+                <button type="button" class="btn btn-primary btn-sm px-4 fw-bold" onclick="cargarEstrategia()">
+                    <i class="bi bi-cloud-arrow-down-fill me-1"></i> CARGAR ESTA CONFIGURACIÓN
                 </button>
             </div>
         </div>
@@ -153,16 +145,119 @@
 
 <script>
 var configModalInstance = null;
+var ultimaConfigCargada = null; 
 
-function verConfiguracion(tandaId) {
+// Ahora la función recibe directamente el regId
+function verConfiguracion(tandaId, regId) {
     const el = document.getElementById('modalConfig');
+    const body = document.getElementById('bodyConfig');
     if (!configModalInstance) configModalInstance = new bootstrap.Modal(el);
     
-    document.getElementById('bodyConfig').innerHTML = `
-        <div class="text-center p-3">
-            <div class="spinner-border text-primary"></div>
-            <p class="mt-2">Consultando tanda: <strong>${tandaId}</strong>...</p>
-        </div>`;
+    body.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary"></div></div>';
     configModalInstance.show();
+
+    fetch(`/get_strategy_params/${regId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) throw new Error(data.error);
+            ultimaConfigCargada = data;
+            
+            // 1. Definir las categorías
+            const categorias = {
+                "GLOBAL & CAPITAL": [],
+                "EMA ESTRATEGIA": [],
+                "RSI": [],
+                "MACD": [],
+                "BOLLINGER & VOLUMEN": [],
+                "OTROS": []
+            };
+
+            // 2. Clasificar cada parámetro
+            Object.entries(data).forEach(([key, val]) => {
+                if (key === '_lista_simbolos') return;
+                
+                const k = key.toUpperCase();
+                let cat = "OTROS";
+
+                if (k.includes("CASH") || k.includes("FECHA") || k.includes("COMISION") || k.includes("STOP") || k.includes("TAKE")) cat = "GLOBAL & CAPITAL";
+                else if (k.includes("EMA") || k.includes("SMA")) cat = "EMA ESTRATEGIA";
+                else if (k.includes("RSI")) cat = "RSI";
+                else if (k.includes("MACD")) cat = "MACD";
+                else if (k.includes("BB") || k.includes("VOLUMEN") || k.includes("STOCH")) cat = "BOLLINGER & VOLUMEN";
+
+                categorias[cat].push({ key, val });
+            });
+
+            // 3. Generar el HTML
+            let html = '';
+            Object.entries(categorias).forEach(([nombreCat, params]) => {
+                if (params.length === 0) return; // No mostrar categorías vacías
+
+                html += `
+                    <div class="mb-4">
+                        <h6 class="text-primary fw-bold mb-2 border-bottom pb-1" style="font-size: 12px;">
+                            <i class="bi bi-tag-fill me-1"></i> ${nombreCat}
+                        </h6>
+                        <div class="row g-2">
+                `;
+
+                params.forEach(p => {
+                    let displayVal = p.val === true ? '<span class="badge bg-success-subtle text-success border border-success-subtle">ON</span>' : 
+                                     p.val === false ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">OFF</span>' : 
+                                     `<span class="fw-bold text-dark">${p.val}</span>`;
+                    
+                    html += `
+                        <div class="col-6 col-md-4 col-lg-2">
+                            <div class="p-2 bg-white border rounded shadow-sm h-100">
+                                <div class="text-muted text-uppercase mb-1" style="font-size: 8px; font-weight: 700;">${p.key.replace(/_/g, ' ')}</div>
+                                <div style="font-size: 11px;">${displayVal}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div></div>`; // Cerrar row y sección
+            });
+
+            body.innerHTML = html;
+        })
+        .catch(err => {
+            body.innerHTML = `<div class="alert alert-danger m-3">Error: ${err.message}</div>`;
+        });
+}
+function cargarEstrategia() {
+    if (!ultimaConfigCargada) return;
+
+    const form = document.getElementById('config-form');
+    
+    // 1. Inputs técnicos
+    Object.keys(ultimaConfigCargada).forEach(key => {
+        const input = form.querySelector(`[name="${key}"]`);
+        if (input) {
+            if (input.type === 'checkbox') {
+                input.checked = (ultimaConfigCargada[key] === true || ultimaConfigCargada[key] === "True");
+            } else {
+                input.value = ultimaConfigCargada[key];
+            }
+            input.dispatchEvent(new Event('change'));
+        }
+    });
+
+    // 2. Lista de activos
+    const symbolsTextarea = form.querySelector('textarea[name="symbols_content"]');
+    if (symbolsTextarea && ultimaConfigCargada['_lista_simbolos']) {
+        symbolsTextarea.value = ultimaConfigCargada['_lista_simbolos'];
+    }
+
+    configModalInstance.hide();
+    
+    // 3. Navegar a configuración
+    const configTabBtn = document.getElementById('btn-nav-config');
+    if (configTabBtn) {
+        bootstrap.Tab.getOrCreateInstance(configTabBtn).show();
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    alert("✅ Configuración cargada correctamente.");
 }
 </script>

@@ -241,8 +241,9 @@ def ejecutar_backtest(config_dict: dict):
         required_period,
         logger
     )
-    
+    # ----------------------------------------------------------------------
     # 🎯 PASO 8: Guardado de Gráficos (Específico para backtesting.lib)
+    # ----------------------------------------------------------------------
     graph_dir = Path(parametros_generales_y_rutas.get('graph_dir'))
     diccionario_graficos_html = {} 
 
@@ -306,38 +307,36 @@ def ejecutar_backtest(config_dict: dict):
             
     except Exception as e:
         logger.error(f"Error al consolidar y/o inyectar parámetros: {e}")
-        
-    # PASO 9. Guardar Resultados y Histórico
-    if not trades_df.empty:
-        os.makedirs(os.path.dirname(fichero_trades), exist_ok=True)
-        trades_df.to_csv(fichero_trades, index=False, encoding='utf-8')
-        logger.info(f"Operaciones de trading guardadas en: {fichero_trades}")
 
-    if not resultados_df.empty:
-        try:
-            os.makedirs(os.path.dirname(fichero_resultados), exist_ok=True)
-            resultados_df.to_csv(fichero_resultados, index=False, mode='w', encoding='utf-8') 
-            logger.info(f"Estadísticas guardadas en: {fichero_resultados}")
-            
-            logger.info(f"Actualizando el histórico detallado: {fichero_historico}")
-            # Asumo que guardar_historico ahora maneja la lógica de append/creación
-            guardar_historico(resultados_df, fichero_historico, COLUMNAS_HISTORICO)
-        except Exception as e:
-            logger.error(f"Error al guardar ficheros físicos: {e}")
+    # ----------------------------------------------------------------------        
+    # PASO 9. Guardar Resultados y Histórico
+    # ----------------------------------------------------------------------
 
     # 🎯 Guardado en Base de Datos SQL
     if not resultados_df.empty:
         try:
-            # LIMPIEZA DE PARÁMETROS PARA JSON
+            # LISTA BLANCA: Prefijos que cubren todas tus variables del .env
+            prefijos_validos = (
+                'EMA_', 'RSI_', 'MACD_', 'STOCH_', 'BB_', 
+                'VOLUME_', 'MARGEN_', 'STOPLOSS_', 'CASH_', 'COMMISSION_'
+            )
+            
+            # Nombres exactos que no empiezan con los prefijos anteriores
+            nombres_extra = [
+                'start_date', 'end_date', 'intervalo', 'enviar_mail', 
+                'destinatario_email', 'usar_filtro_fundamental'
+            ]
             params_limpios = {}
             for k, v in parametros_completos.items():
-                # Convertimos Paths a string y saltamos objetos complejos
-                if isinstance(v, Path):
-                    params_limpios[k] = str(v)
-                elif isinstance(v, (int, float, str, bool, list, dict)) or v is None:
-                    params_limpios[k] = v
-                else:
-                    params_limpios[k] = str(v) # Convertir cualquier otra cosa a texto
+                # 1. Filtro de pertenencia: ¿Es una variable de configuración técnica?
+                # Comprobamos si empieza con un prefijo válido o está en los extras
+                if k.upper().startswith(prefijos_validos) or k.lower() in nombres_extra:
+                    
+                    # 2. Tu lógica de limpieza de tipos (para no romper el JSON)
+                    if isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                        params_limpios[k] = v
+                    else:
+                        params_limpios[k] = str(v)
 
             params_json = json.dumps(params_limpios)
             current_user_id = config_dict.get('user_id', 1)
@@ -382,21 +381,61 @@ def ejecutar_backtest(config_dict: dict):
                 if not trades_df.empty:
                     # Filtramos los trades que pertenecen a este ticker
                     trades_ticker = trades_df[trades_df['Symbol'] == ticker]
+                
+                if not trades_df.empty:
+                    # Filtramos los trades que pertenecen a este ticker
+                    trades_ticker = trades_df[trades_df['Symbol'] == ticker]
                     
                     for _, t_row in trades_ticker.iterrows():
+                        # Función interna para limpiar 'N/A' y convertir a float
+                        def safe_float(val):
+                            if val is None or str(val).strip().upper() == 'N/A':
+                                return 0.0
+                            try:
+                                return float(val)
+                            except:
+                                return 0.0
+
+                        # Mapeo exacto según tus LOGS
+                        tipo_op = str(t_row.get('Tipo', 'COMPRA')).upper()
+                        fecha_val = t_row.get('Fecha', 'S/D')
+                        
+                        # Si es un Timestamp de pandas lo formateamos, si no, lo dejamos como string
+                        fecha_str = fecha_val.strftime('%Y-%m-%d %H:%M') if hasattr(fecha_val, 'strftime') else str(fecha_val)
+
                         nuevo_trade = Trade(
-                            backtest=nuevo_res, # Relación automática con el resultado que acabamos de crear
-                            tipo=str(t_row.get('Size', 'N/A')), # O la columna que uses para Buy/Sell
-                            fecha=str(t_row.get('EntryTime', t_row.name)),
-                            precio_entrada=float(t_row.get('EntryPrice', 0)),
-                            precio_salida=float(t_row.get('ExitPrice', 0)),
-                            pnl_absoluto=float(t_row.get('PnL', 0)),
-                            retorno_pct=float(t_row.get('ReturnPct', 0))
+                            backtest=nuevo_res,
+                            tipo=tipo_op,
+                            fecha=fecha_str,
+                            precio_entrada=safe_float(t_row.get('Precio_Entrada')),
+                            precio_salida=safe_float(t_row.get('Precio_Salida')),
+                            pnl_absoluto=safe_float(t_row.get('PnL_Absoluto')),
+                            retorno_pct=safe_float(t_row.get('Retorno_Pct'))
                         )
                         db.session.add(nuevo_trade)
             
             db.session.commit()
             logger.info("💾 Historial guardado en SQL con éxito.")
+
+            # --- NUEVA LÓGICA DE LIMPIEZA P1 ---
+            try:
+                # 1. Borrar Gráficos HTML locales (ya están en la columna grafico_html de la DB)
+                for symbol in diccionario_graficos_html.keys():
+                    f_grafico = graph_dir / f"{symbol}_backtest.html"
+                    if f_grafico.exists():
+                        os.remove(f_grafico)
+                
+                # 2. Borrar archivo de Ratios diario (Archivo intermedio)
+                if full_ratio_output_path and os.path.exists(full_ratio_output_path):
+                    os.remove(full_ratio_output_path)
+                
+                # 3. Borrar el CSV de símbolos si existiera uno viejo
+                if fichero_simbolos and os.path.exists(fichero_simbolos):
+                    os.remove(fichero_simbolos)
+
+                logger.info("🧹 Limpieza P1 realizada: Temporales eliminados.")
+            except Exception as e:
+                logger.warning(f"⚠️ Error menor en limpieza de archivos: {e}")
 
         except Exception as e:
             db.session.rollback()

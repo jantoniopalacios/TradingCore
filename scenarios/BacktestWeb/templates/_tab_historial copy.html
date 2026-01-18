@@ -1,94 +1,244 @@
-<div class="mt-2">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h3 class="mb-1 text-light">
-                <i class="fas fa-history text-primary me-2"></i>Historial de Ejecuciones
-            </h3>
-            <p class="text-muted small mb-0">Registro histórico de backtests y señales en base de datos.</p>
-        </div>
-        <div class="text-end">
-            <span class="badge border border-info text-info px-3 py-2">
-                <i class="fas fa-user-shield me-2"></i>MODO: {{ session.get('user_mode', 'Operador') }}
-            </span>
-        </div>
+{% if session.get('user_mode') == 'admin' %}
+<div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+    <div class="text-secondary small">
+        <i class="bi bi-info-circle me-1"></i> <strong>Modo Administrador:</strong> Acceso al historial global del sistema.
     </div>
+    <a href="{{ url_for('main.export_todo_admin') }}" class="btn btn-danger btn-sm shadow-sm">
+        <i class="bi bi-database-fill-down me-2"></i>Descargar Base de Datos Completa
+    </a>
+</div>
+{% endif %}
 
-    <div class="card bg-dark border-secondary shadow-lg">
-        <div class="table-responsive">
-            <table class="table table-dark table-hover align-middle mb-0" style="border-color: #2d343c;">
-                <thead class="bg-black text-secondary">
-                    <tr class="small text-uppercase">
-                        <th class="ps-4">Fecha / Hora</th>
-                        <th>Activo</th>
-                        <th class="text-center">Retorno %</th>
-                        <th class="text-center">Ratio Sharpe</th>
-                        <th class="text-center">Max Drawdown</th>
-                        <th class="text-center">Trades</th>
-                        <th class="text-center">Win Rate (%)</th>
-                    </tr>
-                </thead>
-                <tbody class="border-top-0">
-                    {% for reg in registros %}
-                    <tr>
-                        <td class="ps-4">
-                            <div class="d-flex flex-column">
-                                <span class="fw-bold">{{ reg.fecha_ejecucion.strftime('%d %b, %Y') }}</span>
-                                <span class="text-muted smaller">{{ reg.fecha_ejecucion.strftime('%H:%M:%S') }}</span>
-                            </div>
-                        </td>
-                        <td>
-                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1">
-                                {{ reg.symbol }}
-                            </span>
-                        </td>
-                        <td class="text-center fw-bold">
-                            <span class="{{ 'text-success' if reg.return_pct > 0 else 'text-danger' }}">
-                                {{ "+" if reg.return_pct > 0 }}{{ reg.return_pct }}%
-                            </span>
-                        </td>
-                        <td class="text-center">
-                            <span class="badge {{ 'bg-success' if reg.sharpe_ratio and reg.sharpe_ratio > 1.5 else 'bg-dark' }} text-light border border-secondary">
-                                {{ "%.2f"|format(reg.sharpe_ratio) if reg.sharpe_ratio else '0.00' }}
-                            </span>
-                        </td>
-                        <td class="text-center text-danger">
-                            <i class="fas fa-caret-down me-1"></i>{{ reg.max_drawdown }}%
-                        </td>
-                        <td class="text-center">
-                            <span class="text-light">{{ reg.total_trades }}</span>
-                        </td>
-                        <td class="text-center">
-                            <div class="d-flex align-items-center justify-content-center gap-2">
-                                <div class="progress bg-secondary bg-opacity-25" style="height: 6px; width: 60px;">
-                                    <div class="progress-bar {{ 'bg-success shadow-success' if reg.win_rate > 50 else 'bg-warning' }}" 
-                                         role="progressbar" style="width: {{ reg.win_rate }}%"></div>
-                                </div>
-                                <span class="small fw-bold">{{ reg.win_rate }}%</span>
-                            </div>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="7" class="text-center py-5">
-                            <div class="py-4">
-                                <i class="fas fa-database fa-3x text-secondary mb-3"></i>
-                                <p class="text-muted">No se han encontrado registros en la base de datos SQL.</p>
-                                <button class="btn btn-outline-primary btn-sm mt-2">Iniciar Nuevo Backtest</button>
-                            </div>
-                        </td>
-                    </tr>
+<div class="table-responsive">
+    <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+        <thead class="table-dark">
+            <tr>
+                <th style="width: 40px;"></th> 
+                <th>FECHA</th>
+                {% if session.get('user_mode') == 'admin' %}<th>USUARIO</th>{% endif %}
+                <th>ACTIVOS</th>
+                <th>RENDIMIENTO PROM.</th>
+                <th class="text-end" style="width: 120px;">ACCIONES</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for tanda_id, datos in registros.items() %}
+            {% set num_activos = datos.activos|count %}
+            {% set avg_return = (datos.activos|map(attribute='return_pct')|sum / num_activos) if num_activos > 0 else 0 %}
+            
+            <tr class="bg-light shadow-sm" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#bt-{{ tanda_id }}">
+                <td class="text-center"><i class="bi bi-chevron-right toggle-icon"></i></td>
+                <td class="fw-medium text-dark">{{ datos.fecha }}</td>
+                
+                {% if session.get('user_mode') == 'admin' %}
+                    <td class="text-primary fw-bold">{{ datos.usuario_nombre }}</td>
+                {% endif %}
+
+                <td>
+                    {% for r in datos.activos %}
+                        <span class="badge border text-dark bg-white shadow-sm">{{ r.symbol }}</span>
                     {% endfor %}
-                </tbody>
-            </table>
+                </td>
+                
+                <td>
+                    <span class="fw-bold {{ 'text-success' if avg_return > 0 else 'text-danger' }}">
+                        {{ avg_return|round(2) }}%
+                    </span>
+                </td>
+
+                <td class="text-end">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-outline-primary" 
+                                onclick="event.stopPropagation(); verConfiguracion('{{ tanda_id }}')">
+                            <i class="bi bi-gear-fill"></i>
+                        </button>
+                        
+                        <a href="{{ url_for('main.export_tanda', tanda_id=tanda_id) }}" 
+                        class="btn btn-sm btn-outline-secondary" 
+                        onclick="event.stopPropagation();">
+                            <i class="bi bi-download"></i>
+                        </a>
+
+                        <button type="button" class="btn btn-sm btn-danger" 
+                                onclick="confirmDelete(event, '{{ url_for('main.eliminar_backtest', id_estrategia=datos.id_tanda, usuario_id=datos.usuario_id) }}', 'Tanda #{{ tanda_id }}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        
+                    </div>
+                </td>
+            </tr>
+
+            <tr class="collapse" id="bt-{{ tanda_id }}">
+                <td colspan="{{ 6 if session.get('user_mode') == 'admin' else 5 }}" class="p-0">
+                    <div class="bg-white p-4 border-start border-primary border-4">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="table-light" style="font-size: 11px;">
+                                <tr>
+                                    <th>SÍMBOLO</th>
+                                    <th>RETORNO</th>
+                                    <th>SHARPE</th>
+                                    <th>MAX DD</th>
+                                    <th>WIN RATE</th>
+                                    <th>OPERACIONES / GRÁFICO</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in datos.activos %}
+                                <tr>
+                                    <td class="fw-bold text-primary">{{ r.symbol }}</td>
+                                    <td class="{{ 'text-success' if r.return_pct > 0 else 'text-danger' }}">
+                                        {{ r.return_pct }}%
+                                    </td>
+                                    <td>{{ r.sharpe_ratio }}</td>
+                                    <td class="text-danger">{{ r.max_drawdown }}%</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% set wr = r.win_rate if r.win_rate is not none else 0 %}
+                                            <div class="progress me-2" style="height: 8px; width: 60px;">
+                                                <div class="progress-bar {{ 'bg-success' if wr >= 50 else 'bg-danger' }}" 
+                                                     role="progressbar" style="width: {{ wr }}%"></div>
+                                            </div>
+                                            <span class="fw-bold">{{ wr }}%</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" 
+                                                    onclick="verTrades({{ r.id }}, '{{ r.symbol }}')">
+                                                Ver ({{ r.total_trades }})
+                                            </button>
+                                            
+                                            {% if r.grafico_html %}
+                                            <a href="{{ url_for('main.ver_grafico_completo', reg_id=r.id) }}" 
+                                               target="_blank"
+                                               class="btn btn-sm btn-outline-info border-0 ms-auto" 
+                                               title="Ver Gráfico Interactivo">
+                                                <i class="bi bi-graph-up"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="modalConfig" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white py-2">
+                <h6 class="modal-title"><i class="bi bi-gear-wide-connected me-2"></i>Parámetros</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div id="bodyConfig" class="modal-body"></div>
+            <div class="modal-footer bg-light p-2">
+                <button type="button" class="btn btn-primary btn-sm w-100" onclick="cargarEstrategia()">
+                    Cargar en Formulario
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
-<style>
-    .smaller { font-size: 0.75rem; }
-    .table-hover tbody tr:hover {
-        background-color: rgba(13, 110, 253, 0.05) !important;
-        transition: background-color 0.2s ease;
+<script>
+var configModalInstance = null;
+var ultimaConfigCargada = null; 
+
+function verConfiguracion(tandaId) {
+    const el = document.getElementById('modalConfig');
+    const body = document.getElementById('bodyConfig');
+    if (!configModalInstance) configModalInstance = new bootstrap.Modal(el);
+    
+    body.innerHTML = `
+        <div class="text-center p-3">
+            <div class="spinner-border text-primary spinner-border-sm"></div>
+            <p class="mt-2 small text-muted">Consultando parámetros de la tanda...</p>
+        </div>`;
+    configModalInstance.show();
+
+    // Intentamos obtener el ID del primer registro de la tabla de esa tanda
+    const row = document.querySelector(`#bt-${tandaId} tr:first-child`);
+    if (!row) {
+        body.innerHTML = '<div class="alert alert-warning small">No hay datos en esta tanda.</div>';
+        return;
     }
-    .shadow-success { box-shadow: 0 0 8px rgba(25, 135, 84, 0.5); }
-</style>
+    
+    // En lugar de buscar solo en la primera fila, buscamos en todo el contenedor de la tanda
+    const tandaContainer = document.getElementById(`bt-${tandaId}`);
+    const match = row.innerHTML.match(/verTrades\((\d+)/);
+    const regId = match ? match[1] : null;
+
+    if (!regId) {
+        body.innerHTML = '<div class="alert alert-danger small">Error: ID de registro no encontrado.</div>';
+        return;
+    }
+
+    fetch(`/get_strategy_params/${regId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) throw new Error(data.error);
+            ultimaConfigCargada = data;
+            
+            let html = '<div class="row g-2" style="font-size: 11px;">';
+            Object.entries(data).forEach(([key, val]) => {
+                // Ocultamos de la vista del modal la lista de símbolos (es muy larga)
+                if (key === '_lista_simbolos') return;
+
+                let displayVal = val === true ? '✅ ON' : val === false ? '❌ OFF' : val;
+                html += `
+                    <div class="col-6 border-bottom py-1">
+                        <strong class="text-uppercase text-secondary" style="font-size:9px;">${key.replace(/_/g, ' ')}</strong><br>
+                        <span class="text-dark">${displayVal}</span>
+                    </div>`;
+            });
+            html += '</div>';
+            body.innerHTML = html;
+        })
+        .catch(err => {
+            body.innerHTML = `<div class="alert alert-danger small">Error: ${err.message}</div>`;
+        });
+}
+
+function cargarEstrategia() {
+    if (!ultimaConfigCargada) return;
+
+    const form = document.getElementById('config-form');
+    
+    // 1. Cargamos todos los parámetros técnicos en los inputs
+    Object.keys(ultimaConfigCargada).forEach(key => {
+        const input = form.querySelector(`[name="${key}"]`);
+        if (input) {
+            if (input.type === 'checkbox') {
+                input.checked = (ultimaConfigCargada[key] === true || ultimaConfigCargada[key] === "True");
+            } else {
+                input.value = ultimaConfigCargada[key];
+            }
+            input.dispatchEvent(new Event('change'));
+        }
+    });
+
+    // 2. Cargamos la lista de activos en el textarea correspondiente
+    const symbolsTextarea = form.querySelector('textarea[name="symbols_content"]');
+    if (symbolsTextarea && ultimaConfigCargada['_lista_simbolos']) {
+        symbolsTextarea.value = ultimaConfigCargada['_lista_simbolos'];
+    }
+
+    configModalInstance.hide();
+    
+    // 3. CAMBIO CLAVE: Usamos el ID 'btn-nav-config' que pusimos en index.html
+    const configTabBtn = document.getElementById('btn-nav-config');
+    if (configTabBtn) {
+        bootstrap.Tab.getOrCreateInstance(configTabBtn).show();
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    alert("🚀 Configuración y Activos volcados al formulario.");
+}
+</script>
