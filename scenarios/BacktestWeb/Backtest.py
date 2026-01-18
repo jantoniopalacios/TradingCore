@@ -131,16 +131,36 @@ def ejecutar_backtest(config_dict: dict):
     
     logger.info(f"Iniciando proceso de backtesting. Rango de Fechas: {start_date} a {end_date}, Intervalo: {intervalo}")
 
-    # Leer el fichero CSV de los Tickers (Simbolos) a descargar
-    try:
-        simbolos_df = pd.read_csv(fichero_simbolos)
-    except FileNotFoundError:
-        logger.error(f"Error: No se pudo encontrar el archivo '{fichero_simbolos}'.")
-        return None, None, {} 
+    # ----------------------------------------------------------------------
+    #  Leer Símbolos desde la Base de Datos (Sustituye al CSV)
+    # ----------------------------------------------------------------------
+    from .database import Simbolo, Usuario  # Importación local para evitar circulares
     
-    if "Symbol" not in simbolos_df.columns:
-        logger.error("Error: El archivo debe contener una columna llamada 'Symbol'.")
-        return None, None, {} 
+    u_actual = Usuario.query.filter_by(username=user_mode).first()
+    if not u_actual:
+        logger.error(f"Error: No se encontró al usuario '{user_mode}' en la DB.")
+        return None, None, {}
+
+    # Consultamos la tabla de símbolos del usuario
+    simbolos_usuario = Simbolo.query.filter_by(usuario_id=u_actual.id).all()
+    
+    if not simbolos_usuario:
+        logger.warning(f"⚠️ El usuario {user_mode} no tiene símbolos configurados en la DB.")
+        return None, None, {}
+
+    # Creamos un DataFrame compatible con el resto del script
+    # Incluimos los nuevos campos para usarlos más adelante si fuera necesario
+    simbolos_df = pd.DataFrame([
+        {
+            "Symbol": s.symbol, 
+            "Name": s.name, 
+            "usar_full_ratio": s.usar_full_ratio, 
+            "tiene_fundamentales": s.tiene_fundamentales
+        } 
+        for s in simbolos_usuario
+    ])
+    
+    logger.info(f"✅ Cargados {len(simbolos_df)} símbolos desde la base de datos para el backtest.")
 
     # 3. Descarga de Datos OHLCV 
     stocks_data = descargar_datos_YF(

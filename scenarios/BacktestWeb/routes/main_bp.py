@@ -62,22 +62,42 @@ def index():
         form_data = request.form.to_dict()
         
         # 1. Guardar Símbolos
+        # --- NUEVA LÓGICA DE GUARDADO EN BASE DE DATOS (Sustituye al CSV) ---
         if 'symbols_content' in form_data:
             contenido = form_data['symbols_content']
+            # IMPORTANTE: Importamos ambos modelos aquí para evitar el error de "local variable"
+            from ..database import Simbolo, Usuario
             
-            # Limpieza básica de retornos de carro de Windows (\r) para evitar líneas dobles
-            contenido_limpio = contenido.replace('\r\n', '\n').strip()
-            
-            ruta_csv = rutas['fichero_simbolos']
+            # 1. Limpieza y preparación de la lista
+            raw_activos = contenido.replace(';', ',').replace('\n', ',').replace('\r', ',')
+            lista_nombres_simbolos = [s.strip().upper() for s in raw_activos.split(',') if s.strip()]
+            lista_nombres_simbolos = list(dict.fromkeys(lista_nombres_simbolos)) # Sin duplicados
             
             try:
-                # Usamos modo 'w' para borrar lo anterior y escribir de cero
-                with open(ruta_csv, 'w', encoding='utf-8', newline='') as f:
-                    f.write(contenido_limpio + '\n')
+                # 2. Buscamos al usuario actual
+                u = Usuario.query.filter_by(username=user_mode).first()
                 
-                print(f"✅ Archivo guardado tal cual por {user_mode} en: {ruta_csv}")
+                if u:
+                    # 3. Limpiamos sus símbolos antiguos (Borrado previo)
+                    Simbolo.query.filter_by(usuario_id=u.id).delete()
+                    
+                    # 4. Insertamos los nuevos
+                    for sym_name in lista_nombres_simbolos:
+                        nuevo_simbolo = Simbolo(
+                            symbol=sym_name,
+                            name=sym_name, # Por ahora igual al símbolo
+                            usar_full_ratio=True,     # Valor por defecto P1
+                            tiene_fundamentales=True,  # Valor por defecto P1
+                            usuario_id=u.id
+                        )
+                        db.session.add(nuevo_simbolo)
+                    
+                    db.session.commit()
+                    print(f"✅ {len(lista_nombres_simbolos)} símbolos guardados en DB para {user_mode}")
             except Exception as e:
-                print(f"❌ Error al escribir el archivo: {e}")
+                db.session.rollback()
+                print(f"❌ Error al guardar símbolos en DB: {e}")
+                flash("Error al guardar en la base de datos", "danger")
         
         # 2. Configuración (.env)
         env_config = {k: v for k, v in form_data.items() if k not in ['symbols_content', 'action']}
@@ -95,7 +115,9 @@ def index():
         flash("✅ Configuración guardada correctamente.", "success")
         return redirect(url_for('main.index'))
 
+    # ================================================================
     # --- FLUJO GET (Carga normal de la página) ---
+    # ================================================================
     cargar_y_asignar_configuracion(user_mode)
     
     config_web = {}
@@ -170,7 +192,22 @@ def index():
     except Exception as e:
         print(f"Error al cargar historial SQL: {e}")
 
-    # Es importante ordenar el diccionario por la ID de tanda más reciente
+    # ================================================================
+    # --- NUEVA LÓGICA PARA LEER SÍMBOLOS DE LA DB (MODIFICACIÓN AQUÍ) ---
+    # ================================================================
+    from ..database import Simbolo, Usuario
+    u_actual = Usuario.query.filter_by(username=user_mode).first()
+    
+    # Consultamos los símbolos del usuario en la base de datos
+    simbolos_db = Simbolo.query.filter_by(usuario_id=u_actual.id).all() if u_actual else []
+    
+    # Convertimos la lista de objetos en un string separado por comas: "AAPL, MSFT, TSLA"
+    symbols_text = ", ".join([s.symbol for s in simbolos_db])
+    
+    # Si la base de datos está vacía y quieres mostrar los encabezados por defecto:
+    if not symbols_text:
+        symbols_text = "Symbol,Name"
+
     registros_final = dict(sorted(registros_agrupados.items(), key=lambda x: x[0], reverse=True))
 
     return render_template(
@@ -178,9 +215,10 @@ def index():
         system=System,
         strategy=System,
         config=config_web,
-        symbols_content=read_symbols_raw(rutas['fichero_simbolos']) if rutas['fichero_simbolos'].exists() else "",
+        # CAMBIO CLAVE: Ahora enviamos symbols_text (de la DB) en lugar de leer el CSV
+        symbols_content=symbols_text, 
         file_tree=file_tree,
-        registros=registros_final,  # <--- Enviamos el diccionario agrupado
+        registros=registros_final,
         comments=VARIABLE_COMMENTS
     )
 

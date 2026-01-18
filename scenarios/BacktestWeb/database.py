@@ -1,10 +1,35 @@
 # database.py
+
+"""
+Docstring for scenarios.BacktestWeb.database
+Este módulo define las tablas de la base de datos para la aplicación de backtesting web.
+Incluye las tablas para usuarios, resultados de backtesting, trades detallados y símbolos.  
+Cada tabla está diseñada para almacenar información relevante y facilitar la gestión de datos en la aplicación.
+#  --- TABLAS DEFINIDAS ---
+# 1. Tabla de Usuarios
+# 2. Tabla de Resultados de Backtest
+# 3. Tabla de Trades Detallados
+# 4. Tabla de Símbolos
+# Cada tabla incluye comentarios detallados sobre su propósito y estructura.
+# En resumen, este módulo es esencial para la gestión de datos en la aplicación de backtesting web.
+"""
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
 # Inicializamos el objeto de la base de datos
 db = SQLAlchemy()
 
+
+
+"""#  --- TABLA DE USUARIOS ---
+# Esta tabla almacena la información de los usuarios que utilizan la aplicación
+# Incluye campos para el nombre de usuario y la contraseña
+# Permite la gestión de múltiples usuarios en la plataforma
+# Cada usuario puede tener múltiples resultados de backtesting asociados
+# Facilita la autenticación y autorización de los usuarios
+# Mejora la organización y gestión de los datos de los usuarios
+# En resumen, esta tabla es esencial para manejar la información de los usuarios en la aplicación
+# """
 class Usuario(db.Model):
     __tablename__ = 'usuarios'
     id = db.Column(db.Integer, primary_key=True)
@@ -14,6 +39,18 @@ class Usuario(db.Model):
     # Relación: Un usuario tiene muchos resultados de backtesting
     resultados = db.relationship('ResultadoBacktest', backref='propietario', lazy=True)
 
+
+"""#  --- TABLA DE RESULTADOS DE BACKTEST ---
+# Esta tabla almacena los resultados de cada backtest realizado por los usuarios
+# Incluye métricas clave para evaluar el rendimiento de la estrategia
+# También guarda la configuración global utilizada en el backtest
+# Permite flexibilidad para almacenar parámetros específicos de la estrategia
+# Además, incluye campos para observaciones y gráficos generados
+# Cada resultado está vinculado a un usuario específico
+# Facilita el análisis y comparación de diferentes estrategias y configuraciones
+# Mejora la organización y gestión de los datos de backtesting
+# En resumen, esta tabla es esencial para almacenar y analizar los resultados de los backtests realizados por los usuarios
+#  """
 class ResultadoBacktest(db.Model):
     __tablename__ = 'resultados_backtest'
     id = db.Column(db.Integer, primary_key=True)
@@ -53,7 +90,17 @@ class ResultadoBacktest(db.Model):
     
     # Relación: Un backtest tiene muchos trades detallados
     trades = db.relationship('Trade', backref='backtest', cascade='all, delete-orphan')
-
+"""
+#  --- NUEVA TABLA DE TRADES DETALLADOS ---
+# Esta tabla almacena los trades individuales realizados durante un backtest
+# Cada trade está vinculado a un resultado de backtest específico
+# Permite un análisis detallado del rendimiento de la estrategia
+# Incluye información clave como tipo de trade, precios de entrada y salida, PnL
+# Facilita la generación de reportes y estadísticas avanzadas
+# Mejora la transparencia y comprensión del comportamiento de la estrategia
+# En resumen, esta tabla es esencial para un análisis granular de los resultados del backtest
+#
+"""
 class Trade(db.Model):
     __tablename__ = 'trades'
     id = db.Column(db.Integer, primary_key=True)
@@ -65,3 +112,40 @@ class Trade(db.Model):
     precio_salida = db.Column(db.Float)
     pnl_absoluto = db.Column(db.Float)
     retorno_pct = db.Column(db.Float)
+
+#  --- NUEVA TABLA DE SIMBOLOS ---
+# Esta tabla almacena los símbolos que cada usuario quiere analizar
+# Incluye los nuevos campos para la estrategia
+# Permite gestionar múltiples símbolos por usuario
+# Cada símbolo está vinculado a un usuario específico
+# Así, cada usuario puede tener su propia lista de símbolos con configuraciones personalizadas
+# Esto facilita la gestión y el análisis individualizado de cada símbolo
+# Además, permite escalar fácilmente si se desea agregar más configuraciones en el futuro
+# La relación con la tabla de usuarios asegura que cada símbolo esté asociado correctamente
+# y permite acceder a los símbolos de un usuario de manera sencilla
+# También facilita la eliminación en cascada si un usuario es eliminado
+# Esto mejora la organización y la claridad de los datos en la base de datos
+# En resumen, esta tabla es esencial para gestionar los símbolos y sus configuraciones de manera eficiente y personalizada por usuario
+#
+class Simbolo(db.Model):
+    __tablename__ = 'simbolos'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    symbol = db.Column(db.String(20), nullable=False)
+    name = db.Column(db.String(100), nullable=True)
+    
+    # --- NUEVOS CAMPOS DE ESTRATEGIA ---
+    # Para decidir si el motor debe calcular el Full Ratio
+    usar_full_ratio = db.Column(db.Boolean, default=True)
+    
+    # Para decidir si se deben buscar fundamentales (Alpha Vantage vs Yahoo)
+    tiene_fundamentales = db.Column(db.Boolean, default=True)
+    
+    # --- RELACIÓN ---
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
+    
+    # Relación inversa para acceder fácil: usuario.mis_simbolos
+    propietario = db.relationship('Usuario', backref=db.backref('mis_simbolos', lazy=True, cascade="all, delete-orphan"))
+
+    def __repr__(self):
+        return f'<Simbolo {self.symbol} (FR:{self.usar_full_ratio}, Fund:{self.tiene_fundamentales})>'
