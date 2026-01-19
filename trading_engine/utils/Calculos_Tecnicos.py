@@ -17,16 +17,18 @@ SeriesOrList = Union[pd.Series, np.ndarray, List[float]]
 # --- FUNCIONES DE ANÁLISIS DE ESTADO (Tendencia) ---
 # ----------------------------------------------------------------------
 
-def es_ascendente(serie: SeriesOrList, periodo: int = 3) -> bool:
+def es_ascendente(serie: SeriesOrList, periodo: int = 3, umbral: float = 0.001) -> bool:
     """
-    Determina si la serie es ascendente comparando el valor actual 
-    con el valor del inicio del periodo (más robusto ante mesetas).
+    Determina si la serie es ascendente con un margen de seguridad (umbral).
+    El umbral evita cierres por variaciones insignificantes.
     """
     if len(serie) < periodo:
         return False
     
-    # Compara el último punto con el primero del bloque
-    return serie[-1] > serie[-periodo]
+    # Calculamos la diferencia porcentual entre el punto actual y el anterior del periodo
+    cambio_relativo = (serie[-1] - serie[-periodo]) / serie[-periodo]
+    
+    return cambio_relativo > umbral
 
 
 def es_descendente(serie: SeriesOrList, periodo: int = 3) -> bool:
@@ -38,8 +40,8 @@ def es_descendente(serie: SeriesOrList, periodo: int = 3) -> bool:
         return False
         
     # Compara el último punto con el primero del bloque
-    # Esto detectará la caída en MSFT aunque haya velas planas entre medias
-    return serie[-1] < serie[-periodo]
+
+    return serie[-1] <= serie[-periodo]
 
 # ----------------------------------------------------------------------
 # --- FUNCIONES DE ANÁLISIS DE ESTADO (Mínimos y Máximos Locales) ---

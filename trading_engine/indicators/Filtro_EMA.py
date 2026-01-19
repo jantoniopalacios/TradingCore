@@ -88,7 +88,10 @@ def check_ema_buy_signal(strategy_self: 'StrategySelf', condicion_base_tecnica: 
         condicion_base_tecnica = True
 
     # 2. Señal OR por ASCENDENTE: Si el usuario requiere ASCENDENTE Y el estado actual es ASCENDENTE.
-    if strategy_self.ema_slow_ascendente and strategy_self.ema_slow_ascendente_STATE:
+    # if strategy_self.ema_slow_ascendente and strategy_self.ema_slow_ascendente_STATE:
+
+    # EN este caso se activa la compra solo por estar en tendencia ascendente, sin importar el estado previo.
+    if strategy_self.ema_slow_ascendente_STATE:    
         log_reason = "EMA Lenta Ascendente"
         condicion_base_tecnica = True 
         
