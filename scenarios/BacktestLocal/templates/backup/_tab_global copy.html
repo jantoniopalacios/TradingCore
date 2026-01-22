@@ -1,0 +1,90 @@
+<h2 class="mb-3">Parámetros Globales</h2>
+
+<h4 class="mb-3 text-primary border-bottom pb-2">Configuración de Datos y Reporte</h4>
+
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4"><label for="periodo" class="form-label">Período de Datos:</label></div>
+    <div class="col-6">
+        <select class="form-select" id="periodo" name="periodo">
+            {% set options = ["1d", "5d", "1mo", "1y", "5y", "max"] %}
+            {% for option in options %}
+                <option value="{{ option }}" {% if config['periodo'] == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-2"><span class="text-muted small">{% if comments.periodo %}<a href="#" title="{{ comments.periodo }}">?</a>{% endif %}</span></div>
+</div>
+
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4"><label for="intervalo" class="form-label">Intervalo de Datos:</label></div>
+    <div class="col-6">
+        <select class="form-select" id="intervalo" name="intervalo">
+            {% set options = ["1m", "1h", "1d", "1wk", "1mo"] %}
+            {% for option in options %}
+                <option value="{{ option }}" {% if config['intervalo'] == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-2"><span class="text-muted small">{% if comments.intervalo %}<a href="#" title="{{ comments.intervalo }}">?</a>{% endif %}</span></div>
+</div>
+
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4"><label for="cash" class="form-label">Capital Inicial (CASH):</label></div>
+    <div class="col-6">
+        <input type="number" class="form-control" id="cash" name="cash" min="1" 
+               value="{{ config['cash'] | default('10000') }}">
+    </div>
+    <div class="col-2"><span class="text-muted small">{% if comments.cash %}<a href="#" title="{{ comments.cash }}">?</a>{% endif %}</span></div>
+</div>
+
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4"><label for="commission" class="form-label">Comisión (ej: 0.002):</label></div>
+    <div class="col-6">
+        <input type="number" class="form-control" id="commission" name="commission" step="0.0001" min="0.0" max="1.0" 
+               value="{{ config['commission'] | default('0.002') }}">
+    </div>
+    <div class="col-2"><span class="text-muted small">{% if comments.commission %}<a href="#" title="{{ comments.commission }}">?</a>{% endif %}</span></div>
+</div>
+
+<div class="row row-control align-items-center mb-4">
+    <div class="col-4"><label for="stoploss_percentage_below_close" class="form-label">Stop Loss (%):</label></div>
+    <div class="col-6">
+        <input type="number" class="form-control" id="stoploss_percentage_below_close" name="stoploss_percentage_below_close" step="0.01" min="0.0" max="1.0" 
+               value="{{ config['stoploss_percentage_below_close'] | default('0.06') }}">
+    </div>
+    <div class="col-2"><span class="text-muted small">{% if comments.stoploss_percentage_below_close %}<a href="#" title="{{ comments.stoploss_percentage_below_close }}">?</a>{% endif %}</span></div>
+</div>
+
+<h4 class="mb-3 text-primary border-bottom pb-2">Opciones de Ejecución y Correo</h4>
+
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4"><label for="usar_filtro_fundamental" class="form-check-label fw-bold">Usar Filtro Fundamental:</label></div>
+    <div class="col-6">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="usar_filtro_fundamental" name="usar_filtro_fundamental" 
+                   value="True" 
+                   {% if config['usar_filtro_fundamental'] == 'True' %}checked{% endif %}>
+        </div>
+        <small class="text-muted d-block">Si está activo, solo se analizarán activos con recomendación "Mantener".</small>
+    </div>
+    <div class="col-2"></div>
+</div>
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4"><label for="enviar_mail" class="form-check-label fw-bold">Enviar Mail:</label></div>
+    <div class="col-6">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="enviar_mail" name="enviar_mail" value="True" 
+                   {% if config['enviar_mail'] == 'True' %}checked{% endif %}>
+        </div>
+    </div>
+    <div class="col-2"><span class="text-muted small">{% if comments.enviar_mail %}<a href="#" title="{{ comments.enviar_mail }}">?</a>{% endif %}</span></div>
+</div>
+
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4"><label for="destinatario_email" class="form-label">Destinatario(s) Email:</label></div>
+    <div class="col-6">
+        <input type="text" class="form-control" id="destinatario_email" name="destinatario_email" 
+               value="{{ config['destinatario_email'] | default('juantxu@yahoo.com') }}">
+    </div>
+    <div class="col-2"><span class="text-muted small">{% if comments.destinatario_email %}<a href="#" title="{{ comments.destinatario_email }}">?</a>{% endif %}</span></div>
+</div>

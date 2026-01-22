@@ -51,3 +51,10 @@ __pycache__/
 
 # Ignorar archivos de datos
 *.csv
+
+# --- PostgreSQL Local (Laboratorio) ---
+pgsql/
+data_pg/
+postgres_bin.zip
+logfile.txt
+test_conn.py

@@ -306,6 +306,7 @@
                     <thead>
                         <tr>
                             <th>TIPO</th>
+                            <th>DESCRIPCIÓN</th>
                             <th>FECHA</th>
                             <th>ENTRADA</th>
                             <th>SALIDA</th>
@@ -320,6 +321,7 @@
                 html += `
                     <tr>
                         <td><span class="badge ${t.tipo == 'Long' ? 'bg-success' : 'bg-danger'}">${t.tipo}</span></td>
+                        <td class="small text">${t.descripcion || '-'}</td> 
                         <td>${t.fecha}</td>
                         <td>${t.entrada.toFixed(2)}</td>
                         <td>${t.salida.toFixed(2)}</td>

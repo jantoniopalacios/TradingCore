@@ -1,0 +1,93 @@
+<h2 class="mb-3">Parámetros de MACD (Moving Average Convergence Divergence)</h2>
+<p class="alert alert-info">Configura los períodos de cálculo del MACD y define las condiciones de señal (cruce o histograma) con lógica de exclusividad.</p>
+
+<div class="row">
+    <div class="col-6 border-end">
+        <h4 class="mb-3 text-primary">Configuración Principal y Períodos</h4>
+
+        <div class="row row-control align-items-center mb-4">
+            <div class="col-7"><label for="macd" class="form-check-label fw-bold">Activar MACD como Señal:</label></div>
+            <div class="col-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" 
+                            id="macd" 
+                            name="macd" 
+                            value="True" 
+                            {% if config.macd == 'True' %}checked{% endif %}>
+                </div>
+            </div>
+            <div class="col-2"><span class="text-muted small">{% if comments.macd %}<a href="#" title="{{ comments.macd }}">?</a>{% endif %}</span></div>
+        </div>
+
+        <div class="row row-control align-items-center mb-3">
+            <div class="col-7"><label for="macd_fast_period" class="form-label">Período Rápido (Fast Period):</label></div>
+            <div class="col-3">
+                <input type="number" class="form-control" id="macd_fast_period" name="macd_fast_period" min="2" value="{{ config.macd_fast_period }}">
+            </div>
+            <div class="col-2"><span class="text-muted small">{% if comments.macd_fast_period %}<a href="#" title="{{ comments.macd_fast_period }}">?</a>{% endif %}</span></div>
+        </div>
+
+        <div class="row row-control align-items-center mb-3">
+            <div class="col-7"><label for="macd_slow_period" class="form-label">Período Lento (Slow Period):</label></div>
+            <div class="col-3">
+                <input type="number" class="form-control" id="macd_slow_period" name="macd_slow_period" min="2" value="{{ config.macd_slow_period }}">
+            </div>
+            <div class="col-2"><span class="text-muted small">{% if comments.macd_slow_period %}<a href="#" title="{{ comments.macd_slow_period }}">?</a>{% endif %}</span></div>
+        </div>
+        
+        <div class="row row-control align-items-center mb-4">
+            <div class="col-7"><label for="macd_signal_period" class="form-label">Período de Señal (Signal Period):</label></div>
+            <div class="col-3">
+                <input type="number" class="form-control" id="macd_signal_period" name="macd_signal_period" min="1" value="{{ config.macd_signal_period }}">
+            </div>
+            <div class="col-2"><span class="text-muted small">{% if comments.macd_signal_period %}<a href="#" title="{{ comments.macd_signal_period }}">?</a>{% endif %}</span></div>
+        </div>
+    </div>
+
+    <div class="col-6">
+        <h4 class="mb-3 text-dark">Lógica de Señal (Exclusividad)</h4>
+        <p class="text-muted small">Define si la señal de compra/venta se basa en el **Cruce** (MACD vs. Signal) o en el **Histograma** (cambio de signo).</p>
+
+        <h5 class="mt-4 text-success">Lógica de Compra (Buy Logic)</h5>
+        <div class="row row-control align-items-center mb-4">
+            <div class="col-4"><label class="form-label fw-bold">Señal de Compra:</label></div>
+            <div class="col-8">
+                <div class="btn-group" role="group">
+                    
+                    <input type="radio" class="btn-check" name="macd_buy_logic" id="macd_cruce_up" value="macd_cruce_up" 
+                            {% if config.macd_buy_logic == 'macd_cruce_up' %}checked{% endif %}>
+                    <label class="btn btn-outline-success" for="macd_cruce_up" title="MACD cruza la línea Signal al alza">Cruce Up</label>
+                    
+                    <input type="radio" class="btn-check" name="macd_buy_logic" id="macd_histogram_buy" value="macd_histogram_buy" 
+                            {% if config.macd_buy_logic == 'macd_histogram_buy' %}checked{% endif %}>
+                    <label class="btn btn-outline-success" for="macd_histogram_buy" title="El histograma cruza de negativo a positivo">Histograma Buy</label>
+
+                    <input type="radio" class="btn-check" name="macd_buy_logic" id="macd_buy_none" value="None" 
+                            {% if config.macd_buy_logic == 'None' %}checked{% endif %}>
+                    <label class="btn btn-outline-secondary" for="macd_buy_none">Ninguna</label>
+                </div>
+            </div>
+        </div>
+
+        <h5 class="mt-4 text-danger">Lógica de Venta (Sell Logic)</h5>
+        <div class="row row-control align-items-center mb-4">
+            <div class="col-4"><label class="form-label fw-bold">Señal de Venta:</label></div>
+            <div class="col-8">
+                <div class="btn-group" role="group">
+                    
+                    <input type="radio" class="btn-check" name="macd_sell_logic" id="macd_cruce_down" value="macd_cruce_down" 
+                            {% if config.macd_sell_logic == 'macd_cruce_down' %}checked{% endif %}>
+                    <label class="btn btn-outline-danger" for="macd_cruce_down" title="MACD cruza la línea Signal a la baja">Cruce Down</label>
+                    
+                    <input type="radio" class="btn-check" name="macd_sell_logic" id="macd_histogram_sell" value="macd_histogram_sell" 
+                            {% if config.macd_sell_logic == 'macd_histogram_sell' %}checked{% endif %}>
+                    <label class="btn btn-outline-danger" for="macd_histogram_sell" title="El histograma cruza de positivo a negativo">Histograma Sell</label>
+
+                    <input type="radio" class="btn-check" name="macd_sell_logic" id="macd_sell_none" value="None" 
+                            {% if config.macd_sell_logic == 'None' %}checked{% endif %}>
+                    <label class="btn btn-outline-secondary" for="macd_sell_none">Ninguna</label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -406,6 +406,7 @@ def ejecutar_backtest(config_dict: dict):
                         nuevo_trade = Trade(
                             backtest=nuevo_res,
                             tipo=tipo_op,
+                            descripcion=str(t_row.get('Descripcion', 'Sin descripción')),
                             fecha=fecha_str,
                             precio_entrada=safe_float(t_row.get('Precio_Entrada')),
                             precio_salida=safe_float(t_row.get('Precio_Salida')),

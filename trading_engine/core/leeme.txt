@@ -1,0 +1,9 @@
+Organización de Funciones en trading_engine
+
+Para que no te pongas nervioso con el desorden, organiza tus archivos en trading_engine así:
+
+indicators/: Solo lógica matemática (RSI, MACD, etc.). No saben nada de bases de datos.
+
+core/: Gestión de datos (Descargas de precios, conectores a DB).
+
+utils/: Limpieza de datos, formateo de fechas, etc.

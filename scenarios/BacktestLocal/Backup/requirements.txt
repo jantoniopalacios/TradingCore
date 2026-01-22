@@ -1,5 +1,0 @@
-# Dependencias del Backtest
-backtesting
-# Nota: No necesitamos enumerar las dependencias del motor aquí, 
-# pero sí necesitamos decirle a quien use este escenario que instale el motor:
-# -e ../../engines/trading_engine

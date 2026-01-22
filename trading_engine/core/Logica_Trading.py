@@ -278,6 +278,7 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     if condicion_base_tecnica and cond_mos_valida:
         
         strategy_self.buy()
+
         # Inicializa el precio máximo para el Trailing Stop Loss
         strategy_self.max_price = strategy_self.data.Close[-1]
         

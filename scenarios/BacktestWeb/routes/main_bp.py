@@ -18,7 +18,7 @@ from ..configuracion import (
 from trading_engine.core.constants import VARIABLE_COMMENTS
 from ..Backtest import ejecutar_backtest 
 
-from ..database import db, ResultadoBacktest, Trade, Usuario # Importa tus modelos
+from ..database import db, ResultadoBacktest, Trade, Usuario, Simbolo # Importa tus modelos
 from sqlalchemy import func
 from datetime import datetime
 
@@ -241,22 +241,23 @@ def get_strategy_params(reg_id):
 #-- FUNCIÓN PARA EJECUTAR BACKTEST EN HILO SEPARADO --
 def run_backtest_and_save(app_instance, config_web, user_mode):
     """Ejecuta el motor. El guardado en SQL (incluyendo el gráfico) ya ocurre dentro de Backtest.py"""
+    # En Postgres, es vital que cada hilo gestione su propia limpieza de sesión
     with app_instance.app_context():
         try:
             # 1. Llamada al motor. 
-            # IMPORTANTE: Ahora recibimos 3 valores.
-            # El motor ya realiza el db.session.add y db.session.commit internamente.
             resultados_df, trades_df, graficos_dict = ejecutar_backtest(config_web)
-
+            # El motor ya hace el commit, pero cerramos explícitamente al final del hilo
+            db.session.remove()  # Limpieza de sesión tras ejecución
             if resultados_df is not None and not resultados_df.empty:
                 print(f"✅ Backtest finalizado para {user_mode}. Datos y gráficos procesados por el motor.")
             else:
                 print(f"⚠️ El backtest para {user_mode} no generó resultados.")
 
         except Exception as e:
-            print(f"❌ ERROR en run_backtest_and_save: {e}")
-            import traceback
-            traceback.print_exc()
+            db.session.rollback()
+            print(f"❌ ERROR en hilo local: {e}")
+        finally:
+            db.session.remove()
 
 #-- RUTA PARA LANZAR BACKTEST (POST) --
 @main_bp.route('/launch_strategy', methods=['POST'])
@@ -355,6 +356,7 @@ def get_trades(backtest_id):
         
         return jsonify([{
             'tipo': t.tipo,
+            'descripcion': t.descripcion,
             'fecha': t.fecha,
             'entrada': float(t.precio_entrada),
             'salida': float(t.precio_salida),

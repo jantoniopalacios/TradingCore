@@ -1,19 +1,27 @@
 import socket
 import logging
 import os
-import csv  # Necesario para leer el CSV
+import csv
+import sys
 from flask import Flask, send_from_directory
 from logging.handlers import RotatingFileHandler
+
+# Importaciones de tu estructura
 from .configuracion import cargar_y_asignar_configuracion, PROJECT_ROOT, BACKTESTING_BASE_DIR
-from .routes.main_bp import main_bp
+# Importamos el objeto main_bp desde la subcarpeta routes
+from .routes.main_bp import main_bp 
+# Importamos db y el modelo Usuario (ajustado a tu nueva base de datos pg)
+from trading_engine.core.database_pg import db
+from .database import Usuario 
 
-# --- IMPORTACIONES DE BASE DE DATOS ---
-from .database import db, Usuario
+# Forzar UTF-8 para evitar el error de la cruz roja en Windows
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8')
 
-def create_app(user_mode="invitado"):
+def create_app(user_mode="admin"):
     app = Flask(__name__)
 
-    # --- 1. CONFIGURACIÓN DE LOGGING ---
+    # --- 1. CONFIGURACIÓN DE LOGGING (Sin emojis para evitar errores) ---
     log_folder = BACKTESTING_BASE_DIR / "logs" 
     log_folder.mkdir(parents=True, exist_ok=True)
     log_path = log_folder / "trading_app.log"
@@ -27,46 +35,39 @@ def create_app(user_mode="invitado"):
     logging.root.setLevel(logging.INFO)
     logging.root.addHandler(rotating_handler)
     
-    app.logger.handlers = []
     app.logger.addHandler(rotating_handler)
-    app.logger.info(f"💾 LOG ACTIVADO EN: {log_path}")
+    app.logger.info(f"LOG ACTIVADO EN: {log_path}")
 
-    # --- 2. CONFIGURACIÓN DE BASE DE DATOS ---
-    db_path = BACKTESTING_BASE_DIR / "tradingcore.db"
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    # --- 2. CONFIGURACIÓN DE BASE DE DATOS (POSTGRESQL) ---
+    # Usamos la conexión que ya probamos que funciona
+    app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql+pg8000://postgres:admin@localhost:5432/trading_db"
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "JuanBautistaGamiz_EraUnFrailePoeta")
     
     db.init_app(app)
 
-    # --- 3. CREACIÓN DE TABLAS Y MIGRACIÓN INICIAL ---
+    # --- 3. CREACIÓN DE TABLAS Y MIGRACIÓN ---
     with app.app_context():
-        db.create_all()
-        
-        # Lógica de migración de users.csv a la BD
-        ruta_users_csv = BACKTESTING_BASE_DIR / "users.csv"
-        
-        # Solo actuamos si la tabla de usuarios está vacía
-        if Usuario.query.count() == 0 and ruta_users_csv.exists():
-            app.logger.info("Detectada base de datos vacía. Iniciando migración desde users.csv...")
-            try:
+        try:
+            db.create_all()
+            
+            ruta_users_csv = BACKTESTING_BASE_DIR / "users.csv"
+            if Usuario.query.count() == 0 and ruta_users_csv.exists():
+                app.logger.info("Migrando usuarios desde users.csv a Postgres...")
                 with open(ruta_users_csv, mode='r', encoding='utf-8') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
-                        # Creamos el objeto usuario
                         nuevo_usuario = Usuario(
                             username=row['username'],
                             password=row['password']
                         )
                         db.session.add(nuevo_usuario)
-                
                 db.session.commit()
-                app.logger.info("✅ Migración completada: Usuarios insertados en la BD.")
-            except Exception as e:
-                db.session.rollback()
-                app.logger.error(f"❌ Error durante la migración: {e}")
+                app.logger.info("Migracion completada exitosamente.")
+        except Exception as e:
+            app.logger.error(f"Error en base de datos: {e}")
 
-    # --- 4. CONFIGURACIÓN DE USUARIO Y RUTAS ---
+    # --- 4. RUTAS Y BLUEPRINTS ---
     @app.route('/favicon.ico')
     def favicon():
         return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico')
@@ -75,18 +76,17 @@ def create_app(user_mode="invitado"):
     config_usuario = cargar_y_asignar_configuracion(user_mode)
     app.config.update(config_usuario)
 
+    # Registramos el blueprint que Flask ahora sí encontrará
     app.register_blueprint(main_bp)
 
-    app.logger.info(f"🚀 Entorno inicializado para: {user_mode}")
     return app
 
 if __name__ == '__main__':
-    app = create_app(user_mode="invitado")
-    
+    app = create_app(user_mode="admin")
     try:
         local_ip = socket.gethostbyname(socket.gethostname())
     except:
         local_ip = "127.0.0.1"
 
-    print(f"\n✅ SERVIDOR ACTIVO: http://{local_ip}:5000")
+    print(f"\n SERVIDOR ACTIVO: http://{local_ip}:5000")
     app.run(host='0.0.0.0', port=5000, debug=True)

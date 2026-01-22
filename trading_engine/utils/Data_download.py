@@ -30,6 +30,9 @@ except ImportError:
     # Definición de fallback si la constante no existe
     COLUMNAS_OHLCV = ["Open", "High", "Low", "Close", "Volume", "Adj Close"] 
 
+# Importar motor de base de datos para posibles usos futuros
+from trading_engine.core.database_pg import engine_pg
+
 logger = logging.getLogger(__name__)
 
 
@@ -404,3 +407,26 @@ def download_fundamentals_AlphaV(
         return df_final
     
     return pd.DataFrame()
+
+def guardar_en_postgres(df, tabla_nombre):
+    """
+    Toma cualquier DataFrame (OHLCV o Fundamentales) y lo guarda 
+    en PostgreSQL usando una política de 'Append' o 'Replace'.
+    """
+    if df is None or df.empty:
+        logger.warning(f"No hay datos para guardar en la tabla {tabla_nombre}.")
+        return
+
+    # Limpieza de nombres de columnas para Postgres (minúsculas y sin espacios)
+    df_copy = df.copy()
+    if isinstance(df_copy.index, pd.DatetimeIndex):
+        df_copy.reset_index(inplace=True)
+        
+    df_copy.columns = [c.replace(' ', '_').lower() for c in df_copy.columns]
+
+    try:
+        # Usamos method='multi' para que la inserción sea mucho más rápida
+        df_copy.to_sql(tabla_nombre, con=engine_pg, if_exists='append', index=False, method='multi')
+        logger.info(f"✅ Se han guardado {len(df_copy)} registros en la tabla '{tabla_nombre}' de PostgreSQL.")
+    except Exception as e:
+        logger.error(f"❌ Error al inyectar datos en Postgres: {e}")

@@ -17,7 +17,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
 # Inicializamos el objeto de la base de datos
-db = SQLAlchemy()
+from trading_engine.core.database_pg import db
 
 
 
@@ -107,6 +107,7 @@ class Trade(db.Model):
     backtest_id = db.Column(db.Integer, db.ForeignKey('resultados_backtest.id'), nullable=False)
     
     tipo = db.Column(db.String(20)) # COMPRA / VENTA
+    descripcion = db.Column(db.String(255)) # Descripción del trade (ej: "Entrada por cruce de medias")
     fecha = db.Column(db.String(30))
     precio_entrada = db.Column(db.Float)
     precio_salida = db.Column(db.Float)

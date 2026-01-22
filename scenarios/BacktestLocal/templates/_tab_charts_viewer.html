@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>📈 Visor de Gráficos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 900px; margin-top: 30px; }
+        .chart-list-group { max-height: 70vh; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">📈 Gráficos Generados por la Estrategia</h1>
+
+        <p class="lead text-muted">Archivos encontrados en: <code>{{ charts_dir | default('Run_results/Charts') }}</code></p>
+        
+        <a href="{{ url_for('main.results') }}" class="btn btn-secondary mb-4">⬅️ Volver a Resultados</a>
+
+        {% if charts %}
+            <div class="list-group chart-list-group">
+                {% for chart_file in charts %}
+                    {% set file_extension = chart_file.split('.')[-1] %}
+                    
+                    <a href="{{ url_for('main.view_file', path='Run_results/Charts/' + chart_file) }}" 
+                       class="list-group-item list-group-item-action
+                       {% if file_extension == 'html' %}list-group-item-info{% else %}list-group-item-light{% endif %}" 
+                       target="_blank">
+                       
+                        {% if file_extension == 'html' %}
+                            <i class="bi bi-file-earmark-code me-2"></i> Gráfico Interactivo (HTML)
+                        {% else %}
+                            <i class="bi bi-image me-2"></i> Imagen Estática (PNG/{{ file_extension | upper }})
+                        {% endif %}
+                        
+                        <code class="float-end">{{ chart_file }}</code>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-warning mt-4" role="alert">
+                No se encontraron archivos de gráficos en el directorio de resultados.
+            </div>
+        {% endif %}
+
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</body>
+</html>
