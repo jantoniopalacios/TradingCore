@@ -25,7 +25,7 @@ from datetime import datetime
 main_bp = Blueprint('main', __name__) 
 
 # --- FUNCIONES DE SOPORTE (Manteniendo tu lógica de usuarios) ---
-def obtener_usuarios_registrados():
+def obtener_usuarios_registrados_BAK():
     usuarios = {}
     ruta_usuarios = BACKTESTING_BASE_DIR / "users.csv"
     if not ruta_usuarios.exists(): return {"admin": "admin"} 
@@ -36,6 +36,14 @@ def obtener_usuarios_registrados():
                 usuarios[row['username'].strip().lower()] = row['password'].strip()
     except: pass
     return usuarios
+
+def obtener_usuarios_registrados():
+    from trading_engine.core.database_pg import Usuario
+    try:
+        usuarios = {u.username.lower(): u.password for u in Usuario.query.all()}
+        return usuarios
+    except:
+        return {"admin": "admin"} # Fallback de emergencia
 
 def get_user_paths(username):
     rutas = inicializar_configuracion_usuario(username)

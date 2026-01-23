@@ -82,11 +82,22 @@ def create_app(user_mode="admin"):
     return app
 
 if __name__ == '__main__':
+    # Creamos la aplicación
     app = create_app(user_mode="admin")
+    
+    # Intentamos detectar la IP para el mensaje de bienvenida
     try:
+        # Esto obtendrá la IP principal, si Tailscale está activo suele ser la mejor
         local_ip = socket.gethostbyname(socket.gethostname())
     except:
-        local_ip = "127.0.0.1"
+        local_ip = "0.0.0.0"
 
-    print(f"\n SERVIDOR ACTIVO: http://{local_ip}:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    print(f"\n==========================================")
+    print(f" SERVIDOR TRADINGCORE ACTIVO")
+    print(f" Acceso local: http://localhost:5000")
+    print(f" Acceso Tailscale: http://{local_ip}:5000")
+    print(f"==========================================\n")
+
+    # Ejecución: 
+    # debug=False es más estable para el modo 'hidden' del .bat
+    app.run(host='0.0.0.0', port=5000, debug=False)
