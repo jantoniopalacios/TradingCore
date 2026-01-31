@@ -14,8 +14,8 @@ echo    INICIANDO INFRAESTRUCTURA TRADING
 echo ==========================================
 
 :: 1. ARRANCAR POSTGRESQL (Si no está activo)
-echo [*] Comprobando PostgreSQL en puerto 5432...
-netstat -an | findstr 5432 >nul
+echo [*] Comprobando PostgreSQL en puerto 5433...
+netstat -an | findstr 5433 >nul
 if %errorlevel% neq 0 (
     echo [!] PostgreSQL no detectado. Intentando arrancar...
     :: Usamos la ruta relativa de tu pg_start.bat

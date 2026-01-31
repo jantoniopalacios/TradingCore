@@ -24,21 +24,8 @@ from datetime import datetime
 
 main_bp = Blueprint('main', __name__) 
 
-# --- FUNCIONES DE SOPORTE (Manteniendo tu lógica de usuarios) ---
-def obtener_usuarios_registrados_BAK():
-    usuarios = {}
-    ruta_usuarios = BACKTESTING_BASE_DIR / "users.csv"
-    if not ruta_usuarios.exists(): return {"admin": "admin"} 
-    try:
-        with open(ruta_usuarios, mode='r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                usuarios[row['username'].strip().lower()] = row['password'].strip()
-    except: pass
-    return usuarios
-
 def obtener_usuarios_registrados():
-    from trading_engine.core.database_pg import Usuario
+    
     try:
         usuarios = {u.username.lower(): u.password for u in Usuario.query.all()}
         return usuarios
@@ -60,159 +47,148 @@ def index():
     if not session.get('logged_in'):
         return redirect(url_for('main.login'))
 
+    import json
     user_mode = session.get('user_mode')
-    rutas = inicializar_configuracion_usuario(user_mode)
+    u = Usuario.query.filter_by(username=user_mode).first()
 
-    # --- LÓGICA POST (Guardado de Configuración) ---
-    # CAMBIO CRÍTICO: Solo guardamos si el formulario NO es de otra acción (como borrar o lanzar)
-    # Para esto, tu botón de guardar en el HTML debe tener name="action" value="save_config"
+    # ================================================================
+    # --- LÓGICA POST (Guardado de Configuración en DB) ---
+    # ================================================================
     if request.method == 'POST' and request.form.get('action') == 'save_config':
         form_data = request.form.to_dict()
         
-        # 1. Guardar Símbolos
-        # --- NUEVA LÓGICA DE GUARDADO EN BASE DE DATOS (Sustituye al CSV) ---
+        # 1. Guardar Símbolos (Tu lógica actual en DB que ya funciona)
         if 'symbols_content' in form_data:
             contenido = form_data['symbols_content']
-            # IMPORTANTE: Importamos ambos modelos aquí para evitar el error de "local variable"
-            from ..database import Simbolo, Usuario
-            
-            # 1. Limpieza y preparación de la lista
             raw_activos = contenido.replace(';', ',').replace('\n', ',').replace('\r', ',')
             lista_nombres_simbolos = [s.strip().upper() for s in raw_activos.split(',') if s.strip()]
-            lista_nombres_simbolos = list(dict.fromkeys(lista_nombres_simbolos)) # Sin duplicados
+            lista_nombres_simbolos = list(dict.fromkeys(lista_nombres_simbolos))
             
             try:
-                # 2. Buscamos al usuario actual
-                u = Usuario.query.filter_by(username=user_mode).first()
-                
-                if u:
-                    # 3. Limpiamos sus símbolos antiguos (Borrado previo)
-                    Simbolo.query.filter_by(usuario_id=u.id).delete()
-                    
-                    # 4. Insertamos los nuevos
-                    for sym_name in lista_nombres_simbolos:
-                        nuevo_simbolo = Simbolo(
-                            symbol=sym_name,
-                            name=sym_name, # Por ahora igual al símbolo
-                            usar_full_ratio=True,     # Valor por defecto P1
-                            tiene_fundamentales=True,  # Valor por defecto P1
-                            usuario_id=u.id
-                        )
-                        db.session.add(nuevo_simbolo)
-                    
-                    db.session.commit()
-                    print(f"✅ {len(lista_nombres_simbolos)} símbolos guardados en DB para {user_mode}")
+                Simbolo.query.filter_by(usuario_id=u.id).delete()
+                for sym_name in lista_nombres_simbolos:
+                    nuevo_simbolo = Simbolo(symbol=sym_name, name=sym_name, usuario_id=u.id)
+                    db.session.add(nuevo_simbolo)
+                db.session.commit()
             except Exception as e:
                 db.session.rollback()
-                print(f"❌ Error al guardar símbolos en DB: {e}")
-                flash("Error al guardar en la base de datos", "danger")
-        
-        # 2. Configuración (.env)
-        env_config = {k: v for k, v in form_data.items() if k not in ['symbols_content', 'action']}
+                flash(f"Error símbolos: {e}", "danger")
 
-        # GESTIÓN DE SWITCHES
-        for attr in dir(System):
-            if not attr.startswith("__"):
-                val_original = getattr(System, attr)
-                if isinstance(val_original, bool):
-                    env_config[attr] = "True" if attr in form_data else "False"
+        # 2. Guardar Parámetros Técnicos en Usuario.config_actual
+        config_params = {k: v for k, v in form_data.items() if k not in ['symbols_content', 'action']}
 
-        guardar_parametros_a_env(env_config, user_mode)
-        cargar_y_asignar_configuracion(user_mode)
-        
-        flash("✅ Configuración guardada correctamente.", "success")
+        # --- LISTA MAESTRA DE SWITCHES (Basada en tus .html) ---
+        lista_switches = [
+            'macd', 'rsi', 'ema_cruce_signal', 'bb_active', 'bb_buy_crossover', 'bb_sell_crossover',
+            'filtro_fundamental', 'enviar_mail', 'margen_seguridad_active', 
+            'margen_seguridad_ascendente', 'volume_active', 'volume_ascendente',
+            'stoch_fast', 'stoch_mid', 'stoch_slow' # Si estos son switches en tu UI
+        ]
+
+        for s in lista_switches:
+            # FORZAMOS EL TEXTO 'True' o 'False' para que el HTML lo reconozca
+            if s in form_data:
+                config_params[s] = 'True'
+            else:
+                config_params[s] = 'False'
+
+        try:
+            u.config_actual = json.dumps(config_params) # Guardamos como JSON
+            db.session.commit()
+            flash("✅ Configuración guardada correctamente.", "success")
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error al guardar config: {e}", "danger")
+
         return redirect(url_for('main.index'))
 
     # ================================================================
-    # --- FLUJO GET (Carga normal de la página) ---
+    # --- LÓGICA GET (Carga de la página desde DB) ---
     # ================================================================
-    cargar_y_asignar_configuracion(user_mode)
     
-    config_web = {}
-    for attr in dir(System):
-        if not attr.startswith("__"):
-            val = getattr(System, attr)
-            config_web[attr] = str(val).strip() if val is not None else "None"
+    # Intentamos cargar la configuración guardada del usuario
+    config_para_web = {}
+    if u and u.config_actual:
+        try:
+            config_para_web = json.loads(u.config_actual) if isinstance(u.config_actual, str) else u.config_actual
+        
+            # --- NORMALIZADOR PARA EL HTML ---
+            # Esto convierte cualquier True booleano en "True" texto al vuelo
+            for key, value in config_para_web.items():
+                if value is True:
+                    config_para_web[key] = 'True'
+                elif value is False:
+                    config_para_web[key] = 'False'
+        except:
+            config_para_web = {}
 
-    # --- CONSTRUCCIÓN DEL ÁRBOL DE ARCHIVOS (En EXPLORADOR ) ---
+    # Si el usuario no tiene nada guardado, usamos los valores por defecto de la clase System
+    if not config_para_web:
+        for attr in dir(System):
+            if not attr.startswith("__"):
+                val = getattr(System, attr)
+                if not callable(val):
+                    config_para_web[attr] = str(val)
 
-    file_tree = []
-    
-    # 1. Logs de Sistema (SOLO PARA ADMIN)
-    # Ya no mostramos Resultados ni Gráficos porque están en la DB
-    if user_mode == 'admin':
-        logs_p = BACKTESTING_BASE_DIR / "logs"
-        if logs_p.exists():
-            file_tree.append({
-                "name": "Logs del Servidor",
-                "is_dir": True,
-                "children": get_directory_tree(logs_p, True),
-                "type": "Folder",
-                "path": "Logs"
-            })
+    # Preparar símbolos para el textarea
+    simbolos_db = Simbolo.query.filter_by(usuario_id=u.id).all() if u else []
+    symbols_text = ", ".join([s.symbol for s in simbolos_db]) if simbolos_db else "AAPL, MSFT"
 
-    # 2. Datos de Usuario (Opcional)
-    # Si quieres que el usuario vea sus archivos de configuración o caché OHLCV
-    # podrías añadirlo aquí, de lo contrario, deja el file_tree vacío para usuarios.
-
-    # --- Historial de Resultados (Agrupado por Tanda) ---
+    # Historial de resultados (Ordenado por fecha descendente)
     registros_agrupados = {}
     try:
-        from ..database import Usuario, ResultadoBacktest
-        user_mode = session.get('user_mode')
-
-        # CAMBIO AQUÍ: Si es admin, traemos TODOS los registros de la DB
-        if user_mode == 'admin':
-            todos = ResultadoBacktest.query.order_by(ResultadoBacktest.fecha_ejecucion.desc()).all()
-        else:
-            # Si no es admin, mantenemos tu lógica actual de filtrado
-            u = Usuario.query.filter_by(username=user_mode).first()
-            todos = ResultadoBacktest.query.filter_by(usuario_id=u.id)\
-                    .order_by(ResultadoBacktest.fecha_ejecucion.desc()).all() if u else []
+        # 1. Traemos los registros ordenados por fecha desde la base de datos
+        query_base = ResultadoBacktest.query.order_by(ResultadoBacktest.fecha_ejecucion.desc())
         
+        if user_mode == 'admin':
+            todos = query_base.all()
+        else:
+            todos = query_base.filter_by(usuario_id=u.id).all()
+        
+        # 2. Agrupamos manteniendo el orden de aparición (que ya viene ordenado por fecha)
         for r in todos:
-            # Mantenemos tu clave para agrupar en la interfaz
+            # La tanda_key identifica el grupo (por id_estrategia)
             tanda_key = f"{r.usuario_id}_{r.id_estrategia}" if user_mode == 'admin' else r.id_estrategia
             
             if tanda_key not in registros_agrupados:
                 registros_agrupados[tanda_key] = {
-                    'id_tanda': r.id_estrategia,  # El número 1, 2 o 3
-                    'usuario_id': r.usuario_id,   # El ID numérico del dueño (ej: 2)
+                    'id_tanda': r.id_estrategia,
+                    'usuario_id': r.usuario_id,
+                    'fecha_raw': r.fecha_ejecucion, # Guardamos el objeto datetime para ordenar
                     'fecha': r.fecha_ejecucion.strftime('%Y-%m-%d %H:%M'),
                     'usuario_nombre': r.propietario.username,
                     'activos': []
                 }
             registros_agrupados[tanda_key]['activos'].append(r)
+            
     except Exception as e:
-        print(f"Error al cargar historial SQL: {e}")
+        print(f"Error historial: {e}")
 
-    # ================================================================
-    # --- NUEVA LÓGICA PARA LEER SÍMBOLOS DE LA DB (MODIFICACIÓN AQUÍ) ---
-    # ================================================================
-    from ..database import Simbolo, Usuario
-    u_actual = Usuario.query.filter_by(username=user_mode).first()
-    
-    # Consultamos los símbolos del usuario en la base de datos
-    simbolos_db = Simbolo.query.filter_by(usuario_id=u_actual.id).all() if u_actual else []
-    
-    # Convertimos la lista de objetos en un string separado por comas: "AAPL, MSFT, TSLA"
-    symbols_text = ", ".join([s.symbol for s in simbolos_db])
-    
-    # Si la base de datos está vacía y quieres mostrar los encabezados por defecto:
-    if not symbols_text:
-        symbols_text = "Symbol,Name"
+    # 3. EL CAMBIO FINAL: Ordenar el diccionario de tandas por la fecha del primer elemento de cada tanda
+    # Esto garantiza que la Tanda #10 aparezca antes que la #9 si se hizo después.
+    tandas_ordenadas = dict(sorted(
+        registros_agrupados.items(), 
+        key=lambda x: x[1]['fecha_raw'], 
+        reverse=True
+    ))
 
-    registros_final = dict(sorted(registros_agrupados.items(), key=lambda x: x[0], reverse=True))
+# Inicializamos vacío por seguridad
+    arbol_ficheros = []
+
+    # SOLO escaneamos si el usuario es admin
+    if user_mode == 'admin':
+        logs_dir = BACKTESTING_BASE_DIR / "logs"
+        if logs_dir.exists():
+            arbol_ficheros = get_directory_tree(logs_dir, is_admin=True)
 
     return render_template(
         'index.html',
         system=System,
         strategy=System,
-        config=config_web,
-        # CAMBIO CLAVE: Ahora enviamos symbols_text (de la DB) en lugar de leer el CSV
-        symbols_content=symbols_text, 
-        file_tree=file_tree,
-        registros=registros_final,
+        config=config_para_web,
+        symbols_content=symbols_text,
+        file_tree=arbol_ficheros, 
+        registros=tandas_ordenadas, # Enviamos las tandas ya ordenadas
         comments=VARIABLE_COMMENTS
     )
 
@@ -268,59 +244,109 @@ def run_backtest_and_save(app_instance, config_web, user_mode):
             db.session.remove()
 
 #-- RUTA PARA LANZAR BACKTEST (POST) --
+import logging
+import traceback
+
+# Obtenemos el logger configurado en tu app
+logger = logging.getLogger(__name__)
+
 @main_bp.route('/launch_strategy', methods=['POST'])
 def launch_strategy():
-    if not session.get('logged_in'): 
-        return jsonify({"status": "error"}), 401
     
-    config_web = request.form.to_dict()
-    user_mode = session.get('user_mode')
-    config_web['user_mode'] = user_mode
-
-    # 1. Buscamos el usuario y su ID
-    from ..database import Usuario
-    u = Usuario.query.filter_by(username=user_mode).first()
-    
-    if not u:
-        return jsonify({"status": "error", "message": "Usuario no encontrado en la DB"}), 404
+    try:
+        if not session.get('logged_in'): 
+            return jsonify({"status": "error"}), 401
         
-    config_web['user_id'] = u.id 
+        user_mode = session.get('user_mode')
+        u = Usuario.query.filter_by(username=user_mode).first()
+        if not u:
+            return jsonify({"status": "error", "message": "Usuario no encontrado"}), 404
 
-    # 2. Calculamos la tanda (1, 2, 3...)
-    ultima_tanda = db.session.query(func.max(ResultadoBacktest.id_estrategia)).filter_by(usuario_id=u.id).scalar()
-    config_web['tanda_id'] = (ultima_tanda + 1) if ultima_tanda is not None else 1
+        # 1. Cargamos configuración base del disco
+        cargar_y_asignar_configuracion(user_mode)
+        
+        # 2. Capturamos el formulario
+        form_data = request.form.to_dict()
+        config_web = {}
 
-    # 3. Lanzamiento del hilo
-    from flask import current_app
-    app_instance = current_app._get_current_object()
+        # 1. Cargar valores por defecto de la clase System
+        for attr in dir(System):
+            if not attr.startswith("__"):
+                val = getattr(System, attr)
+                if not callable(val):
+                    config_web[attr] = val
 
-    threading.Thread(
-        target=run_backtest_and_save, 
-        args=(app_instance, config_web, user_mode)
-    ).start()
+        # 2. LISTA MAESTRA DE BOOLEANOS (Switches de tu UI)
+        # Asegúrate de que los nombres coincidan exactamente con el 'name' en tu HTML
+        switches = [
+            'macd', 'rsi', 'ema_cruce_signal', 'bb_active', 'bb_buy_crossover', 
+            'bb_sell_crossover', 'filtro_fundamental', 'enviar_mail', 
+            'margen_seguridad_active', 'volume_active', 'stoch_fast', 'stoch_mid', 'stoch_slow'
+        ]
 
-    return jsonify({"status": "success", "message": f"Tanda #{config_web['tanda_id']} iniciada para {user_mode}."})
+        # 3. PROCESAR EL FORMULARIO
+        for key, value in form_data.items():
+            if key in switches:
+                config_web[key] = True  # Si llegó en el POST, es que estaba ON
+            elif value == "" or value.lower() == 'none':
+                config_web[key] = None
+            else:
+                # Intentar convertir a número para el motor
+                try:
+                    config_web[key] = float(value) if '.' in value else int(value)
+                except:
+                    config_web[key] = value
+
+        # 4. EL PASO CRUCIAL: Si un switch NO vino en el form_data, forzarlo a False
+        for s in switches:
+            if s not in form_data:
+                config_web[s] = False
+
+        # 6. Metadatos cruciales para el motor
+        config_web['user_id'] = u.id 
+        config_web['user_mode'] = user_mode # <--- FUNDAMENTAL para que Backtest.py sepa quién es
+        
+        ultima_tanda = db.session.query(func.max(ResultadoBacktest.id_estrategia)).filter_by(usuario_id=u.id).scalar()
+        config_web['tanda_id'] = (ultima_tanda + 1) if ultima_tanda is not None else 1
+        
+        logger.info(f"🚀 LANZANDO HILO: Usuario={user_mode} (ID={u.id}) Tanda #{config_web['tanda_id']}")
+
+        # 7. Lanzar el hilo con el contexto de la app
+        from flask import current_app
+        app_instance = current_app._get_current_object()
+
+        threading.Thread(
+            target=run_backtest_and_save, 
+            args=(app_instance, config_web, user_mode)
+        ).start()
+
+        return jsonify({"status": "success", "message": "Iniciado correctamente"})
+
+    except Exception as e:
+        logger.error(f"❌ ERROR CRÍTICO EN LAUNCH:\n{traceback.format_exc()}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 #-- RUTA PARA VER ARCHIVOS DE LOGS --
-@main_bp.route('/file/<path:path>')
+@main_bp.route('/view_file/<path:path>')
 def view_file(path):
-    if not session.get('logged_in'): abort(401)
-    user_mode = session.get('user_mode')
+    if not session.get('logged_in'):
+        return "No autorizado", 401
     
-    # Los resultados y gráficos ahora se ven vía /backtest/ver_grafico/ 
-    # Esta ruta queda solo para visualizar Logs del sistema (Admin)
-    if user_mode != 'admin': abort(403)
-
-    filename = os.path.basename(path)
+    # Usamos la constante global para evitar errores de ruta relativa
+    # Como el explorador lista desde la carpeta "logs", concatenamos adecuadamente
     logs_dir = BACKTESTING_BASE_DIR / "logs"
-    target = logs_dir / filename
+    full_path = logs_dir / os.path.basename(path) # Evitamos saltos de directorio por seguridad
 
-    if not target.exists(): abort(404)
-    
-    # Lectura segura de logs (últimas 2000 líneas)
-    with open(target, 'r', encoding='utf-8', errors='replace') as f:
-        contenido = "".join(deque(f, maxlen=2000))
-    return Response(contenido, mimetype='text/plain')
+    if not full_path.exists():
+        return f"Archivo no encontrado en: {full_path}", 404
+
+    try:
+        with open(full_path, 'r', encoding='utf-8', errors='replace') as f:
+            # Mandamos las últimas 1000 líneas
+            content = "".join(deque(f, maxlen=1000))
+        return Response(content, mimetype='text/plain')
+    except Exception as e:
+        return f"Error: {str(e)}", 500
 
 #-- RUTA PARA ELIMINAR ARCHIVOS DE LOGS --
 @main_bp.route('/delete-file/<path:path>', methods=['POST'])
@@ -347,6 +373,69 @@ def delete_file(path):
         flash("El archivo no existe o no es un log.", "warning")
 
     return redirect(url_for('main.index'))
+
+# Fecha y hora: 2026-01-31 13:47
+# En main_bp.py
+
+@main_bp.route('/admin/visor_logs')
+def visor_logs():
+    if not session.get('logged_in') or session.get('user_mode') != 'admin':
+        abort(403)
+
+    logs_dir = BACKTESTING_BASE_DIR / "logs"
+    target = logs_dir / "trading_app.log"
+    
+    if not target.exists():
+        return "El archivo de log no existe aún.", 404
+
+    lista_logs = []
+    with open(target, 'r', encoding='utf-8', errors='replace') as f:
+        # Leemos las últimas 500 líneas
+        for linea in deque(f, maxlen=500):
+            # El formato en app.py es: '%(asctime)s - %(levelname)s - %(message)s'
+            # Dividimos por el guion con espacios para extraer las partes
+            partes = linea.split(' - ')
+            if len(partes) >= 3:
+                lista_logs.append({
+                    'timestamp': partes[0],
+                    'nivel': partes[1],
+                    'mensaje': " - ".join(partes[2:]) # Por si el mensaje contiene guiones
+                })
+
+    return render_template('admin_logs.html', logs=reversed(lista_logs))
+
+# Fecha y hora: 2026-01-31 14:18
+# En main_bp.py
+
+@main_bp.route('/get_log_json/<path:path>')
+def get_log_json(path):
+    if not session.get('logged_in') or session.get('user_mode') != 'admin':
+        abort(403)
+    
+    filename = os.path.basename(path)
+    logs_dir = BACKTESTING_BASE_DIR / "logs"
+    target = logs_dir / filename
+
+    if not target.exists(): abort(404)
+
+    logs_parsed = []
+    with open(target, 'r', encoding='utf-8', errors='replace') as f:
+        for linea in deque(f, maxlen=1000): # Últimas 1000 líneas
+            # Ajustamos al formato: 2026-01-30 23:21:19,388 - INFO - Mensaje
+            try:
+                partes = linea.split(' - ', 2)
+                if len(partes) >= 3:
+                    logs_parsed.append({
+                        'timestamp': partes[0],
+                        'level': partes[1].strip(),
+                        'message': partes[2].strip()
+                    })
+                else:
+                    logs_parsed.append({'timestamp': '', 'level': 'DEBUG', 'message': linea})
+            except:
+                continue
+
+    return jsonify(logs_parsed)
 
 #-- RUTA PARA OBTENER TRADES EN FORMATO JSON --
 @main_bp.route('/get_trades/<int:backtest_id>')

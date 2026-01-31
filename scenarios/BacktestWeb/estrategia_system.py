@@ -231,175 +231,92 @@ class System(Strategy):
         self.venta_detectada = False
         
         # -------------------------------------------------------------
-        # 🟢 Inicialización de Indicadores (I) - CORRECCIÓN DE DATOS 🟢
+        # 🟢 Inicialización de Indicadores (I) - BLOQUE COMPLETO 🟢
         # -------------------------------------------------------------
         
-        # MEDIAS MÓVILES EXPONENCIALES (EMA)
-
-        # 1. 💡 REGLA DE ACTIVACIÓN: ema_slow_activo
-        # Si alguno de los filtros de estado está activo en la configuración,
-        # forzamos ema_slow_activo a True (si no lo estaba ya).
-        if self.ema_slow_minimo or self.ema_slow_maximo or \
-           self.ema_slow_ascendente or self.ema_slow_descendente:
+        # --- 1. MEDIAS MÓVILES (EMA) ---
+        # Sincronización de activación
+        if any([self.ema_slow_minimo, self.ema_slow_maximo, self.ema_slow_ascendente, self.ema_slow_descendente]):
             self.ema_slow_activo = True
             
-        # 2. CÁLCULO DE INDICADORES
-        
-        # EMA Lenta: Siempre se calcula si hay CRUCE O si hay filtro activo.
         if self.ema_cruce_signal or self.ema_slow_activo:
             self.ema_slow_series = self.I(
                 ta.trend.ema_indicator, self.data.Close.s, 
-                self.ema_slow_period, name='EMA_Lenta'
+                int(self.ema_slow_period), name='EMA_Lenta'
             )
-            # Inicialización de series de estado (solo si se usan filtros)
             if self.ema_slow_activo:
                 self.ema_slow_minimo_s = self.ema_slow_series.copy() * 0
                 self.ema_slow_maximo_s = self.ema_slow_series.copy() * 0
                 self.ema_slow_ascendente_s = self.ema_slow_series.copy() * 0
                 self.ema_slow_descendente_s = self.ema_slow_series.copy() * 0
-            
-        else:
-            self.ema_slow_series = None
 
-        # EMA Rápida: Solo se calcula si hay CRUCE.
         if self.ema_cruce_signal:
             self.ema_fast_series = self.I(
                 ta.trend.ema_indicator, self.data.Close.s, 
-                self.ema_fast_period, name='EMA_Rapida'
+                int(self.ema_fast_period), name='EMA_Rapida'
             )
-        else:
-            self.ema_fast_series = None
 
-        # 2. RSI
+        # --- 2. RSI ---
         if self.rsi and self.rsi_period:
-            # FIX: Usamos .s para asegurar que 'ta' reciba un objeto Series válido (soluciona el AttributeError)
-            self.rsi_ind = self.I(ta.momentum.rsi, self.data.Close.s, self.rsi_period, name='RSI')
+            self.rsi_ind = self.I(ta.momentum.rsi, self.data.Close.s, int(self.rsi_period), name='RSI')
+            self.rsi_threshold_ind = self.I(
+                lambda x: pd.Series([float(self.rsi_low_level)] * len(x), index=x.index), 
+                self.data.Close.s, name='RSI_Threshold'
+            )
             
-            # Indicador auxiliar para la línea de umbral del RSI
-            self.rsi_threshold_ind = self.I(lambda x: pd.Series([self.rsi_low_level] * len(x), index=x.index), self.data.Close.s, name='RSI_Threshold')
-            
-        # 3. STOCHASTICS (FAST, MID, SLOW)
-        # Creamos una instancia única del calculador (puede ser dentro o fuera del init si es más limpio)
+        # --- 3. STOCHASTICS (FAST, MID, SLOW) ---
         stoch_calculator = StochHelper()
-        data = self.data
-
-        # --- STOCH FAST ---
-        if self.stoch_fast and self.stoch_fast_period:
-            # 1. Calcular las series K y D usando el método 'calculate'
-            stoch_k_fast_series, stoch_d_fast_series = stoch_calculator.calculate(
-                data=data,
-                window=self.stoch_fast_period, 
-                smooth_window=self.stoch_fast_smooth
-            )
-            # 2. Asignar las Series a las variables de la estrategia usando self.I(lambda: ...)
-            self.stoch_k_fast = self.I(lambda: stoch_k_fast_series, name='STOCH_FAST_K')
-            self.stoch_d_fast = self.I(lambda: stoch_d_fast_series, name='STOCH_FAST_D')
-
-        # --- STOCH MID ---
-        if self.stoch_mid and self.stoch_mid_period:
-            stoch_k_mid_series, stoch_d_mid_series = stoch_calculator.calculate(
-                data=data,
-                window=self.stoch_mid_period, 
-                smooth_window=self.stoch_mid_smooth
-            )
-            self.stoch_k_mid = self.I(lambda: stoch_k_mid_series, name='STOCH_MID_K')
-            self.stoch_d_mid = self.I(lambda: stoch_d_mid_series, name='STOCH_MID_D')
-
-        # --- STOCH SLOW ---
-        if self.stoch_slow and self.stoch_slow_period:
-            stoch_k_slow_series, stoch_d_slow_series = stoch_calculator.calculate(
-                data=data,
-                window=self.stoch_slow_period, 
-                smooth_window=self.stoch_slow_smooth
-            )
-            self.stoch_k_slow = self.I(lambda: stoch_k_slow_series, name='STOCH_SLOW_K')
-            self.stoch_d_slow = self.I(lambda: stoch_d_slow_series, name='STOCH_SLOW_D')
-        # ----------------------------------------------------------------------
+        for prefix in ['fast', 'mid', 'slow']:
+            active = getattr(self, f'stoch_{prefix}')
+            period = getattr(self, f'stoch_{prefix}_period')
+            smooth = getattr(self, f'stoch_{prefix}_smooth')
             
-        # 4. MACD
-        # El MACD de ta.trend.macd generalmente no necesita .s
-        if self.macd and self.macd_fast and self.macd_slow and self.macd_signal:
-            self.macd_line = self.I(ta.trend.macd, self.data.Close.s, self.macd_fast, self.macd_slow, name='MACD_Line')
-            self.macd_signal_line = self.I(ta.trend.macd_signal, self.data.Close.s, self.macd_fast, self.macd_slow, self.macd_signal, name='MACD_Signal')
-            self.macd_hist = self.I(ta.trend.macd_diff, self.data.Close.s, self.macd_fast, self.macd_slow, self.macd_signal, name='MACD_Hist')
+            if active and period:
+                k_ser, d_ser = stoch_calculator.calculate(
+                    data=self.data, window=int(period), smooth_window=int(smooth)
+                )
+                setattr(self, f'stoch_k_{prefix}', self.I(lambda: k_ser, name=f'STOCH_{prefix.upper()}_K'))
+                setattr(self, f'stoch_d_{prefix}', self.I(lambda: d_ser, name=f'STOCH_{prefix.upper()}_D'))
 
-       
-        # 5. BANDAS DE BOLLINGER (BB) 🌟 INTEGRACIÓN FINAL
-        if self.bb_active: # Verificar si el indicador está habilitado en los parámetros
-            # backtesting.py requiere que las series sean envueltas en self.I() si van a ser ploteadas,
-            # pero dado que calculate_bollinger_bands devuelve Series de Pandas ya calculadas,
-            # las asignamos directamente (aunque no se plotean automáticamente a menos que las envuelvas)
-            # o si las pasas como lambdas a self.I()
-            
-            # Opción 1 (La mejor, usando I() con lambda para ploteo si es necesario)
+        # --- 4. MACD ---
+        self.macd = str(getattr(self, 'macd', 'False')).lower() == 'true'
+        if self.macd:
+            try:
+                self.macd_line = self.I(ta.trend.macd, self.data.Close.s, int(self.macd_fast), int(self.macd_slow), name='MACD_Line')
+                self.macd_signal_line = self.I(ta.trend.macd_signal, self.data.Close.s, int(self.macd_fast), int(self.macd_slow), int(self.macd_signal), name='MACD_Signal')
+                self.macd_hist = self.I(ta.trend.macd_diff, self.data.Close.s, int(self.macd_fast), int(self.macd_slow), int(self.macd_signal), name='MACD_Hist')
+            except Exception as e:
+                print(f"⚠️ MACD Error: {e}")
+                self.macd = False
+
+        # --- 5. BANDAS DE BOLLINGER (BB) ---
+        if self.bb_active:
             bb_sma_s, bb_upper_s, bb_lower_s = calculate_bollinger_bands(
-                self.data.df, 
-                window=self.bb_window, 
-                num_std=self.bb_num_std
+                self.data.df, window=int(self.bb_window), num_std=float(self.bb_num_std)
             )
-            
             self.bb_sma_series = self.I(lambda: bb_sma_s, name='BB_SMA', overlay=True, color='blue')
             self.bb_upper_band_series = self.I(lambda: bb_upper_s, name='BB_Upper', overlay=True, color='red')
             self.bb_lower_band_series = self.I(lambda: bb_lower_s, name='BB_Lower', overlay=True, color='red')
 
-        # 6. MARGEN DE SEGURIDAD (FUNDAMENTAL)
-        if self.margen_seguridad_active:
-             # Corrección: Se utiliza 'Margen de seguridad' in self.data para comprobar la existencia de la columna
-             # self.data.df es la forma correcta de acceder al DataFrame completo en init()
-             if 'Margen de seguridad' in self.data.df.columns:
-                 self.margen_seguridad_ind = self.I(lambda x: x, self.data.df['Margen de seguridad'], name='MoS')
-             else:
-                 self.margen_seguridad_active = False
+        # --- 6. MARGEN DE SEGURIDAD (MoS) ---
+        if self.margen_seguridad_active and 'Margen de seguridad' in self.data.df.columns:
+            self.margen_seguridad_ind = self.I(lambda x: x, self.data.df['Margen de seguridad'], name='MoS')
 
-            
-        # 7. VOLUMEN Y VMA 
+        # --- 7. VOLUMEN Y RVOL ---
         if self.volume_active and self.volume_period:
-            
-            # 1. Calcular VMA (CÁLCULO INTERNO: plot=False)
-            self.data.VMA_SMA = self.I(
-                _calculate_vma_sma,               # <--- NUEVA FUNCIÓN CORREGIDA
-                self.data.Volume,         
-                self.volume_period,       
-                name='VMA_SMA',
-                plot=False,  # <--- ESENCIAL: No ensuciar el gráfico
-            )
+            self.data.VMA_SMA = self.I(_calculate_vma_sma, self.data.Volume, int(self.volume_period), name='VMA_SMA', plot=False)
             self.volume_series = self.data.VMA_SMA
             
-            # 2. 📊 RVOL (CREA el panel de escala relativa)
-            self.rvol = self.I(
-                lambda v, ma: v / ma, 
-                self.data.Volume, 
-                self.data.VMA_SMA,
-                name='Vol_Relativo',
-                plot=True,
-                color='black',
-                overlay=False,  # <--- CREA EL NUEVO EJE (panel)
-                scatter=False
-            )
-            
-            # 3. Línea de Referencia (Se DIBUJA sobre el panel creado en #2)
+            # Panel de Volumen Relativo (RVOL)
+            self.rvol = self.I(lambda v, ma: v / ma, self.data.Volume, self.data.VMA_SMA, name='Vol_Relativo', overlay=False)
             self.rvol_threshold = self.I(
-                lambda x: pd.Series([self.volume_avg_multiplier]*len(x), index=x.index),
-                self.data.Close.s, 
-                name='Umbral_Nivel',
-                plot=True,
-                color='red',
-                overlay=True,  # <--- SUPERPONE sobre RVOL (mismo panel)
-                scatter=False
+                lambda x: pd.Series([float(self.volume_avg_multiplier)]*len(x), index=x.index),
+                self.data.Close.s, name='Umbral_Nivel', color='red', overlay=True
             )
-
-            # 4. Puntos de Estado (Se DIBUJA sobre el panel RVOL)
+            # Puntos de estado sobre el panel de volumen
             self.volume_umbral_s = self.I(
-                # 💡 CORRECCIÓN: La lambda acepta 'x' (que será self.data.Close.s) para obtener len e index.
-                lambda x, *args, **kwargs: pd.Series([np.nan] * len(x), index=x.index),
-                self.data.Close.s,  # <--- Pasamos self.data.Close.s como serie de referencia
-                name='Estado_Asc',
-                # Parámetros de Ploteo
-                plot=True,
-                color='green', 
-                overlay=True,  
-                scatter=True, 
-                size=5 
+                lambda x: pd.Series([np.nan] * len(x), index=x.index),
+                self.data.Close.s, name='Estado_Asc', color='green', overlay=True, scatter=True
             )
     # ------------------------------------------------------------------
     # --- MÉTODO NEXT (Limpio - Llama a los Wrappers) ---

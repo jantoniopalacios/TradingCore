@@ -36,7 +36,9 @@ class Usuario(db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
     
-    # Relación: Un usuario tiene muchos resultados de backtesting
+    # Nuevo campo para guardar la configuración "viva" del usuario
+    config_actual = db.Column(db.Text, nullable=True) 
+
     resultados = db.relationship('ResultadoBacktest', backref='propietario', lazy=True)
 
 
@@ -137,7 +139,7 @@ class Simbolo(db.Model):
     
     # --- NUEVOS CAMPOS DE ESTRATEGIA ---
     # Para decidir si el motor debe calcular el Full Ratio
-    usar_full_ratio = db.Column(db.Boolean, default=True)
+    full_ratio = db.Column(db.Boolean, default=True)
     
     # Para decidir si se deben buscar fundamentales (Alpha Vantage vs Yahoo)
     tiene_fundamentales = db.Column(db.Boolean, default=True)
@@ -149,4 +151,4 @@ class Simbolo(db.Model):
     propietario = db.relationship('Usuario', backref=db.backref('mis_simbolos', lazy=True, cascade="all, delete-orphan"))
 
     def __repr__(self):
-        return f'<Simbolo {self.symbol} (FR:{self.usar_full_ratio}, Fund:{self.tiene_fundamentales})>'
+        return f'<Simbolo {self.symbol} (FR:{self.full_ratio}, Fund:{self.tiene_fundamentales})>'

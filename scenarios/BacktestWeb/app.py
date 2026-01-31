@@ -30,7 +30,8 @@ def create_app(user_mode="admin"):
         logging.root.removeHandler(h)
 
     rotating_handler = RotatingFileHandler(log_path, maxBytes=500 * 1024, backupCount=3, encoding='utf-8')
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    # Nuevo formato: separador '|' para facilitar el parseo posterior
+    formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(name)s | %(message)s')
     rotating_handler.setFormatter(formatter)
     logging.root.setLevel(logging.INFO)
     logging.root.addHandler(rotating_handler)
@@ -40,7 +41,7 @@ def create_app(user_mode="admin"):
 
     # --- 2. CONFIGURACIÓN DE BASE DE DATOS (POSTGRESQL) ---
     # Usamos la conexión que ya probamos que funciona
-    app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql+pg8000://postgres:admin@localhost:5432/trading_db"
+    app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql+pg8000://postgres:admin@localhost:5433/trading_db"
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "JuanBautistaGamiz_EraUnFrailePoeta")
     
@@ -100,4 +101,4 @@ if __name__ == '__main__':
 
     # Ejecución: 
     # debug=False es más estable para el modo 'hidden' del .bat
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)

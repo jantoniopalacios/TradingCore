@@ -23,8 +23,8 @@ if %errorlevel% equ 0 (
 )
 
 :: 2. DETENER POSTGRESQL
-echo [*] Comprobando PostgreSQL en puerto 5432...
-netstat -an | findstr 5432 >nul
+echo [*] Comprobando PostgreSQL en puerto 5433...
+netstat -an | findstr 5433 >nul
 if %errorlevel% equ 0 (
     echo [!] Cerrando motor PostgreSQL de forma segura...
     "%PG_BIN%" stop -D "%PG_DATA%" -m fast

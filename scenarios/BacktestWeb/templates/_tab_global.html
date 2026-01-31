@@ -63,12 +63,12 @@
 <h4 class="mb-3 text-primary border-bottom pb-2">Opciones de Ejecución y Correo</h4>
 
 <div class="row row-control align-items-center mb-2">
-    <div class="col-4"><label for="usar_filtro_fundamental" class="form-check-label fw-bold">Usar Filtro Fundamental:</label></div>
+    <div class="col-4"><label for="filtro_fundamental" class="form-check-label fw-bold">Usar Filtro Fundamental:</label></div>
     <div class="col-6">
         <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" role="switch" id="usar_filtro_fundamental" name="usar_filtro_fundamental" 
+            <input class="form-check-input" type="checkbox" role="switch" id="filtro_fundamental" name="filtro_fundamental" 
                    value="True" 
-                   {% if config.usar_filtro_fundamental == 'True' %}checked{% endif %}>
+                   {% if config.filtro_fundamental == 'True' %}checked{% endif %}>
         </div>
         <small class="text-muted d-block">Si está activo, solo se analizarán activos con recomendación "Mantener".</small>
     </div>

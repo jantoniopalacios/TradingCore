@@ -149,7 +149,7 @@ def asignar_parametros_a_system(config_data: dict, rutas: dict):
     System.cash = get_param('cash', 10000, int)
     System.commission = get_param('commission', 0.0, float)
     System.stoploss_percentage_below_close = get_param('stoploss_percentage_below_close', 0.0, float)
-    System.usar_filtro_fundamental = get_param('usar_filtro_fundamental', False, bool)
+    System.filtro_fundamental = get_param('filtro_fundamental', False, bool)
     System.enviar_mail = get_param('enviar_mail', False, bool)
     System.destinatario_email = get_param('destinatario_email', '', str)
 
@@ -172,9 +172,9 @@ def asignar_parametros_a_system(config_data: dict, rutas: dict):
 
     # --- 4. MACD ---
     System.macd = get_param('macd', False, bool)
-    System.macd_fast_period = get_param('macd_fast_period', 12, int)
-    System.macd_slow_period = get_param('macd_slow_period', 26, int)
-    System.macd_signal_period = get_param('macd_signal_period', 9, int)
+    System.macd_fast = get_param('macd_fast', 12, int)
+    System.macd_slow = get_param('macd_slow', 26, int)
+    System.macd_signal = get_param('macd_signal', 9, int)
     System.macd_buy_logic = get_param('macd_buy_logic', 'None')
     System.macd_sell_logic = get_param('macd_sell_logic', 'None')
 

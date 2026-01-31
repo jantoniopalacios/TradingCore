@@ -1,49 +1,46 @@
 {% macro render_tree(tree, current_path="") %}
   <ul class="list-unstyled ms-3 border-start border-secondary border-opacity-25 ps-2">
     {% for item in tree %}
-      {# Extraemos los valores del diccionario enviado desde el servidor #}
       {% set name = item.name %}
       {% set is_dir = item.is_dir %}
       {% set children = item.children %}
       {% set date = item.date if not is_dir else "" %}
-      
       {% set item_path = (current_path + "/" + name) if current_path else name %}
       
-      {# Lógica de Seguridad de Acceso #}
       {% set is_log_related = (name.lower() == "trading_app.log" or name.lower() == "logs") %}
       {% if not is_log_related or (is_log_related and session.get('user_mode') == 'admin') %}
         
         <li class="mb-1 py-1">
           {% if is_dir %}
-            {# Fila de Carpeta #}
-            <div class="folder-row d-flex align-items-center py-1 rounded" onclick="toggleFolder(this)" style="cursor: pointer;">
+            <div class="folder-row d-flex align-items-center py-1 rounded hover-bg-dark" onclick="toggleFolder(this)" style="cursor: pointer;">
               <span class="folder-icon me-2">📁</span>
-              <strong class="text-light-emphasis small">{{ name }}</strong>
+              <strong class="text-info small fw-bold">{{ name }}</strong>
             </div>
-            {# La clase 'nested' es vital para el JS de index.html #}
             <div class="nested" style="display: none;">
               {{ render_tree(children, item_path) }}
             </div>
           {% else %}
-            {# Fila de Archivo #}
-            <div class="file-row d-flex justify-content-between align-items-center rounded px-2 hover-bg">
+            <div class="file-row-grid rounded px-2 hover-bg-dark">
               <div class="d-flex align-items-center overflow-hidden">
                 <i class="bi bi-file-earmark-code text-info me-2"></i>
                 <a href="javascript:void(0);" 
                    onclick="openFile('{{ url_for('main.view_file', path=item_path) }}', '{{ name }}')"
-                   class="text-decoration-none text-light opacity-75 small text-truncate">
+                   class="text-decoration-none text-white small fw-bold text-truncate">
                    {{ name }}
                 </a>
-                <span class="ms-3 text-muted smaller font-monospace d-none d-md-inline">{{ date }}</span>
               </div>
               
-              <div class="file-actions d-flex gap-2">
+              <div class="text-end">
+                <span class="timestamp-yellow font-monospace d-none d-md-inline">{{ date }}</span>
+              </div>
+
+              <div class="d-flex justify-content-end gap-2">
                 <a href="{{ url_for('main.view_file', path=item_path) }}" download="{{ name }}" 
-                   class="btn btn-link btn-sm text-secondary p-0 hover-primary" title="Descargar">
+                   class="btn btn-link btn-sm text-secondary p-0 hover-info">
                    <i class="bi bi-download"></i>
                 </a>
                 <button type="button" class="btn btn-link btn-sm text-secondary p-0 hover-danger" 
-                        onclick="confirmDelete('{{ url_for('main.delete_file', path=item_path) }}', '{{ name }}')" title="Eliminar">
+                        onclick="confirmDelete(event, '{{ url_for('main.delete_file', path=item_path) }}', '{{ name }}')">
                     <i class="bi bi-trash"></i>
                 </button>
               </div>
@@ -55,43 +52,74 @@
   </ul>
 {% endmacro %}
 
-<div id="file-viewer" class="card bg-dark border-secondary shadow-lg">
-    <div class="card-header bg-black border-bottom border-secondary d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 text-primary small fw-bold text-uppercase tracking-wider">
-            <i class="bi bi-hdd-network me-2"></i>Sistema de Archivos
-        </h5>
-        <span class="badge bg-secondary opacity-75 small">Usuario: {{ session.get('user_mode') }}</span>
-    </div>
-    
-    <div class="card-body">
-        {% if file_tree %}
-            <div class="file-tree-container custom-scrollbar" style="max-height: 500px; overflow-y: auto;">
-                {{ render_tree(file_tree) }}
+{% if session.get('user_mode') == 'admin' %}
+    <div id="file-viewer-admin" class="card bg-black border-secondary shadow-lg overflow-hidden" style="display: flex; flex-direction: column; height: 600px;">
+        
+        <div class="card-header bg-black border-bottom border-secondary p-3" style="flex: 0 auto; z-index: 10;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0 text-info small fw-bold text-uppercase tracking-wider">
+                    <i class="bi bi-hdd-network me-2"></i>Sistema de Archivos (Admin)
+                </h5>
             </div>
-        {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-folder-x fa-3x text-secondary opacity-25 mb-3"></i>
-                <p class="text-muted">No hay archivos disponibles para mostrar.</p>
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-dark border-secondary text-secondary border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" id="adminSearch" class="form-control bg-dark border-secondary text-white border-start-0" placeholder="Filtrar por nombre o fecha...">
             </div>
-        {% endif %}
+        </div>
+        
+        <div class="card-body p-0 custom-scrollbar" style="flex: 1; overflow-y: auto;">
+            <div class="p-3">
+                {% if file_tree %}
+                    {{ render_tree(file_tree) }}
+                {% else %}
+                    <p class="text-muted text-center py-5 small">No hay archivos.</p>
+                {% endif %}
+            </div>
+        </div>
     </div>
-</div>
+{% endif %}
 
 <style>
-    /* Estilos para el explorador */
-    .hover-bg:hover { background-color: rgba(255, 255, 255, 0.05); }
-    .hover-primary:hover { color: #0d6efd !important; }
-    .hover-danger:hover { color: #dc3545 !important; }
-    .smaller { font-size: 0.75rem; }
-    .tracking-wider { letter-spacing: 1px; }
+    /* COLORES BASE */
+    .bg-black { background-color: #000000 !important; }
+    .text-white { color: #ffffff !important; }
+    .text-info { color: #00d4ff !important; } /* Cian para iconos y carpetas */
     
-    .folder-row:hover { background-color: rgba(243, 156, 18, 0.1); }
-    
-    /* Espaciado para la anidación */
-    .nested { margin-left: 20px; }
+    /* TIMESTAMP AMARILLO - Estilo terminal */
+    .timestamp-yellow {
+        color: #ffcc00 !important; /* Amarillo sólido y brillante */
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
 
-    /* Scrollbar minimalista */
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f4750; border-radius: 10px; }
+    /* GRID DE ALINEACIÓN */
+    .file-row-grid {
+        display: grid;
+        grid-template-columns: 1fr 160px 70px;
+        align-items: center;
+        gap: 10px;
+        min-height: 38px;
+        border-bottom: 1px solid #111;
+    }
+
+    /* HOVERS */
+    .hover-bg-dark:hover { background-color: #111 !important; }
+    .hover-info:hover { color: #00d4ff !important; }
+    .hover-danger:hover { color: #ff4444 !important; }
+
+    /* SCROLLBAR */
+    .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #ffcc00; }
 </style>
+
+<script>
+document.getElementById('adminSearch')?.addEventListener('input', function(e) {
+    const term = e.target.value.toLowerCase();
+    document.querySelectorAll('li').forEach(li => {
+        const text = li.textContent.toLowerCase();
+        li.style.display = text.includes(term) ? "" : "none";
+    });
+});
+</script>

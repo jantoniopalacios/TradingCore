@@ -198,25 +198,91 @@
         });
     });
 
-    // 2. APERTURA DE ARCHIVOS (Tu lógica original)
     function openFile(url, filename) {
         if (filename.toLowerCase().endsWith('.html')) {
             window.open(url + '?cache=' + Date.now(), '_blank');
             return;
         }
+        
         const modalElement = document.getElementById('csvViewerModal');
         const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
         const displayArea = document.getElementById('fileContent');
         
-        document.getElementById('csvViewerTitle').innerHTML = `<i class="bi bi-file-earmark-spreadsheet"></i> ${filename}`;
+        document.getElementById('csvViewerTitle').innerHTML = `<i class="bi bi-terminal"></i> ${filename}`;
         displayArea.innerHTML = '<div class="p-5 text-center"><div class="spinner-border text-primary"></div></div>';
         modalInstance.show();
 
         fetch(url + '?nocache=' + Date.now())
             .then(res => res.text())
             .then(raw => {
-                displayArea.innerHTML = filename.toLowerCase().endsWith('.csv') ? buildHtmlTableFromCsv(raw) : `<pre class="p-4 m-0 text-white">${raw}</pre>`;
+                if (filename.toLowerCase().endsWith('.csv')) {
+                    displayArea.innerHTML = buildHtmlTableFromCsv(raw);
+                } else if (filename.toLowerCase().endsWith('.log')) {
+                    // RENDERIZADO ESPECIAL PARA LOGS
+                    displayArea.innerHTML = buildLogViewer(raw);
+                } else {
+                    displayArea.innerHTML = `<pre class="p-4 m-0 text-white">${raw}</pre>`;
+                }
             });
+            
+    }function buildLogViewer(text) {
+        const lines = text.trim().split(/\r?\n/).reverse();
+        
+        let html = `
+            <div class="p-2 bg-black border-bottom border-secondary d-flex gap-2 sticky-top" style="top: 0; z-index: 100;">
+                <input type="text" id="logSearch" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Filtrar por activo, error o fecha..." onkeyup="filterLogs()">
+                <select id="logLevelFilter" class="form-select form-select-sm bg-dark text-white border-secondary" style="width:150px" onchange="filterLogs()">
+                    <option value="">Todos los niveles</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                </select>
+            </div>
+            
+            <table class="csv-table" id="logTable">
+                <thead>
+                    <tr>
+                        <th style="width:180px; top: 45px;">Timestamp</th> <th style="width:100px; top: 45px;">Nivel</th>
+                        <th style="top: 45px;">Mensaje</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        lines.forEach(line => {
+            const parts = line.split(' - ');
+            if (parts.length >= 3) {
+                const level = parts[1].trim();
+                let badgeClass = 'bg-info';
+                if (level === 'ERROR') badgeClass = 'bg-danger';
+                if (level === 'WARNING') badgeClass = 'bg-warning text-dark';
+                
+                html += `
+                    <tr class="log-row" data-level="${level}">
+                        <td style="color: #ffcc00 !important; font-family: 'JetBrains Mono', monospace; font-weight: 500;">
+                            ${parts[0]}
+                        </td>
+                        <td><span class="badge ${badgeClass}">${level}</span></td>
+                        <td class="log-msg text-white-50">${parts.slice(2).join(' - ')}</td>
+                    </tr>`;
+            }
+        });
+
+        return html + '</tbody></table>';
+    }
+
+    // Función de filtrado instantáneo para la consola
+    function filterLogs() {
+        const search = document.getElementById('logSearch').value.toLowerCase();
+        const level = document.getElementById('logLevelFilter').value;
+        const rows = document.querySelectorAll('.log-row');
+
+        rows.forEach(row => {
+            const text = row.querySelector('.log-msg').textContent.toLowerCase();
+            const rowLevel = row.getAttribute('data-level');
+            const matchesSearch = text.includes(search);
+            const matchesLevel = level === "" || rowLevel === level;
+            row.style.display = (matchesSearch && matchesLevel) ? '' : 'none';
+        });
     }
 
     // 3. RENDER CSV (Tu lógica original)
@@ -240,24 +306,36 @@
     function lanzarEstrategia() {
         const launchBtn = document.querySelector('button[onclick="lanzarEstrategia()"]');
         const originalHtml = launchBtn.innerHTML;
+
+        // 1. OBTENER EL FORMULARIO (Certeza: ID coincide con tu HTML)
+        const formElement = document.getElementById('config-form');
+        
+        // 2. EMPAQUETAR LOS DATOS (Esto incluye lo de _tab_global.html, etc.)
+        const formData = new FormData(formElement);
+
         launchBtn.disabled = true;
         launchBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
 
-        fetch("{{ url_for('main.launch_strategy') }}", { method: 'POST' })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    localStorage.setItem('activeTabKey', 'tab-historial');
-                    alert("✅ " + data.message);
-                    location.reload();
-                } else {
-                    alert("❌ Error: " + data.message);
-                }
-            })
-            .finally(() => {
-                launchBtn.disabled = false;
-                launchBtn.innerHTML = originalHtml;
-            });
+        // 3. ENVIAR CON EL BODY LLENO
+        fetch("{{ url_for('main.launch_strategy') }}", { 
+            method: 'POST',
+            body: formData  // <-- Certeza: Ahora el diccionario NO llegará vacío
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                localStorage.setItem('activeTabKey', 'tab-historial');
+                alert("✅ " + data.message);
+                location.reload();
+            } else {
+                alert("❌ Error: " + data.message);
+            }
+        })
+        .catch(err => alert("❌ Error de red: " + err))
+        .finally(() => {
+            launchBtn.disabled = false;
+            launchBtn.innerHTML = originalHtml;
+        });
     }
 
     function toggleFolder(el) {
