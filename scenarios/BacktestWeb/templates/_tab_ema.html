@@ -1,19 +1,18 @@
 <h2 class="mb-3">Parámetros de Medias Móviles Exponenciales (EMA)</h2>
-<p class="alert alert-info">Define la señal de cruce (EMA Rápida vs Lenta) y los filtros de estado de la EMA Lenta aplicando la lógica de exclusividad.</p>
+<p class="alert alert-info">Define la señal de cruce y activa múltiples filtros de estado de forma simultánea para mayor flexibilidad.</p>
 
 <div class="row">
     <div class="col-6 border-end">
         <h4 class="mb-3 text-primary">Configuración de Cruce de EMA</h4>
-
+        
         <div class="row row-control align-items-center mb-4">
-            <div class="col-7"><label for="ema_cruce_signal" class="form-check-label fw-bold">Activar Cruce (Fast > Slow) como Señal de Compra:</label></div>
+            <div class="col-7"><label for="ema_cruce_signal" class="form-check-label fw-bold">Activar Cruce (Fast > Slow):</label></div>
             <div class="col-3">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" role="switch" id="ema_cruce_signal" name="ema_cruce_signal" value="True" 
                            {% if config.ema_cruce_signal == 'True' %}checked{% endif %}>
                 </div>
             </div>
-            <div class="col-2"><span class="text-muted small">{% if comments.ema_cruce_signal %}<a href="#" title="{{ comments.ema_cruce_signal }}">?</a>{% endif %}</span></div>
         </div>
 
         <div class="row row-control align-items-center mb-3">
@@ -21,7 +20,6 @@
             <div class="col-3">
                 <input type="number" class="form-control" id="ema_fast_period" name="ema_fast_period" min="2" value="{{ config.ema_fast_period }}">
             </div>
-            <div class="col-2"><span class="text-muted small">{% if comments.ema_fast_period %}<a href="#" title="{{ comments.ema_fast_period }}">?</a>{% endif %}</span></div>
         </div>
 
         <div class="row row-control align-items-center mb-4">
@@ -29,50 +27,45 @@
             <div class="col-3">
                 <input type="number" class="form-control" id="ema_slow_period" name="ema_slow_period" min="2" value="{{ config.ema_slow_period }}">
             </div>
-            <div class="col-2"><span class="text-muted small">{% if comments.ema_slow_period %}<a href="#" title="{{ comments.ema_slow_period }}">?</a>{% endif %}</span></div>
         </div>
     </div>
 
     <div class="col-6">
-        <h4 class="mb-3 text-dark">Filtros de Estado de EMA Lenta (Lógica Exclusiva)</h4>
-        <p class="text-muted small">Estas condiciones actúan como filtros adicionales. Solo puedes elegir una opción por tipo de lógica (Compra/Venta).</p>
+        <h4 class="mb-3 text-dark">Filtros de Estado (Lógica Aditiva)</h4>
+        <p class="text-muted small">Puedes activar varias opciones. Funcionarán como señales OR para la entrada.</p>
 
-        <h5 class="mt-4 text-success">Lógica de Compra / Tendencia Alcista</h5>
-        <div class="row row-control align-items-center mb-4">
-            <div class="col-4"><label class="form-label fw-bold">EMA Lenta (Señal):</label></div>
-            <div class="col-8">
-                <div class="btn-group" role="group" data-bs-toggle="buttons">
-                    <input type="radio" class="btn-check" name="ema_buy_logic" id="ema_slow_min_radio" value="ema_slow_minimo" 
-                           {% if config.ema_buy_logic == 'ema_slow_minimo' %}checked{% endif %}>
-                    <label class="btn btn-outline-success" for="ema_slow_min_radio" title="Señal de mínimo en la EMA Lenta (retroceso)">Mínimo</label>
-                    
-                    <input type="radio" class="btn-check" name="ema_buy_logic" id="ema_slow_asc_radio" value="ema_slow_ascendente" 
-                           {% if config.ema_buy_logic == 'ema_slow_ascendente' %}checked{% endif %}>
-                    <label class="btn btn-outline-success" for="ema_slow_asc_radio" title="La EMA Lenta está creciendo (tendencia confirmada)">Ascendente</label>
-
-                    <input type="radio" class="btn-check" name="ema_buy_logic" id="ema_buy_none" value="None" 
-                           {% if config.ema_buy_logic == 'None' %}checked{% endif %}>
-                    <label class="btn btn-outline-secondary" for="ema_buy_none">Ninguna</label>
+        <h5 class="mt-4 text-success">Lógica de Compra</h5>
+        <div class="row mb-2">
+            <div class="col-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="ema_slow_minimo" name="ema_slow_minimo" value="True"
+                           {% if config.ema_slow_minimo == 'True' %}checked{% endif %}>
+                    <label class="form-check-label" for="ema_slow_minimo">Mínimo (Giro)</label>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="ema_slow_ascendente" name="ema_slow_ascendente" value="True"
+                           {% if config.ema_slow_ascendente == 'True' %}checked{% endif %}>
+                    <label class="form-check-label" for="ema_slow_ascendente">Ascendente</label>
                 </div>
             </div>
         </div>
 
         <h5 class="mt-4 text-danger">Lógica de Venta / Bloqueo</h5>
-        <div class="row row-control align-items-center mb-4">
-            <div class="col-4"><label class="form-label fw-bold">EMA Lenta (Bloqueo):</label></div>
-            <div class="col-8">
-                <div class="btn-group" role="group" data-bs-toggle="buttons">
-                    <input type="radio" class="btn-check" name="ema_sell_logic" id="ema_slow_max_radio" value="ema_slow_maximo" 
-                           {% if config.ema_sell_logic == 'ema_slow_maximo' %}checked{% endif %}>
-                    <label class="btn btn-outline-danger" for="ema_slow_max_radio" title="Señal de máximo en la EMA Lenta (posible corrección)">Máximo</label>
-                    
-                    <input type="radio" class="btn-check" name="ema_sell_logic" id="ema_slow_desc_radio" value="ema_slow_descendente" 
-                           {% if config.ema_sell_logic == 'ema_slow_descendente' %}checked{% endif %}>
-                    <label class="btn btn-outline-danger" for="ema_slow_desc_radio" title="La EMA Lenta está cayendo (bloqueo de compra)">Decreciente</label>
-
-                    <input type="radio" class="btn-check" name="ema_sell_logic" id="ema_sell_none" value="None" 
-                           {% if config.ema_sell_logic == 'None' %}checked{% endif %}>
-                    <label class="btn btn-outline-secondary" for="ema_sell_none">Ninguna</label>
+        <div class="row">
+            <div class="col-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="ema_slow_maximo" name="ema_slow_maximo" value="True"
+                           {% if config.ema_slow_maximo == 'True' %}checked{% endif %}>
+                    <label class="form-check-label" for="ema_slow_maximo">Máximo (Techo)</label>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="ema_slow_descendente" name="ema_slow_descendente" value="True"
+                           {% if config.ema_slow_descendente == 'True' %}checked{% endif %}>
+                    <label class="form-check-label" for="ema_slow_descendente">Decreciente</label>
                 </div>
             </div>
         </div>

@@ -2,6 +2,7 @@ import os
 import threading
 import csv
 import io
+import json
 from pathlib import Path
 from flask import (
     Blueprint, render_template, request, redirect, url_for, 
@@ -12,7 +13,7 @@ from collections import deque
 # --- IMPORTACIONES ORIGINALES ---
 from ..file_handler import read_symbols_raw, write_symbols_raw, get_directory_tree
 from ..configuracion import (
-    guardar_parametros_a_env, inicializar_configuracion_usuario,
+    inicializar_configuracion_usuario,
     cargar_y_asignar_configuracion, System, BACKTESTING_BASE_DIR
 ) 
 from trading_engine.core.constants import VARIABLE_COMMENTS
@@ -47,7 +48,6 @@ def index():
     if not session.get('logged_in'):
         return redirect(url_for('main.login'))
 
-    import json
     user_mode = session.get('user_mode')
     u = Usuario.query.filter_by(username=user_mode).first()
 
@@ -79,10 +79,16 @@ def index():
 
         # --- LISTA MAESTRA DE SWITCHES (Basada en tus .html) ---
         lista_switches = [
+            # Indicadores principales
             'macd', 'rsi', 'ema_cruce_signal', 'bb_active', 'bb_buy_crossover', 'bb_sell_crossover',
+            # Parámetros RSI (nuevos)
+            'rsi_minimo', 'rsi_ascendente', 'rsi_maximo', 'rsi_descendente',
+            # Parámetros EMA (existentes)
+            'ema_slow_minimo', 'ema_slow_ascendente', 'ema_slow_maximo', 'ema_slow_descendente',
+            # Filtros globales
             'filtro_fundamental', 'enviar_mail', 'margen_seguridad_active', 
             'margen_seguridad_ascendente', 'volume_active', 'volume_ascendente',
-            'stoch_fast', 'stoch_mid', 'stoch_slow' # Si estos son switches en tu UI
+            'stoch_fast', 'stoch_mid', 'stoch_slow'
         ]
 
         for s in lista_switches:
@@ -197,8 +203,7 @@ def index():
 #-- RUTA PARA OBTENER PARÁMETROS DE LA ESTRATEGIA EN FORMATO JSON --
 @main_bp.route('/get_strategy_params/<int:reg_id>')
 def get_strategy_params(reg_id):
-    from ..database import ResultadoBacktest
-    import json
+
     
     res = ResultadoBacktest.query.get_or_404(reg_id)
     if not res.params_tecnicos:
@@ -224,24 +229,52 @@ def get_strategy_params(reg_id):
 
 #-- FUNCIÓN PARA EJECUTAR BACKTEST EN HILO SEPARADO --
 def run_backtest_and_save(app_instance, config_web, user_mode):
-    """Ejecuta el motor. El guardado en SQL (incluyendo el gráfico) ya ocurre dentro de Backtest.py"""
-    # En Postgres, es vital que cada hilo gestione su propia limpieza de sesión
+    """
+    Ejecuta el motor de backtest en hilo separado.
+    El guardado en SQL (incluyendo gráfico) ocurre dentro de Backtest.py
+    """
+    # Obtenemos el logger de la app
+    logger = logging.getLogger("BacktestExecution")
+    
+    # En Postgres, cada hilo debe gestionar su propia sesión
     with app_instance.app_context():
         try:
-            # 1. Llamada al motor. 
+            logger.info(f"\n{'='*70}")
+            logger.info(f"🚀 INICIANDO BACKTEST | Usuario: {user_mode} | Tanda: {config_web.get('tanda_id', 'N/A')}")
+            logger.info(f"{'='*70}")
+            
+            # 1. Llamada al motor
+            logger.info("Ejecutando motor de backtest...")
             resultados_df, trades_df, graficos_dict = ejecutar_backtest(config_web)
-            # El motor ya hace el commit, pero cerramos explícitamente al final del hilo
-            db.session.remove()  # Limpieza de sesión tras ejecución
+            
+            # El motor hace el commit, pero limpiamos la sesión explícitamente
+            db.session.remove()
+            
+            # 2. Validar resultados
             if resultados_df is not None and not resultados_df.empty:
-                print(f"✅ Backtest finalizado para {user_mode}. Datos y gráficos procesados por el motor.")
+                logger.info(f"✅ ÉXITO | {len(resultados_df)} resultados procesados")
+                logger.info(f"✅ Gráficos generados: {len(graficos_dict)}")
+                logger.info(f"{'='*70}\n")
+                print(f"✅ Backtest finalizado para {user_mode}. {len(resultados_df)} resultados guardados.")
             else:
+                logger.warning(f"⚠️  ADVERTENCIA | El backtest no generó resultados")
+                logger.warning(f"{'='*70}\n")
                 print(f"⚠️ El backtest para {user_mode} no generó resultados.")
 
         except Exception as e:
+            logger.error(f"\n{'='*70}")
+            logger.error(f"❌ ERROR CRÍTICO EN BACKTEST | Usuario: {user_mode}")
+            logger.error(f"Excepción: {type(e).__name__}: {str(e)}")
+            logger.error(f"{'='*70}")
+            logger.error(traceback.format_exc())
             db.session.rollback()
-            print(f"❌ ERROR en hilo local: {e}")
+            print(f"❌ ERROR en backtest para {user_mode}: {str(e)}")
+        
         finally:
-            db.session.remove()
+            try:
+                db.session.remove()
+            except Exception as e:
+                logger.error(f"Error al limpiar sesión DB: {e}")
 
 #-- RUTA PARA LANZAR BACKTEST (POST) --
 import logging
@@ -252,17 +285,27 @@ logger = logging.getLogger(__name__)
 
 @main_bp.route('/launch_strategy', methods=['POST'])
 def launch_strategy():
+    """
+    Lanza el backtest en hilo separado y retorna confirmación inmediata.
+    El progreso se puede ver en los logs en tiempo real.
+    """
+    logger = logging.getLogger("LaunchStrategy")
     
     try:
         if not session.get('logged_in'): 
-            return jsonify({"status": "error"}), 401
+            logger.warning("Intento de acceso sin autenticación a /launch_strategy")
+            return jsonify({"status": "error", "message": "No autenticado"}), 401
         
         user_mode = session.get('user_mode')
+        logger.info(f"[LAUNCH] Usuario {user_mode} lanzando backtest...")
+        
         u = Usuario.query.filter_by(username=user_mode).first()
         if not u:
+            logger.error(f"[LAUNCH] Usuario {user_mode} no encontrado en BD")
             return jsonify({"status": "error", "message": "Usuario no encontrado"}), 404
 
         # 1. Cargamos configuración base del disco
+        logger.info(f"[LAUNCH] Cargando configuración base para {user_mode}")
         cargar_y_asignar_configuracion(user_mode)
         
         # 2. Capturamos el formulario
@@ -309,21 +352,30 @@ def launch_strategy():
         ultima_tanda = db.session.query(func.max(ResultadoBacktest.id_estrategia)).filter_by(usuario_id=u.id).scalar()
         config_web['tanda_id'] = (ultima_tanda + 1) if ultima_tanda is not None else 1
         
-        logger.info(f"🚀 LANZANDO HILO: Usuario={user_mode} (ID={u.id}) Tanda #{config_web['tanda_id']}")
+        logger.info(f"[LAUNCH] Configuración preparada:")
+        logger.info(f"  - Usuario: {user_mode} (ID={u.id})")
+        logger.info(f"  - Tanda: #{config_web['tanda_id']}")
+        logger.info(f"  - Indicadores activos: {len([k for k,v in config_web.items() if v == True])}")
+        logger.info(f"  - Símbolos: {Simbolo.query.filter_by(usuario_id=u.id).count()}")
 
         # 7. Lanzar el hilo con el contexto de la app
         from flask import current_app
         app_instance = current_app._get_current_object()
 
+        logger.info(f"[LAUNCH] ✅ Iniciando hilo de backtest...")
         threading.Thread(
             target=run_backtest_and_save, 
-            args=(app_instance, config_web, user_mode)
+            args=(app_instance, config_web, user_mode),
+            daemon=False  # Permitir que la app espere si es necesario
         ).start()
 
-        return jsonify({"status": "success", "message": "Iniciado correctamente"})
+        logger.info(f"[LAUNCH] Hilo iniciado correctamente")
+        return jsonify({"status": "success", "message": "Backtest iniciado. Revisa los logs para más detalles."})
 
     except Exception as e:
-        logger.error(f"❌ ERROR CRÍTICO EN LAUNCH:\n{traceback.format_exc()}")
+        error_msg = f"ERROR CRÍTICO EN LAUNCH: {traceback.format_exc()}"
+        logger.error(error_msg)
+        print(f"❌ {error_msg}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 #-- RUTA PARA VER ARCHIVOS DE LOGS --
@@ -332,21 +384,29 @@ def view_file(path):
     if not session.get('logged_in'):
         return "No autorizado", 401
     
-    # Usamos la constante global para evitar errores de ruta relativa
-    # Como el explorador lista desde la carpeta "logs", concatenamos adecuadamente
-    logs_dir = BACKTESTING_BASE_DIR / "logs"
-    full_path = logs_dir / os.path.basename(path) # Evitamos saltos de directorio por seguridad
+    # 1. Normalizamos la ruta. 
+    # Si el frontend envía "logs/trading_app.log", evitamos duplicar "logs/logs/..."
+    if path.startswith("logs/"):
+        full_path = BACKTESTING_BASE_DIR / path
+    else:
+        full_path = BACKTESTING_BASE_DIR / "logs" / os.path.basename(path)
 
     if not full_path.exists():
         return f"Archivo no encontrado en: {full_path}", 404
 
     try:
+        # 2. IMPORTANTE: Usamos 'errors='replace' para caracteres extraños
+        # y leemos el archivo aunque esté siendo escrito por otro proceso (Flask)
         with open(full_path, 'r', encoding='utf-8', errors='replace') as f:
-            # Mandamos las últimas 1000 líneas
+            # Leemos las últimas 1000 líneas para no colapsar el modal si el log es enorme
             content = "".join(deque(f, maxlen=1000))
+            
+        if not content:
+            return "El archivo está vacío.", 200
+            
         return Response(content, mimetype='text/plain')
     except Exception as e:
-        return f"Error: {str(e)}", 500
+        return f"Error al leer el archivo: {str(e)}", 500
 
 #-- RUTA PARA ELIMINAR ARCHIVOS DE LOGS --
 @main_bp.route('/delete-file/<path:path>', methods=['POST'])
@@ -448,9 +508,6 @@ def get_trades(backtest_id):
         # Buscamos los trades asociados al ID único del ResultadoBacktest
         trades = Trade.query.filter_by(backtest_id=backtest_id).all()
 
-        # TIP: Si ves ceros en la web, mira este log:
-        print(f"DEBUG: Enviando {len(trades)} trades para el ID {backtest_id}")
-        
         return jsonify([{
             'tipo': t.tipo,
             'descripcion': t.descripcion,

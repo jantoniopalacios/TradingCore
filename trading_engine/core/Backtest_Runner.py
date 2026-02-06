@@ -47,6 +47,7 @@ def run_backtest_for_symbol(
         cash=cash,
         commission=commission,
         trade_on_close=True,
+        finalize_trades=True
     )
 
     stats = bt.run()
@@ -120,25 +121,23 @@ def run_multi_symbol_backtest(
                 logger
             )
         except Exception as e:
-            logger.error(f"Error CRÍTICO durante la ejecución del backtest para {symbol}: {e}")
+            logger.exception(f"Error CRÍTICO durante la ejecución del backtest para {symbol}")
             continue
 
         # 3. Recolección de resultados
         all_trades.extend(trades_log) 
         backtest_objects[symbol] = bt_obj
         
-        # Recolección de estadísticas resumidas
-        resultados_finales.append(
-             {
-                 "Symbol": symbol,
-                 "Sharpe Ratio": round(stats_dict.get("Sharpe Ratio", pd.NA), 2),
-                 "Max Drawdown [%]": round(stats_dict.get("Max. Drawdown [%]", pd.NA), 2),
-                 "Profit Factor": round(stats_dict.get("Profit Factor", pd.NA), 2),
-                 "Return [%]": round(stats_dict.get("Return [%]", pd.NA), 2),
-                 "Total Trades": stats_dict.get("# Trades", pd.NA),
-                 "Win Rate [%]": round(stats_dict.get("Win Rate [%]", pd.NA), 2),
-             }
-           )
+        # Recolección de estadísticas resumidas con protección contra pd.NA
+        resultados_finales.append({
+            "Symbol": symbol,
+            "Sharpe Ratio": round(float(stats_dict.get("Sharpe Ratio") if pd.notna(stats_dict.get("Sharpe Ratio")) else 0.0), 2),
+            "Max. Drawdown [%]": round(float(stats_dict.get("Max. Drawdown [%]") if pd.notna(stats_dict.get("Max. Drawdown [%]")) else 0.0), 2),
+            "Profit Factor": round(float(stats_dict.get("Profit Factor") if pd.notna(stats_dict.get("Profit Factor")) else 0.0), 2),
+            "Return [%]": round(float(stats_dict.get("Return [%]") if pd.notna(stats_dict.get("Return [%]")) else 0.0), 2),
+            "Total Trades": int(stats_dict.get("# Trades", 0)),
+            "Win Rate [%]": round(float(stats_dict.get("Win Rate [%]") if pd.notna(stats_dict.get("Win Rate [%]")) else 0.0), 2),
+        })
             
     resultados_df = pd.DataFrame(resultados_finales)
     trades_df = pd.DataFrame(all_trades)

@@ -55,6 +55,9 @@ def check_ema_buy_signal(strategy_self: 'StrategySelf', condicion_base_tecnica: 
     Revisa las señales de compra (lógica OR) generadas por la EMA (Cruce, Mínimo o Ascendente).
 
     Cualquiera de estas señales puede establecer la `condicion_base_tecnica` como True.
+    
+    IMPORTANTE: Las señales de EMA SOLO se activan si están EXPLÍCITAMENTE habilitadas en la configuración.
+    No se activan automáticamente incluso si los estados técnicos son favorables.
 
     Parameters
     ----------
@@ -72,6 +75,7 @@ def check_ema_buy_signal(strategy_self: 'StrategySelf', condicion_base_tecnica: 
     log_reason = None
     
     # (A) Lógica de Cruce (EMA Rápida cruza encima de la EMA Lenta)
+    # SOLO se activa si ema_cruce_signal está explícitamente habilitado
     if strategy_self.ema_cruce_signal and strategy_self.ema_fast_series is not None and strategy_self.ema_slow_series is not None:
         # La función 'crossover' verifica si la primera serie cruza sobre la segunda en el tick actual.
         cond_tendencia_cruce = crossover(strategy_self.ema_fast_series, strategy_self.ema_slow_series)
@@ -81,19 +85,17 @@ def check_ema_buy_signal(strategy_self: 'StrategySelf', condicion_base_tecnica: 
             condicion_base_tecnica |= cond_tendencia_cruce
 
     # (B) Lógica de Estado (Señal OR basada en el estado dinámico de la EMA Lenta)
+    # SOLO se activan si están explícitamente habilitadas en la configuración
     
-    # 1. Señal OR por MÍNIMO: Si el usuario requiere MÍNIMO Y el estado actual es MÍNIMO.
-    if strategy_self.ema_slow_minimo and strategy_self.ema_slow_minimo_STATE:
+    # 1. Señal OR por MÍNIMO: SOLO si el usuario explícitamente activó ema_slow_minimo=True
+    if getattr(strategy_self, 'ema_slow_minimo', False) and strategy_self.ema_slow_minimo_STATE:
         log_reason = "EMA Lenta Minimo"
         condicion_base_tecnica = True
 
-    # 2. Señal OR por ASCENDENTE: Si el usuario requiere ASCENDENTE Y el estado actual es ASCENDENTE.
-    # if strategy_self.ema_slow_ascendente and strategy_self.ema_slow_ascendente_STATE:
-
-    # EN este caso se activa la compra solo por estar en tendencia ascendente, sin importar el estado previo.
-    if strategy_self.ema_slow_ascendente_STATE:    
+    # 2. Señal OR por ASCENDENTE: SOLO si el usuario explícitamente activó ema_slow_ascendente=True
+    if getattr(strategy_self, 'ema_slow_ascendente', False) and strategy_self.ema_slow_ascendente_STATE:    
         log_reason = "EMA Lenta Ascendente"
-        condicion_base_tecnica = True 
+        condicion_base_tecnica = True     
         
     return condicion_base_tecnica, log_reason
 
@@ -104,9 +106,11 @@ def apply_ema_global_filter(strategy_self: 'StrategySelf', condicion_base_tecnic
     """
     Aplica el filtro global excluyente (Condición AND) de la EMA Lenta.
 
-    Este filtro puede anular cualquier señal de compra generada por la lógica OR si 
-    las condiciones de tendencia de la EMA Lenta son desfavorables o si no se cumplen 
-    los requerimientos mínimos.
+    IMPORTANTE: Este filtro implementa una **regla de veto permanente**:
+    - Si EMA Lenta está en DESCENSO → BLOQUEA CUALQUIER COMPRA (sin excepciones)
+    - Esto es un filtro de protección hardcodeado que no depende de configuración
+    
+    Además, aplica requerimientos configurables si están habilitados.
 
     Parameters
     ----------
@@ -121,22 +125,44 @@ def apply_ema_global_filter(strategy_self: 'StrategySelf', condicion_base_tecnic
         La `condicion_base_tecnica` modificada (False si falla el filtro, True en caso contrario).
     """
 
-    # Si el filtro de EMA no está activo, devolvemos la condición tal cual viene
-    if not strategy_self.ema_cruce_signal: 
+    # ======================================================================
+    # --- FILTRO GLOBAL DE VETO (HARDCODEADO): EMA Descendente BLOQUEA TODO ---
+    # ======================================================================
+    # Este es un filtro de PROTECCIÓN PERMANENTE que no depende de parámetros configurables.
+    # Si la EMA Lenta está en descenso → NO se ejecuta NINGUNA compra, independientemente de
+    # cualquier otra señal técnica positiva.
+    if hasattr(strategy_self, 'ema_slow_descendente_STATE') and strategy_self.ema_slow_descendente_STATE:
+        return False  # VETO ABSOLUTO: Bloquea cualquier compra si EMA está descendiendo
+    
+    # ======================================================================
+    # --- FILTROS CONFIGURABLES (si estan habilitados) ---
+    # ======================================================================
+    
+    # Determinar si el filtro EMA Lenta está habilitado según los flags disponibles
+    ema_filter_enabled = any([
+        getattr(strategy_self, 'ema_slow_minimo', False),
+        getattr(strategy_self, 'ema_slow_maximo', False),
+        getattr(strategy_self, 'ema_slow_ascendente', False),
+        getattr(strategy_self, 'ema_cruce_signal', False),
+    ])
+
+    # Si ningún flag relacionado con EMA Lenta está activado, devolvemos la condición original
+    # (pero el filtro de veto ya se aplicó arriba)
+    if not ema_filter_enabled:
         return condicion_base_tecnica
 
-    if strategy_self.ema_slow_activo:
-        
-        # ⚠️ Lógica de DENIEGO (Si se intenta comprar en tendencia MAXIMO o DESCENDENTE)
-        if (strategy_self.ema_slow_maximo and strategy_self.ema_slow_maximo_STATE) or \
-           (strategy_self.ema_slow_descendente and strategy_self.ema_slow_descendente_STATE):
-            return False # DENIEGO TOTAL (Anula cualquier señal OR)
-            
-        # ✅ Lógica de REQUERIMIENTO (Asegura que se cumpla el estado deseado)
-        # Si el usuario REQUIERE MÍNIMO pero el estado NO es MÍNIMO, se deniega.
-        if (strategy_self.ema_slow_minimo and not strategy_self.ema_slow_minimo_STATE) or \
-           (strategy_self.ema_slow_ascendente and not strategy_self.ema_slow_ascendente_STATE):
-            return False # DENIEGO por requerimiento no cumplido (Anula cualquier señal OR)
+    # ⚠️ Lógica de DENIEGO (Si se intenta comprar en tendencia MAXIMO)
+    if getattr(strategy_self, 'ema_slow_maximo', False) and strategy_self.ema_slow_maximo_STATE:
+        return False # DENIEGO: Máximo local detectado
+
+    # ✅ Lógica de REQUERIMIENTO (Asegura que se cumpla el estado deseado)
+    # Si el usuario REQUIERE MÍNIMO pero el estado NO es MÍNIMO, se deniega.
+    if getattr(strategy_self, 'ema_slow_minimo', False) and not strategy_self.ema_slow_minimo_STATE:
+        return False # DENIEGO: Requerimiento de mínimo no cumplido
+    
+    # Si el usuario REQUIERE ASCENDENTE pero el estado NO es ASCENDENTE, se deniega.
+    if getattr(strategy_self, 'ema_slow_ascendente', False) and not strategy_self.ema_slow_ascendente_STATE:
+        return False # DENIEGO: Requerimiento de ascendente no cumplido
 
     return condicion_base_tecnica
 
@@ -147,8 +173,12 @@ def check_ema_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
     """
     Revisa la señal de venta de cierre técnico basada en el estado de la EMA Lenta.
 
-    La señal de venta se activa si la EMA Lenta pasa a un estado de tendencia descendente o mñaximo,
-    sirviendo como filtro de salida de tendencia.
+    La señal de venta se activa si:
+    1. El usuario activó la opción "Descendente" (ema_slow_descendente=True) Y la EMA está descendiendo
+    2. El usuario activó la opción "Máximo" (ema_slow_maximo=True) Y la EMA detecta un máximo local
+
+    ** IMPORTANTE: Esta lógica AHORA lee directamente los flags de configuración (ema_slow_descendente y 
+    ema_slow_maximo), no depende de un parámetro externo ema_sell_logic que no pasa desde el formulario.
 
     Parameters
     ----------
@@ -161,18 +191,19 @@ def check_ema_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
         - bool: True si la señal de venta está activa.
         - Optional[str]: Descripción del cierre para el log, o None.
     """
- 
-    """Verifica si el botón 'Decreciente' de la web debe cerrar la posición."""
     
-    # 1. Comprobar si el usuario seleccionó 'Decreciente' (valor: ema_slow_descendente)
-    if strategy_self.ema_sell_logic == 'ema_slow_descendente':
-        # 2. Si el cálculo técnico (de los extremos) confirma que baja
-        if strategy_self.ema_slow_descendente_STATE:
-            return True, "VENTA: EMA Lenta Descendente"
-            
-    # Si eligió 'Máximo'
-    if strategy_self.ema_sell_logic == 'ema_slow_maximo':
-        if strategy_self.ema_slow_maximo_STATE:
-            return True, "VENTA: Máximo en EMA Lenta"
+    # ======================================================================
+    # OPCIÓN 1: Usuario seleccionó "Decreciente" → Cierra si EMA desciende
+    # ======================================================================
+    # Si el usuario tiene el switch 'Descendente' activado en la UI para VENTA
+    if getattr(strategy_self, 'ema_slow_descendente', False) and strategy_self.ema_slow_descendente_STATE:
+        return True, "VENTA: EMA Lenta Descendente"
+    
+    # ======================================================================
+    # OPCIÓN 2: Usuario seleccionó "Máximo" → Cierra si EMA toca máximo local
+    # ======================================================================
+    # Si el usuario tiene el switch 'Máximo' activado en la UI para VENTA
+    if getattr(strategy_self, 'ema_slow_maximo', False) and strategy_self.ema_slow_maximo_STATE:
+        return True, "VENTA: Máximo en EMA Lenta"
 
     return False, None

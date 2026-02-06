@@ -32,6 +32,8 @@ if TYPE_CHECKING:
 # ----------------------------------------------------------------------
 # --- FUNCIONES AUXILIARES PARA LOGS ---
 # ----------------------------------------------------------------------
+import logging
+logger = logging.getLogger('Logica_Trading')
 
 def _log_trade_action_sl_update(strategy_self: 'StrategySelf', old_sl: float, new_sl: float) -> None:
     """
@@ -161,6 +163,23 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
 
     # 1. CALCULAR Y ACTUALIZAR ESTADOS
     _actualizar_estados_indicadores(strategy_self)
+
+    # DEBUG: Log de estados de indicadores (útil para diagnosticar por qué no hay trades)
+    try:
+        # Protector para obtener último valor compatible con backtesting._Indicator
+        rsi_val = None
+        try:
+            rsi_val = getattr(strategy_self, 'rsi_ind', None)
+            if rsi_val is not None:
+                try:
+                    rsi_val = rsi_val.iloc[-1]
+                except Exception:
+                    rsi_val = rsi_val[-1]
+        except Exception:
+            rsi_val = None
+        logger.debug(f"DEBUG STATES | Ticker={getattr(strategy_self,'ticker', 'UNK')} | RSI_active={getattr(strategy_self,'rsi', False)} | RSI_minimo_FLAG={getattr(strategy_self,'rsi_minimo', False)} | RSI_minimo_STATE={getattr(strategy_self,'rsi_minimo_STATE', False)} | RSI_actual={rsi_val}")
+    except Exception:
+        logger.debug("DEBUG STATES | could not print RSI values")
 
     # Condición principal de compra: se activa con OR entre señales fuertes
     condicion_base_tecnica = False
@@ -354,7 +373,7 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     # Lógica de Control: Solo ejecuta cierre técnico si hay indicadores activos.
     indicadores_tecnicos_activos = (
         strategy_self.ema_cruce_signal or
-        (strategy_self.ema_slow_activo) or
+        (getattr(strategy_self, 'ema_slow_minimo', False) or getattr(strategy_self, 'ema_slow_maximo', False) or getattr(strategy_self, 'ema_slow_ascendente', False) or getattr(strategy_self, 'ema_slow_descendente', False)) or
         strategy_self.rsi or
         strategy_self.macd or
         strategy_self.stoch_fast or
@@ -491,3 +510,12 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
             "Retorno_Pct": round(trade_obj.pl_pct * 100, 2) if trade_obj and trade_obj.pl_pct is not None else "N/A", 
             "Comision_Total": round(trade_obj._commissions, 2) if trade_obj and trade_obj._commissions is not None else "N/A",
         })
+    else:
+        # Registro por qué no se compró (debug) — protegido contra variables no definidas
+        try:
+            cbt = locals().get('condicion_base_tecnica', None)
+            cmv = locals().get('cond_mos_valida', None)
+            tre = locals().get('technical_reasons', None)
+            logger.debug(f"NO BUY | Ticker={getattr(strategy_self,'ticker','UNK')} | condicion_base_tecnica={cbt} | cond_mos_valida={cmv} | technical_reasons={tre}")
+        except Exception:
+            logger.debug("NO BUY | Ticker=%s | debug values unavailable", getattr(strategy_self,'ticker','UNK'))

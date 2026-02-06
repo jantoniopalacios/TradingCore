@@ -17,31 +17,23 @@ SeriesOrList = Union[pd.Series, np.ndarray, List[float]]
 # --- FUNCIONES DE ANÁLISIS DE ESTADO (Tendencia) ---
 # ----------------------------------------------------------------------
 
-def es_ascendente(serie: SeriesOrList, periodo: int = 3, umbral: float = 0.001) -> bool:
-    """
-    Determina si la serie es ascendente con un margen de seguridad (umbral).
-    El umbral evita cierres por variaciones insignificantes.
-    """
-    if len(serie) < periodo:
+def es_descendente(serie: SeriesOrList, periodo: int = 5) -> bool:
+    # Convertimos a array de numpy para evitar problemas de tipos de la librería
+    arr = np.array(serie)
+    if len(arr) < periodo + 1:
         return False
     
-    # Calculamos la diferencia porcentual entre el punto actual y el anterior del periodo
-    cambio_relativo = (serie[-1] - serie[-periodo]) / serie[-periodo]
-    
-    return cambio_relativo > umbral
+    # Comparamos la EMA de hoy con la de hace X días de forma directa
+    # Si la de hoy es menor que la de hace 'periodo' días, es tendencia bajista.
+    return arr[-1] < arr[-periodo]
 
-
-def es_descendente(serie: SeriesOrList, periodo: int = 3) -> bool:
-    """
-    Determina si la serie es descendente comparando el valor actual 
-    con el valor del inicio del periodo.
-    """
-    if len(serie) < periodo:
+def es_ascendente(serie: SeriesOrList, periodo: int = 5) -> bool:
+    arr = np.array(serie)
+    if len(arr) < periodo + 1:
         return False
-        
-    # Compara el último punto con el primero del bloque
-
-    return serie[-1] <= serie[-periodo]
+    
+    # Solo es ascendente si hay una subida clara
+    return arr[-1] > arr[-periodo]
 
 # ----------------------------------------------------------------------
 # --- FUNCIONES DE ANÁLISIS DE ESTADO (Mínimos y Máximos Locales) ---
@@ -104,7 +96,7 @@ def verificar_estado_indicador(indicador_serie: SeriesOrList) -> dict: # <-- Usa
     :return: Diccionario con los estados booleanos.
     """
     # Verificación de datos insuficientes
-    if indicador_serie is None or len(indicador_serie) < 3:
+    if indicador_serie is None or len(indicador_serie) < 10:
         return {
             "minimo": False, "maximo": False, 
             "ascendente": False, "descendente": False
@@ -119,8 +111,8 @@ def verificar_estado_indicador(indicador_serie: SeriesOrList) -> dict: # <-- Usa
         "minimo": es_minimo_local(indicador_serie), # <-- Pasamos el objeto directamente
         "maximo": es_maximo_local(indicador_serie), # <-- Pasamos el objeto directamente
         # El valor del indicador crece/decrece en las últimas 3 velas
-        "ascendente": es_ascendente(indicador_serie, periodo=3), # <-- Pasamos el objeto directamente
-        "descendente": es_descendente(indicador_serie, periodo=3) # <-- Pasamos el objeto directamente
+        "ascendente": es_ascendente(indicador_serie, periodo=5), # <-- Pasamos el objeto directamente
+        "descendente": es_descendente(indicador_serie, periodo=5) # <-- Pasamos el objeto directamente
     }
     
     return estado

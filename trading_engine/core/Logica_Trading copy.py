@@ -224,18 +224,15 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
                 technical_reasons['BB'] = log_reason_bb
 
 
-    # ----------------------------------------------------------------------
-    # --- 2. FILTRO GLOBAL EMA LENTA (Condición AND) ---
-    # ----------------------------------------------------------------------
-    
-    # Este filtro puede anular una señal de compra si la tendencia es muy desfavorable.
-    condicion_base_tecnica = apply_ema_global_filter(strategy_self, condicion_base_tecnica)
+
 
     # ----------------------------------------------------------------------
-    # --- 3. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
+    # --- 2. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
     # ----------------------------------------------------------------------
     indicadores_tecnicos_activos = (
         strategy_self.ema_cruce_signal or
+        strategy_self.ema_slow_minimo or      # <--- NUEVO
+        strategy_self.ema_slow_ascendente or  # <--- NUEVO
         strategy_self.rsi or 
         strategy_self.macd or 
         strategy_self.stoch_fast or 
@@ -245,10 +242,25 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     )
     if not condicion_base_tecnica:
         # Lógica Buy & Hold: Compra si no hay señales activas PERO la tendencia de la EMA Lenta es favorable.
+        # Si el usuario NO ha activado ninguna señal técnica (Cruce, RSI, MACD, etc.)
         if not indicadores_tecnicos_activos:
-            condicion_base_tecnica = strategy_self.ema_slow_minimo_STATE or strategy_self.ema_slow_ascendente_STATE
-            if condicion_base_tecnica:
-                technical_reasons['B&H'] = "B&H Mínimo"
+            # 1. ¿Acaba de marcar un suelo? (Prioridad para detectar el giro exacto)
+            if strategy_self.ema_slow_minimo_STATE:
+                condicion_base_tecnica = True
+                technical_reasons['B&H'] = "Giro en Mínimo (Sin Filtros)"
+            
+            # 2. ¿Está la EMA subiendo? (Motor de re-entrada y mantenimiento)
+            elif strategy_self.ema_slow_ascendente_STATE:
+                condicion_base_tecnica = True
+                technical_reasons['B&H'] = "Tendencia Alcista (Sin Filtros)"
+
+    # ----------------------------------------------------------------------
+    # --- 3. FILTRO GLOBAL EMA LENTA (Condición AND) ---
+    # ----------------------------------------------------------------------
+    
+    # Este filtro puede anular una señal de compra si la tendencia es muy desfavorable.
+    condicion_base_tecnica = apply_ema_global_filter(strategy_self, condicion_base_tecnica)
+
 
     # ----------------------------------------------------------------------
     # --- 4. FILTRO DE VOLUMEN (Condición AND Excluyente) ---
@@ -278,7 +290,6 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     if condicion_base_tecnica and cond_mos_valida:
         
         strategy_self.buy()
-
         # Inicializa el precio máximo para el Trailing Stop Loss
         strategy_self.max_price = strategy_self.data.Close[-1]
         
@@ -354,7 +365,8 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     # Lógica de Control: Solo ejecuta cierre técnico si hay indicadores activos.
     indicadores_tecnicos_activos = (
         strategy_self.ema_cruce_signal or
-        (strategy_self.ema_slow_activo) or
+        strategy_self.ema_slow_maximo or      # <--- NUEVO
+        strategy_self.ema_slow_descendente or # <--- NUEVO
         strategy_self.rsi or
         strategy_self.macd or
         strategy_self.stoch_fast or
@@ -416,36 +428,48 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
             if close_position_bb:
                 close_position = True
                 descripcion_cierre = desc_bb
-            
-        # ----------------------------------------------------------------------
-        # --- CIERRE Y REGISTRO TÉCNICO ---
-        # ----------------------------------------------------------------------
+
+    else:
+        # --- NUEVO: LÓGICA DE CIERRE BUY & HOLD (Si todo está apagado) ---
+        # Prioridad 1: Máximo (Giro de tendencia)
+        if strategy_self.ema_slow_maximo_STATE:
+            close_position = True
+            descripcion_cierre = "VENTA B&H: Máximo en EMA Lenta"
         
-        if close_position:
-            strategy_self.position.close()
-            
-            # Obtener el objeto trade para el log
-            trade_obj = strategy_self.trades[-1] if strategy_self.trades else None
-            
-            # Reseteo de variables de la estrategia
-            strategy_self.max_price = 0
-            strategy_self.my_stop_loss = None
-            
-            # 🌟 REGISTRO DE VENTA TÉCNICA 🌟
-            strategy_self.trades_list.append({
-                "Symbol": strategy_self.ticker, 
-                "Tipo": "VENTA",
-                "Descripcion": descripcion_cierre, 
-                "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
-                "Precio_Entrada": round(trade_obj.entry_price, 4) if trade_obj and trade_obj.entry_price is not None else "N/A",
-                "Stop_Loss_Inicial": round(final_stop_loss, 2) if final_stop_loss else "N/A", 
-                "Precio_Salida": round(trade_obj.exit_price, 4) if trade_obj and trade_obj.exit_price is not None else round(strategy_self.data.Close[-1], 4),
-                "PnL_Absoluto": round(trade_obj.pl, 2) if trade_obj and trade_obj.pl is not None else "N/A", 
-                "Retorno_Pct": round(trade_obj.pl_pct * 100, 2) if trade_obj and trade_obj.pl_pct is not None else "N/A", 
-                "Comision_Total": round(trade_obj._commissions, 2) if trade_obj and trade_obj._commissions is not None else "N/A",
-            })
-            
-            return 
+        # Prioridad 2: Descendente (Confirmación de caída)
+        elif strategy_self.ema_slow_descendente_STATE:
+            close_position = True
+            descripcion_cierre = "VENTA B&H: Tendencia Descendente"
+
+    # ----------------------------------------------------------------------
+    # --- CIERRE Y REGISTRO TÉCNICO ---
+    # ----------------------------------------------------------------------
+    
+    if close_position:
+        strategy_self.position.close()
+        
+        # Obtener el objeto trade para el log
+        trade_obj = strategy_self.trades[-1] if strategy_self.trades else None
+        
+        # Reseteo de variables de la estrategia
+        strategy_self.max_price = 0
+        strategy_self.my_stop_loss = None
+        
+        # 🌟 REGISTRO DE VENTA TÉCNICA 🌟
+        strategy_self.trades_list.append({
+            "Symbol": strategy_self.ticker, 
+            "Tipo": "VENTA",
+            "Descripcion": descripcion_cierre, 
+            "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
+            "Precio_Entrada": round(trade_obj.entry_price, 4) if trade_obj and trade_obj.entry_price is not None else "N/A",
+            "Stop_Loss_Inicial": round(final_stop_loss, 2) if final_stop_loss else "N/A", 
+            "Precio_Salida": round(trade_obj.exit_price, 4) if trade_obj and trade_obj.exit_price is not None else round(strategy_self.data.Close[-1], 4),
+            "PnL_Absoluto": round(trade_obj.pl, 2) if trade_obj and trade_obj.pl is not None else "N/A", 
+            "Retorno_Pct": round(trade_obj.pl_pct * 100, 2) if trade_obj and trade_obj.pl_pct is not None else "N/A", 
+            "Comision_Total": round(trade_obj._commissions, 2) if trade_obj and trade_obj._commissions is not None else "N/A",
+        })
+        
+        return 
             
     # ----------------------------------------------------------------------
     # --- GESTIÓN DE STOP LOSS DINÁMICO (Trailing Stop) ---
@@ -467,27 +491,40 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
         # _log_trade_action_sl_update(strategy_self, old_stop_loss, new_stop_loss)
 
     # 4. Cierre por Stop Loss
-    if strategy_self.my_stop_loss is not None and strategy_self.data.Close[-1] < strategy_self.my_stop_loss:
-        
-        strategy_self.position.close()
-        
+    if strategy_self.my_stop_loss is not None and strategy_self.position.size > 0:
+        precio_actual = strategy_self.data.Close[-1]
 
-        trade_obj = strategy_self.trades[-1] if strategy_self.trades else None
-        
-        # Reseteo de variables de la estrategia
-        strategy_self.max_price = 0
-        strategy_self.my_stop_loss = None
-        
-        # 🌟 REGISTRO DE VENTA POR STOP LOSS 🌟
-        strategy_self.trades_list.append({
-            "Symbol": strategy_self.ticker, 
-            "Tipo": "VENTA",
-            "Descripcion": "StopLoss", 
-            "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
-            "Precio_Entrada": round(trade_obj.entry_price, 4) if trade_obj and trade_obj.entry_price is not None else "N/A",
-            "Stop_Loss_Inicial": round(final_stop_loss, 2) if final_stop_loss else "N/A", 
-            "Precio_Salida": round(trade_obj.exit_price, 4) if trade_obj and trade_obj.exit_price is not None else round(strategy_self.data.Close[-1], 4),
-            "PnL_Absoluto": round(trade_obj.pl, 2) if trade_obj and trade_obj.pl is not None else "N/A", 
-            "Retorno_Pct": round(trade_obj.pl_pct * 100, 2) if trade_obj and trade_obj.pl_pct is not None else "N/A", 
-            "Comision_Total": round(trade_obj._commissions, 2) if trade_obj and trade_obj._commissions is not None else "N/A",
-        })
+        if precio_actual < strategy_self.my_stop_loss:
+            # 1. Buscamos el precio de entrada de forma SEGURA en el historial de trades
+            # Si self.trades tiene algo, el último trade abierto es el que nos interesa
+            try:
+                # Accedemos al trade activo directamente del motor
+                trade_activo = strategy_self.trades[-1] 
+                p_ent = trade_activo.entry_price
+            except:
+                # Si falla lo anterior, usamos el precio que guardaste al comprar (si lo tienes)
+                # o un fallback para que el código NO se detenga
+                p_ent = getattr(strategy_self, 'last_entry_price', precio_actual)
+
+            # 2. CAPTURAMOS DATOS
+            p_sal = precio_actual
+            sl_final = strategy_self.my_stop_loss
+
+            # 3. EJECUTAMOS EL CIERRE (Primero el comando técnico)
+            strategy_self.position.close()
+
+            # 4. LIMPIEZA TOTAL (Esto es lo que evita el bucle en SQL)
+            strategy_self.my_stop_loss = None
+            strategy_self.max_price = 0
+
+            # 5. REGISTRO EN SQL (Ahora sí, con datos seguros)
+            strategy_self.trades_list.append({
+                "Symbol": strategy_self.ticker,
+                "Tipo": "VENTA",
+                "Descripcion": "StopLoss",
+                "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
+                "Precio_Entrada": round(p_ent, 4),
+                "Precio_Salida": round(p_sal, 4),
+                "Retorno_Pct": round(((p_sal / p_ent) - 1) * 100, 2) if p_ent > 0 else 0
+            })
+            print(f"✅ Venta registrada correctamente para {strategy_self.ticker} en DB.")

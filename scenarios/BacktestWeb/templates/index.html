@@ -27,13 +27,61 @@
         .nav-sub .nav-link { font-size: 11px; padding: 6px 14px; border: none; color: #64748b; font-weight: 600; text-transform: uppercase; border-radius: 6px; background: transparent; }
         .nav-sub .nav-link.active { background: white; color: var(--accent); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         
-        /* Visor de Archivos (CSV Table) */
-        #fileContent { background: #1a1a1a; min-height: 500px; max-height: 80vh; overflow: auto; color: #e0e0e0; border-radius: 6px; }
-        .csv-table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
-        .csv-table th { position: sticky; top: 0; background: #2d3436; color: #00d4ff; padding: 12px; border: 1px solid #444; z-index: 10; text-align: left; }
-        .csv-table td { padding: 8px 12px; border: 1px solid #333; white-space: nowrap; }
-        .csv-table tr:nth-child(even) { background: #212121; }
-        .csv-table tr:hover { background: #2c3e50; }
+        /* Visor de Archivos (CSV Table y Logs) */
+        #fileContent { 
+            background: #000000 !important; /* Negro total para mejor contraste de logs */
+            min-height: 500px; 
+            max-height: 80vh; 
+            overflow: auto; 
+            color: #e0e0e0; 
+            border-radius: 6px; 
+        }
+
+        .csv-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 11px; 
+        }
+
+        .csv-table th { 
+            position: sticky; 
+            top: 0; 
+            background: #1a1a1a; /* Fondo oscuro para el header sticky */
+            color: #00d4ff; 
+            padding: 12px; 
+            border: 1px solid #333; 
+            z-index: 10; 
+            text-align: left; 
+        }
+
+        .csv-table td { 
+            padding: 8px 12px; 
+            border: 1px solid #222; 
+            white-space: pre-wrap; /* CAMBIO CLAVE: Permite que los mensajes largos de log bajen de línea */
+            word-break: break-all;
+            vertical-align: top;
+        }
+
+        .csv-table td:first-child {
+            white-space: nowrap !important; /* El timestamp nunca debe romperse en dos líneas */
+            border-right: 1px solid #333;
+        }
+
+        .log-msg {
+            word-break: break-all;   /* Rompe URLs largas si es necesario */
+            white-space: normal;    /* Permite que el texto largo salte de línea */
+        }
+
+        .csv-table tr:nth-child(even) { background: #0a0a0a; }
+        .csv-table tr:hover { background: #16213e; } /* Azul oscuro sutil al pasar el mouse */
+
+        /* Estilo para los Badges de nivel en el log */
+        .badge {
+            font-size: 0.75rem;
+            padding: 0.35em 0.65em;
+            font-weight: 600;
+        }
 
         /* Explorador de archivos */
         .folder { cursor: pointer; color: #f39c12; font-weight: bold; display: flex; align-items: center; gap: 8px; }
@@ -44,6 +92,25 @@
         tr[aria-expanded="true"] .toggle-icon { transform: rotate(90deg); }
         .bg-tanda { background-color: #f1f5f9 !important; border-left: 4px solid #2563eb; }
         .sub-table-container { background: white; padding: 15px; border-radius: 0 0 8px 8px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+    
+        .tab-pane.fade {
+            transition: opacity 0.2s ease-in-out; /* Transición más rápida y suave */
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        /* Evita el salto visual al cambiar de pestaña */
+        .card-main {
+            min-height: 500px; /* Asegura que el contenedor no colapse al cambiar */
+            transition: all 0.3s ease;
+        }
+
+        /* Efecto hover suave en las sub-pestañas */
+        .nav-sub .nav-link:hover {
+            background-color: rgba(255,255,255,0.5);
+        }
     </style>
 
 </head>
@@ -191,14 +258,36 @@
             if (triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
         }
 
+        // PERSISTENCIA DE PESTAÑAS
+        const tabs = ['activeTabKey', 'activeSubTabKey'];
+        tabs.forEach(key => {
+            const savedTab = localStorage.getItem(key);
+            if (savedTab) {
+                const triggerEl = document.querySelector(`#${savedTab}`);
+                if (triggerEl) {
+                    const tab = new bootstrap.Tab(triggerEl);
+                    tab.show();
+                }
+            }
+        });
+
+        // GUARDAR PESTAÑA AL HACER CLIC
         document.querySelectorAll('button[data-bs-toggle="tab"], button[data-bs-toggle="pill"]').forEach(tabBtn => {
             tabBtn.addEventListener('shown.bs.tab', (e) => {
-                localStorage.setItem('activeTabKey', e.target.id);
+                // Si es una pestaña principal (pane-...)
+                if (e.target.id.startsWith('btn-nav') || e.target.id.startsWith('tab-master')) {
+                    localStorage.setItem('activeTabKey', e.target.id);
+                } 
+                // Si es una sub-pestaña (global, ema, rsi...)
+                else {
+                    localStorage.setItem('activeSubTabKey', e.target.id);
+                }
             });
         });
     });
 
     function openFile(url, filename) {
+        // Si es HTML, abrir en pestaña nueva como ya hacías
         if (filename.toLowerCase().endsWith('.html')) {
             window.open(url + '?cache=' + Date.now(), '_blank');
             return;
@@ -206,31 +295,51 @@
         
         const modalElement = document.getElementById('csvViewerModal');
         const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
-        const displayArea = document.getElementById('fileContent');
+        const displayArea = document.getElementById('fileContent'); // El ID correcto de tu HTML
         
+        // Título con icono
         document.getElementById('csvViewerTitle').innerHTML = `<i class="bi bi-terminal"></i> ${filename}`;
-        displayArea.innerHTML = '<div class="p-5 text-center"><div class="spinner-border text-primary"></div></div>';
+        
+        // Spinner de carga
+        displayArea.innerHTML = '<div class="p-5 text-center"><div class="spinner-border text-primary"></div><p class="text-white-50 mt-2">Cargando contenido...</p></div>';
         modalInstance.show();
 
         fetch(url + '?nocache=' + Date.now())
-            .then(res => res.text())
+            .then(res => {
+                if (!res.ok) throw new Error(`Error ${res.status}: No se pudo acceder al archivo`);
+                return res.text();
+            })
             .then(raw => {
+                if (!raw || raw.trim() === "") {
+                    displayArea.innerHTML = '<div class="p-5 text-center text-warning">--- El archivo está vacío ---</div>';
+                    return;
+                }
+
                 if (filename.toLowerCase().endsWith('.csv')) {
                     displayArea.innerHTML = buildHtmlTableFromCsv(raw);
                 } else if (filename.toLowerCase().endsWith('.log')) {
-                    // RENDERIZADO ESPECIAL PARA LOGS
-                    displayArea.innerHTML = buildLogViewer(raw);
+                    // Verificamos si el log tiene el formato esperado (separado por " - ")
+                    if (raw.includes(' - ')) {
+                        displayArea.innerHTML = buildLogViewer(raw);
+                    } else {
+                        // Si el log no tiene el formato estándar, lo mostramos como texto plano
+                        displayArea.innerHTML = `<pre class="p-4 m-0 text-white" style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 12px;">${raw}</pre>`;
+                    }
                 } else {
-                    displayArea.innerHTML = `<pre class="p-4 m-0 text-white">${raw}</pre>`;
+                    displayArea.innerHTML = `<pre class="p-4 m-0 text-white" style="white-space: pre-wrap;">${raw}</pre>`;
                 }
+            })
+            .catch(err => {
+                displayArea.innerHTML = `<div class="alert alert-danger m-3">Error al cargar el archivo: ${err.message}</div>`;
             });
-            
-    }function buildLogViewer(text) {
-        const lines = text.trim().split(/\r?\n/).reverse();
+    }
+    
+    function buildLogViewer(text) {
+        const lines = text.trim().split(/\r?\n/).filter(l => l.trim()).reverse();
         
         let html = `
             <div class="p-2 bg-black border-bottom border-secondary d-flex gap-2 sticky-top" style="top: 0; z-index: 100;">
-                <input type="text" id="logSearch" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Filtrar por activo, error o fecha..." onkeyup="filterLogs()">
+                <input type="text" id="logSearch" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Filtrar..." onkeyup="filterLogs()">
                 <select id="logLevelFilter" class="form-select form-select-sm bg-dark text-white border-secondary" style="width:150px" onchange="filterLogs()">
                     <option value="">Todos los niveles</option>
                     <option value="INFO">INFO</option>
@@ -238,31 +347,42 @@
                     <option value="ERROR">ERROR</option>
                 </select>
             </div>
-            
             <table class="csv-table" id="logTable">
                 <thead>
                     <tr>
-                        <th style="width:180px; top: 45px;">Timestamp</th> <th style="width:100px; top: 45px;">Nivel</th>
+                        <th style="width:180px; top: 45px;">Timestamp</th> 
+                        <th style="width:100px; top: 45px;">Nivel</th>
                         <th style="top: 45px;">Mensaje</th>
                     </tr>
                 </thead>
                 <tbody>`;
 
         lines.forEach(line => {
-            const parts = line.split(' - ');
+            // Separamos por la barra vertical " | "
+            const parts = line.split(' | ');
+
             if (parts.length >= 3) {
+                const timestamp = parts[0].split(',')[0]; // Quitamos los milisegundos para que quede limpio
                 const level = parts[1].trim();
+                const message = parts.slice(2).join(' | '); // El resto es el mensaje
+                
                 let badgeClass = 'bg-info';
-                if (level === 'ERROR') badgeClass = 'bg-danger';
-                if (level === 'WARNING') badgeClass = 'bg-warning text-dark';
+                if (level.includes('ERROR')) badgeClass = 'bg-danger';
+                if (level.includes('WARNING')) badgeClass = 'bg-warning text-dark';
                 
                 html += `
-                    <tr class="log-row" data-level="${level}">
-                        <td style="color: #ffcc00 !important; font-family: 'JetBrains Mono', monospace; font-weight: 500;">
-                            ${parts[0]}
-                        </td>
-                        <td><span class="badge ${badgeClass}">${level}</span></td>
-                        <td class="log-msg text-white-50">${parts.slice(2).join(' - ')}</td>
+                    <tr class="log-row" data-level="${level.toUpperCase()}">
+                        <td class="text-warning font-monospace small" style="white-space: nowrap;">${timestamp}</td>
+                        <td><span class="badge ${badgeClass}">${level.toUpperCase()}</span></td>
+                        <td class="log-msg text-white-50" style="font-size: 11px;">${message}</td>
+                    </tr>`;
+            } else {
+                // Línea sin formato estándar
+                html += `
+                    <tr class="log-row" data-level="INFO">
+                        <td class="text-muted small">--:--:--</td>
+                        <td><span class="badge bg-secondary">LOG</span></td>
+                        <td class="log-msg text-white-50">${line}</td>
                     </tr>`;
             }
         });

@@ -55,47 +55,54 @@
     </div>
 
     <div class="col-6">
-        <h4 class="mb-3 text-dark">Lógica de Compra y Venta (Máx. 1 Opción por Grupo)</h4>
-        <p class="text-muted small">Selecciona una condición de activación por cada grupo (Compra/Venta).</p>
+        <h4 class="mb-3 text-dark">Señales de Compra y Cierres</h4>
+        <p class="text-muted small">Marca qué condiciones pueden generar compra (OR) o rechazarla (AND).</p>
 
-        <h5 class="mt-4 text-success">Lógica de Compra (RSI Buy Logic)</h5>
-        <div class="row row-control align-items-center mb-4">
-            <div class="col-4"><label class="form-label fw-bold">Señal de Compra:</label></div>
-            <div class="col-8">
-                <div class="btn-group" role="group" data-bs-toggle="buttons">
-                    <input type="radio" class="btn-check" name="rsi_buy_logic" id="rsi_min_radio" value="rsi_minimo" 
-                           {% if config.rsi_buy_logic == 'rsi_minimo' %}checked{% endif %}>
-                    <label class="btn btn-outline-success" for="rsi_min_radio" title="RSI ≤ Nivel Mínimo (Oversold)">Mínimo</label>
-                    
-                    <input type="radio" class="btn-check" name="rsi_buy_logic" id="rsi_ascendente" value="rsi_ascendente" 
-                           {% if config.rsi_buy_logic == 'rsi_ascendente' %}checked{% endif %}>
-                    <label class="btn btn-outline-success" for="rsi_ascendente" title="RSI cruza al alza el Nivel Mínimo">Ascendente</label>
-
-                    <input type="radio" class="btn-check" name="rsi_buy_logic" id="rsi_buy_none" value="None" 
-                           {% if config.rsi_buy_logic == 'None' %}checked{% endif %}>
-                    <label class="btn btn-outline-secondary" for="rsi_buy_none">Ninguna</label>
-                </div>
-            </div>
+        <h5 class="mt-4 text-success">🟢 Señales de COMPRA (Lógica OR - Si cumple CUALQUIERA)</h5>
+        <p class="text-muted small mb-2">Marca las condiciones que pueden generar una compra.</p>
+        
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="rsi_minimo" name="rsi_minimo" value="true" 
+                   {% if config.get('rsi_minimo') == 'True' or config.get('rsi_minimo') == True %}checked{% endif %}>
+            <label class="form-check-label" for="rsi_minimo">
+                <strong>Mínimo (Sobreventa):</strong> Compra cuando RSI toca valle local (RSI &lt; {{ config.rsi_low_level }})
+            </label>
         </div>
 
-        <h5 class="mt-4 text-danger">Lógica de Venta / Bloqueo (RSI Sell Logic)</h5>
-        <div class="row row-control align-items-center mb-4">
-            <div class="col-4"><label class="form-label fw-bold">Señal de Bloqueo:</label></div>
-            <div class="col-8">
-                <div class="btn-group" role="group" data-bs-toggle="buttons">
-                    <input type="radio" class="btn-check" name="rsi_sell_logic" id="rsi_max_radio" value="rsi_maximo" 
-                           {% if config.rsi_sell_logic == 'rsi_maximo' %}checked{% endif %}>
-                    <label class="btn btn-outline-danger" for="rsi_max_radio" title="RSI ≥ Nivel Máximo (Overbought)">Máximo</label>
-                    
-                    <input type="radio" class="btn-check" name="rsi_sell_logic" id="rsi_descendente" value="rsi_descendente" 
-                           {% if config.rsi_sell_logic == 'rsi_descendente' %}checked{% endif %}>
-                    <label class="btn btn-outline-danger" for="rsi_descendente" title="RSI cruza a la baja el Nivel Máximo">Decreciente</label>
+        <div class="form-check mb-4">
+            <input class="form-check-input" type="checkbox" id="rsi_ascendente" name="rsi_ascendente" value="true" 
+                   {% if config.get('rsi_ascendente') == 'True' or config.get('rsi_ascendente') == True %}checked{% endif %}>
+            <label class="form-check-label" for="rsi_ascendente">
+                <strong>Ascendente:</strong> Compra cuando RSI está subiendo (se recupera del valle)
+            </label>
+        </div>
 
-                    <input type="radio" class="btn-check" name="rsi_sell_logic" id="rsi_sell_none" value="None" 
-                           {% if config.rsi_sell_logic == 'None' %}checked{% endif %}>
-                    <label class="btn btn-outline-secondary" for="rsi_sell_none">Ninguna</label>
-                </div>
-            </div>
+        <h5 class="mt-4 text-danger">🔴 Señales de BLOQUEO/VENTA (Lógica AND - Rechaza si cumple CUALQUIERA)</h5>
+        <p class="text-muted small mb-2">Marca las condiciones que pueden rechazar la compra o cerrar posición abierta.</p>
+        
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="rsi_maximo" name="rsi_maximo" value="true" 
+                   {% if config.get('rsi_maximo') == 'True' or config.get('rsi_maximo') == True %}checked{% endif %}>
+            <label class="form-check-label" for="rsi_maximo">
+                <strong>Máximo (Sobrecompra):</strong> Rechaza compra / Vende si RSI toca pico (RSI &gt; {{ config.rsi_high_level }})
+            </label>
+        </div>
+
+        <div class="form-check mb-4">
+            <input class="form-check-input" type="checkbox" id="rsi_descendente" name="rsi_descendente" value="true" 
+                   {% if config.get('rsi_descendente') == 'True' or config.get('rsi_descendente') == True %}checked{% endif %}>
+            <label class="form-check-label" for="rsi_descendente">
+                <strong>Descendente:</strong> Rechaza compra / Vende si RSI está bajando (pierde fuerza)
+            </label>
+        </div>
+
+        <div class="alert alert-info mt-3">
+            <small>
+                <strong>💡 Ejemplos de combinaciones:</strong><br>
+                ✓ <em>Mínimo + Máximo</em>: Compra en valles, vende en picos<br>
+                ✓ <em>Ascendente sin deniegos</em>: Agresivo, compra cada vez que sube<br>
+                ⚠️ <em>Solo deniegos sin señales</em>: 0 trades (incompatible)<br>
+            </small>
         </div>
     </div>
 </div>

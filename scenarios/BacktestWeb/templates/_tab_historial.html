@@ -85,10 +85,12 @@
                                 <tr>
                                     <td class="fw-bold text-primary">{{ r.symbol }}</td>
                                     <td class="{{ 'text-success' if r.return_pct > 0 else 'text-danger' }}">
-                                        {{ r.return_pct }}%
+                                        {{ "%.2f"|format(r.return_pct|float) }}%
                                     </td>
-                                    <td>{{ r.sharpe_ratio }}</td>
-                                    <td class="text-danger">{{ r.max_drawdown }}%</td>
+                                    <td>{{ "%.2f"|format(r.sharpe_ratio|float) if r.sharpe_ratio else '0.00' }}</td>
+                                    <td class="fw-bold text-danger">
+                                        {{ "%.2f"|format(r.max_drawdown|float|abs) }}%
+                                    </td>
                                     <td>
                                         <div class="d-flex align-items-center">
                                             {% set wr = r.win_rate if r.win_rate is not none else 0 %}

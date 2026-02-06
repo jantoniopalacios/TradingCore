@@ -1,4 +1,11 @@
-# C:\Users\...\BacktestWeb\__main__.py
+# ----------------------------------------------------------------------
+# --- __main__.py ---
+# ----------------------------------------------------------------------
+# Descripción       : Punto de entrada para ejecutar la aplicación Flask de BacktestWeb
+#               Permite iniciar el servidor directamente desde este módulo.
+#         
+# Fecha de modificación : 2026-02-01
+# ----------------------------------------------------------------------
 
 import os
 from .app import create_app

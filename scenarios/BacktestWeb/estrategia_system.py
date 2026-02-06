@@ -49,10 +49,11 @@ class System(Strategy):
     # RSI
     rsi = None; rsi_period = None; rsi_low_level = None; rsi_high_level = None
     rsi_strength_threshold = None
-    rsi_minimo = False # Placeholder
-    rsi_maximo = False # Placeholder
-    rsi_ascendente = False # Placeholder
-    rsi_descendente = False # Placeholder
+    # RSI Flags (Señales OR y Deniegos AND)
+    rsi_minimo = False
+    rsi_maximo = False
+    rsi_ascendente = False
+    rsi_descendente = False
 
     # ESTOCÁSTICOS
     stoch_fast = None; stoch_fast_period = None; stoch_fast_smooth = None; stoch_fast_low_level = None
@@ -82,7 +83,6 @@ class System(Strategy):
     # MEDIAS MÓVILES (EMA)
     # MODIFICACIÓN: 'ema_cruce_signal' añadido para coincidir con .env
     ema_cruce_signal = False
-    ema_slow_activo = False
     ema_fast_period = None
     ema_slow_period = None
     # Series de indicadores (Para evitar conflicto con la variable de activación)
@@ -235,22 +235,20 @@ class System(Strategy):
         # -------------------------------------------------------------
         
         # --- 1. MEDIAS MÓVILES (EMA) ---
-        # Sincronización de activación
-        if any([self.ema_slow_minimo, self.ema_slow_maximo, self.ema_slow_ascendente, self.ema_slow_descendente]):
-            self.ema_slow_activo = True
-            
-        if self.ema_cruce_signal or self.ema_slow_activo:
+        # Forzamos la creación de la serie siempre que los periodos estén definidos,
+        # independientemente de los interruptores de señal.
+        if self.ema_slow_period:
             self.ema_slow_series = self.I(
                 ta.trend.ema_indicator, self.data.Close.s, 
                 int(self.ema_slow_period), name='EMA_Lenta'
             )
-            if self.ema_slow_activo:
-                self.ema_slow_minimo_s = self.ema_slow_series.copy() * 0
-                self.ema_slow_maximo_s = self.ema_slow_series.copy() * 0
-                self.ema_slow_ascendente_s = self.ema_slow_series.copy() * 0
-                self.ema_slow_descendente_s = self.ema_slow_series.copy() * 0
+            # Inicializamos las series de estados para el plot
+            self.ema_slow_minimo_s = self.ema_slow_series.copy() * 0
+            self.ema_slow_maximo_s = self.ema_slow_series.copy() * 0
+            self.ema_slow_ascendente_s = self.ema_slow_series.copy() * 0
+            self.ema_slow_descendente_s = self.ema_slow_series.copy() * 0
 
-        if self.ema_cruce_signal:
+        if self.ema_cruce_signal and self.ema_fast_period:
             self.ema_fast_series = self.I(
                 ta.trend.ema_indicator, self.data.Close.s, 
                 int(self.ema_fast_period), name='EMA_Rapida'
@@ -323,23 +321,12 @@ class System(Strategy):
     # ------------------------------------------------------------------
 
     def next(self):
-
-        # 1. DEBUG DE SUPERVIVENCIA: Si esto no sale, el problema es el DATASET
-        # print(f"DEBUG: Procesando fecha {self.data.index[-1]}") 
-
-        # 2. COMPROBACIÓN DE INDICADORES
-        if self.bb_active and self.bb_upper_band_series is not None:
-            # En backtesting.py, [-1] es la vela que se está procesando AHORA
-            precio_actual = self.data.Close[-1]
-            banda_inf = self.bb_lower_band_series[-1]
-            
-            # Si quieres ver por qué no compra, imprime la comparativa:
-            # print(f"Precio: {precio_actual:.2f} | Banda Inf: {banda_inf:.2f} | ¿Debajo?: {precio_actual < banda_inf}")
-
         """
-        Genera señales de trading, delegando la lógica a métodos wrapper internos.
+        Orquesta el ciclo de vida de cada vela:
+        1. Si hay posición abierta: gestiona salida.
+        2. Si no hay posición: busca entrada.
         """
-        
+        # Delegamos la lógica pesada a los wrappers que conectan con Logica_Trading.py
         if self.position:
             self._manage_existing_position_wrapper()
         else:

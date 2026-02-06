@@ -9,6 +9,16 @@ from backtesting.lib import crossover
 from typing import TYPE_CHECKING, Callable, Tuple, Optional
 import pandas as pd
 
+# Helper para obtener el último valor compatible con backtesting._Indicator y pd.Series
+def _last_value(series):
+    try:
+        return float(series.iloc[-1])
+    except Exception:
+        try:
+            return float(series[-1])
+        except Exception:
+            return None
+
 if TYPE_CHECKING:
     # Usamos StrategySelf para tipado sin crear una dependencia circular de importación
     from estrategia_system import System as StrategySelf 
@@ -48,58 +58,76 @@ def update_rsi_state(strategy_self: 'StrategySelf', verificar_estado_indicador_f
 # ----------------------------------------------------------------------
 # --- Lógica de Compra (Señales OR) ---
 # ----------------------------------------------------------------------
+# --- Lógica de Compra (Señales OR) ---
+# ─────────────────────────────────────────────────────────────────────────────
 def check_rsi_buy_signal(strategy_self: 'StrategySelf', condicion_base_tecnica: bool) -> Tuple[bool, Optional[str]]:
     """
-    Revisa las señales de compra (lógica OR) generadas por el RSI (Giro de Mínimo o Fuerza Pura).
-
-    La señal de compra se activa por un giro desde un extremo (sobreventa) o por una fuerza 
-    continua por encima de un umbral predefinido.
-
+    Revisa las señales de compra (lógica OR) generadas por el RSI.
+    
+    Dos tipos de señales:
+    1. GIRO DESDE SOBREVENTA: RSI estaba bajo y cruza su nivel mínimo al alza
+    2. FUERZA PURA: RSI está por encima del threshold de fuerza
+    
     Parameters
     ----------
     strategy_self : StrategySelf
-        Instancia de la estrategia, que contiene las series RSI y las configuraciones del usuario.
+        Instancia de la estrategia con RSI y configuraciones.
     condicion_base_tecnica : bool
-        Condición técnica global actual (el resultado de las señales OR anteriores).
+        Condición técnica global actual.
 
     Returns
     -------
     tuple
         - bool: Nueva `condicion_base_tecnica` (True si se activó una señal OR).
-        - Optional[str]: Razón del log de la señal activada, o None si no hay señal de RSI.
+        - Optional[str]: Razón del log de la señal activada, o None.
     """
     log_reason = None
     
     if strategy_self.rsi and strategy_self.rsi_ind is not None:
         
-        # Condición de Giro (Señal más fuerte: Mínimo Local + Cruce de Impulso/Threshold)
-        if hasattr(strategy_self, 'rsi_threshold_ind') and strategy_self.rsi_threshold_ind is not None:
+        # Obtener valor actual del RSI (compatible con backtesting._Indicator y pd.Series)
+        rsi_actual = _last_value(strategy_self.rsi_ind)
+        
+        # ════════════════════════════════════════════════════════════════════════════
+        # OPCIÓN 1: COMPRA POR GIRO DESDE SOBREVENTA (Cruce al alza del bajo_level)
+        # ════════════════════════════════════════════════════════════════════════════
+        if strategy_self.rsi_minimo:
+            # Si el usuario activó que quiere comprar en mínimos (sobreventa)
+            # Verificar si el RSI está en estado de mínimo Y si cruza hacia arriba
             
-            # Se asume que 'rsi_minimo' es una propiedad de la estrategia que indica que se detectó un mínimo (e.g., sobreventa).
-            cond_min_detect = strategy_self.rsi_minimo if hasattr(strategy_self, 'rsi_minimo') and strategy_self.rsi_minimo is not None else False
-            
-            # Cruce del RSI por encima de una línea de impulso (ej. 30 o 50).
-            cond_crossover_confirm = crossover(strategy_self.rsi_ind, strategy_self.rsi_threshold_ind)
-            
-            cond_rsi_giro = cond_min_detect and cond_crossover_confirm
-            
-            if cond_rsi_giro:
-                log_reason = "RSI Giro desde Sobreventa"
-            
-            # Lógica de Fuerza Pura RSI (Anulación OR, se activa si hay fuerza por encima de un umbral)
-            cond_rsi_pure_force = False
-            if hasattr(strategy_self, 'rsi_strength_threshold') and strategy_self.rsi_strength_threshold is not None:
-                # Compara el último valor del RSI con el umbral de fuerza (ej. 50 o un nivel de sobrecompra).
-                cond_rsi_pure_force = (strategy_self.rsi_ind[-1] > strategy_self.rsi_strength_threshold)
-
-            # Si hay fuerza pura y aún no se ha detectado una razón (para no sobrescribir el Giro)
-            if cond_rsi_pure_force and log_reason is None:
+            if hasattr(strategy_self, 'rsi_minimo_STATE') and strategy_self.rsi_minimo_STATE:
+                # RSI está en mínimo local
+                if hasattr(strategy_self, 'rsi_threshold_ind') and strategy_self.rsi_threshold_ind is not None:
+                    # Hay threshold definido, verificar cruce
+                    cond_crossover = crossover(strategy_self.rsi_ind, strategy_self.rsi_threshold_ind)
+                    if cond_crossover and (rsi_actual is not None and rsi_actual > float(strategy_self.rsi_low_level)):
+                        log_reason = "RSI Giro desde Sobreventa"
+                        condicion_base_tecnica = True
+                else:
+                    # Sin threshold, solo detección de mínimo
+                    if (rsi_actual is not None and rsi_actual > float(strategy_self.rsi_low_level)):  # RSI saliendo de sobreventa
+                        log_reason = "RSI Giro desde Sobreventa"
+                        condicion_base_tecnica = True
+        
+        # ════════════════════════════════════════════════════════════════════════════
+        # OPCIÓN 2: COMPRA POR FUERZA PURA (RSI por encima de threshold)
+        # ════════════════════════════════════════════════════════════════════════════
+        if strategy_self.rsi_ascendente:
+            # Si el usuario activó que quiere comprar cuando RSI está ascendente
+            if hasattr(strategy_self, 'rsi_ascendente_STATE') and strategy_self.rsi_ascendente_STATE:
+                if log_reason is None:  # No sobrescribir si ya hay razón anterior
+                    log_reason = "RSI Ascendente"
+                condicion_base_tecnica = True
+        
+        # ════════════════════════════════════════════════════════════════════════════
+        # OPCIÓN 3: COMPRA POR FUERZA PURA (RSI > threshold)
+        # ════════════════════════════════════════════════════════════════════════════
+        if hasattr(strategy_self, 'rsi_strength_threshold') and strategy_self.rsi_strength_threshold is not None:
+            if rsi_actual is not None and rsi_actual > float(strategy_self.rsi_strength_threshold):
+                if log_reason is None:  # No sobrescribir si ya hay razón
                     log_reason = "RSI Fuerza Pura"
-
-            # Combinar ambas señales con OR
-            condicion_base_tecnica |= cond_rsi_giro 
-            condicion_base_tecnica |= cond_rsi_pure_force
-            
+                condicion_base_tecnica = True
+    
     return condicion_base_tecnica, log_reason
 
 # ----------------------------------------------------------------------
@@ -107,11 +135,12 @@ def check_rsi_buy_signal(strategy_self: 'StrategySelf', condicion_base_tecnica: 
 # ----------------------------------------------------------------------
 def check_rsi_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional[str]]:
     """
-    Revisa la señal de venta de cierre técnico basada en el estado de sobrecompra o tendencia descendente del RSI.
+    Revisa la señal de venta de cierre técnico basada en el estado del RSI.
 
-    La señal de venta se activa si la estrategia está configurada para reaccionar a 
-    niveles máximos o a un cambio de tendencia descendente en el RSI.
-
+    La señal de venta se activa si:
+    - RSI alcanza máximo local (sobrecompra) y el usuario lo activó
+    - RSI está descendiendo y el usuario lo activó
+    
     Parameters
     ----------
     strategy_self : StrategySelf
@@ -123,11 +152,16 @@ def check_rsi_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
         - bool: True si la señal de venta está activa.
         - Optional[str]: Descripción del cierre para el log, o None.
     """
-    # Cierre si el usuario activó rsi_maximo O rsi_descendente como intención, 
-    # Y el estado dinámico correspondiente se cumple.
-    if (strategy_self.rsi_maximo and strategy_self.rsi_maximo_STATE) or \
-       (strategy_self.rsi_descendente and strategy_self.rsi_descendente_STATE): 
+    
+    # Verificar si alguno de los deniegos está activo
+    if strategy_self.rsi and hasattr(strategy_self, 'rsi_maximo_STATE') and hasattr(strategy_self, 'rsi_descendente_STATE'):
         
-        return True, "VENTA RSI Máximo/Descendente"
+        # Cierre si RSI alcanza máximo (sobrecompra)
+        if strategy_self.rsi_maximo and strategy_self.rsi_maximo_STATE:
+            return True, "VENTA RSI Máximo (Sobrecompra)"
+        
+        # Cierre si RSI desciende
+        if strategy_self.rsi_descendente and strategy_self.rsi_descendente_STATE:
+            return True, "VENTA RSI Descendente"
     
     return False, None

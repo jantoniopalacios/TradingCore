@@ -73,17 +73,27 @@ def save_backtest_run(user_id, stats, config_dict, trades_df, grafico_html=None)
         # 3. Guardado detallado de Trades
         if trades_df is not None and not trades_df.empty:
             for _, row in trades_df.iterrows():
-                # Normalizamos nombres de columnas (backtesting.py usa CamelCase o espacios)
+                # Normalizamos valores base
                 size = _clean_value(row.get('Size', 0))
                 
                 t = Trade(
                     backtest_id=nuevo_resultado.id,
-                    tipo="BUY" if size > 0 else "SELL",
-                    fecha=str(row.name), 
+                    # 1. Priorizamos el 'Tipo' manual que definimos en la lógica (COMPRA/VENTA)
+                    tipo=row.get('Tipo', ("BUY" if size > 0 else "SELL")),
+                    
+                    # 2. Capturamos el motivo (StopLoss, Cruce EMA, etc.)
+                    descripcion=row.get('Descripcion', 'Estrategia'),
+                    
+                    # 3. Fecha (Maneja tanto el índice de backtesting.py como la columna manual)
+                    fecha=str(row.name if not isinstance(row.name, int) else row.get('Fecha')), 
+                    
+                    # 4. Precios con fallback cruzado
                     precio_entrada=_clean_value(row.get('EntryPrice', row.get('Precio_Entrada'))),
                     precio_salida=_clean_value(row.get('ExitPrice', row.get('Precio_Salida'))),
                     pnl_absoluto=_clean_value(row.get('PnL', row.get('PnL_Absoluto'))),
-                    retorno_pct=_clean_value(row.get('ReturnPct', row.get('Retorno_Pct'))) * 100
+                    
+                    # 5. Retorno: Aseguramos que no se multiplique doblemente
+                    retorno_pct=_clean_value(row.get('ReturnPct', row.get('Retorno_Pct')))
                 )
                 db.session.add(t)
 
