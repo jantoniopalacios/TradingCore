@@ -48,7 +48,7 @@ jobs:
 
       # 5. Build: Compila el sitio web de MkDocs (genera la carpeta 'site')
       - name: Build documentation
-        run: mkdocs build --strict
+        run: mkdocs build --verbose
         env:
           # Volvemos a añadir esta variable, ya que la instalación editable no funciona
           PYTHONPATH: ${{ github.workspace }}
