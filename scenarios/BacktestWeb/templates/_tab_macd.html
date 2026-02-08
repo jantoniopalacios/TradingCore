@@ -1,5 +1,117 @@
-<h2 class="mb-3">Parámetros de MACD (Moving Average Convergence Divergence)</h2>
+<h2 class="mb-3">
+    Parámetros de MACD (Moving Average Convergence Divergence)
+    <button type="button" class="btn btn-sm btn-info ms-2" data-bs-toggle="modal" data-bs-target="#macHelpModal">
+        ℹ️ Ayuda
+    </button>
+</h2>
 <p class="alert alert-info">Configura los períodos de cálculo del MACD y define las condiciones de señal (cruce o histograma) con lógica de exclusividad.</p>
+
+<!-- Modal de Ayuda MACD -->
+<div class="modal fade" id="macHelpModal" tabindex="-1" aria-labelledby="macHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="macHelpModalLabel">📊 Ayuda: Indicador MACD</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6 class="mb-3 text-primary">🔍 ¿Qué es el MACD?</h6>
+                <p>
+                    El <strong>MACD (Moving Average Convergence Divergence)</strong> es un indicador de momentum que mide la relación
+                    entre dos medias móviles exponenciales (EMA). Detecta cambios de dirección y fuerza del impulso.
+                </p>
+                
+                <h6 class="mt-4 mb-2 text-primary">📈 Componentes del MACD:</h6>
+                <ul class="small">
+                    <li><strong>MACD Line:</strong> EMA rápida (12) - EMA lenta (26)</li>
+                    <li><strong>Signal Line:</strong> EMA de 9 períodos de la MACD Line</li>
+                    <li><strong>Histograma:</strong> Diferencia entre MACD Line y Signal Line</li>
+                </ul>
+                
+                <h6 class="mt-4 mb-2 text-primary">⚙️ Parámetros Configurables:</h6>
+                <table class="table table-sm table-bordered">
+                    <tr>
+                        <th>Parámetro</th>
+                        <th>Default</th>
+                        <th>Rango Recomendado</th>
+                        <th>Descripción</th>
+                    </tr>
+                    <tr>
+                        <td>Fast Period</td>
+                        <td>12</td>
+                        <td>8-15</td>
+                        <td>EMA rápida. Menor = más reactivo</td>
+                    </tr>
+                    <tr>
+                        <td>Slow Period</td>
+                        <td>26</td>
+                        <td>20-35</td>
+                        <td>EMA lenta. Mayor = más suave</td>
+                    </tr>
+                    <tr>
+                        <td>Signal Period</td>
+                        <td>9</td>
+                        <td>7-12</td>
+                        <td>Línea de señal. Afecta sensibilidad de cruces</td>
+                    </tr>
+                </table>
+                
+                <h6 class="mt-4 mb-2 text-success">🟢 Señales de COMPRA:</h6>
+                <ul class="small">
+                    <li><strong>MACD Fuerte (Default):</strong> MACD Line cruza por encima de Signal Line</li>
+                    <li>
+                        <strong>Con Ascendente:</strong> Además, el histograma debe estar SUBIENDO 
+                        (impulso creciente = mayor confianza)
+                    </li>
+                </ul>
+                
+                <h6 class="mt-4 mb-2 text-danger">🔴 Señales de VENTA / BLOQUEOS:</h6>
+                <ul class="small">
+                    <li>
+                        <strong>Máximo:</strong> Vende cuando el histograma alcanza un punto máximo 
+                        (sobrecompra). También BLOQUEA nuevas compras mientras esté en máximo.
+                    </li>
+                    <li>
+                        <strong>Descendente:</strong> Vende cuando el histograma BAJA 
+                        (pérdida de impulso). También BLOQUEA nuevas compras.
+                    </li>
+                </ul>
+                
+                <div class="alert alert-warning mt-4">
+                    <h6 class="mb-2">⚠️ <strong>IMPORTANTE: Sin Switches Activados</strong></h6>
+                    <p class="mb-0">
+                        Si NO activas ningún switch (Mínimo, Máximo, Ascendente, Descendente), 
+                        el MACD generaply compras por <strong>MACD Fuerte</strong> (cruce simple) 
+                        y <strong>SOLO</strong> ventas por <strong>StopLoss</strong>. 
+                        Es un modo automático que puede generar MUCHAS señales.
+                    </p>
+                </div>
+                
+                <h6 class="mt-4 mb-2 text-info">🔀 Diferencia vs Otros Indicadores:</h6>
+                <ul class="small">
+                    <li><strong>vs EMA:</strong> MACD es momentum puro, no bloquea por descenso de EMA</li>
+                    <li><strong>vs RSI:</strong> MACD usa cruces de medias, RSI usa sobreventa/sobrecompra</li>
+                    <li><strong>Sin vetos hardcoded:</strong> A diferencia de EMA, MACD NO tiene bloqueos permanentes</li>
+                </ul>
+                
+                <h6 class="mt-4 mb-2 text-success">✅ Ejemplo de Configuración Equilibrada:</h6>
+                <code class="small">
+                    Fast=12, Slow=26, Signal=9 (estándar) + Máximo + Descendente
+                    = Venta en picos Y cuando pierde impulso
+                </code>
+                
+                <h6 class="mt-4 mb-2 text-info">⚡ Ejemplo de Configuración Agresiva:</h6>
+                <code class="small">
+                    Fast=8, Slow=17, Signal=9 + Sin switches + Ascendente
+                    = Muchas compras, cierre solo por StopLoss
+                </code>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="row">
     <div class="col-6 border-end">
