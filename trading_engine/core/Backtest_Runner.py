@@ -58,6 +58,15 @@ def run_backtest_for_symbol(
     # Recolección de Trades
     trades_log = stats._strategy.trades_list
     
+    # 🔧 ORDENAR TRADES POR FECHA (Fix para problema de ordenamiento temporal)
+    if trades_log and len(trades_log) > 0:
+        # Ordenar por fecha de entrada (o fecha disponible)
+        try:
+            trades_log = sorted(trades_log, key=lambda x: x.get('Fecha', x.get('Entry Time', '')))
+        except Exception:
+            # Si falla el ordenamiento, al menos logear el warning
+            logger.warning(f"No se pudo ordenar trades_log para {symbol}")
+    
     # Se devuelve el objeto bt para que el ESCENARIO (Web) pueda generar el gráfico HTML.
     return stats_dict, trades_log, bt
 
@@ -141,5 +150,11 @@ def run_multi_symbol_backtest(
             
     resultados_df = pd.DataFrame(resultados_finales)
     trades_df = pd.DataFrame(all_trades)
+    
+    # 🔧 ORDENAR TRADES POR FECHA (Fix para problema multi-símbolo temporal)
+    if not trades_df.empty and 'Fecha' in trades_df.columns:
+        trades_df = trades_df.sort_values('Fecha').reset_index(drop=True)
+    elif not trades_df.empty and 'Entry Time' in trades_df.columns:
+        trades_df = trades_df.sort_values('Entry Time').reset_index(drop=True)
     
     return resultados_df, trades_df, backtest_objects

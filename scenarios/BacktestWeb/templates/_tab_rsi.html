@@ -1,5 +1,84 @@
-<h2 class="mb-3">Parámetros de Índice de Fuerza Relativa (RSI)</h2>
-<p class="alert alert-info">Define las condiciones de compra y venta basadas en los umbrales del RSI, utilizando la lógica de exclusividad.</p>
+<div class="d-flex align-items-center gap-2 mb-3">
+    <h2 class="mb-0">Parámetros de Índice de Fuerza Relativa (RSI)</h2>
+    <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#rsiInfoModal">
+        <i class="bi bi-info-circle"></i> ℹ️ Ayuda
+    </button>
+</div>
+
+<!-- Modal con información RSI -->
+<div class="modal fade" id="rsiInfoModal" tabindex="-1" aria-labelledby="rsiInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="rsiInfoModalLabel">📈 Índice de Fuerza Relativa (RSI) - Guía Completa</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>¿Qué es el RSI?</strong> Es un oscilador de momentum que mide la velocidad y magnitud de los cambios de precio en una escala de 0 a 100. Identifica condiciones de sobrecompra (overbought) y sobreventa (oversold).</p>
+                
+                <h6 class="mt-4 text-dark"><strong>Parámetros Configurables:</strong></h6>
+                <ul class="mb-3">
+                    <li><strong>Período de Cálculo:</strong> Por defecto 14. Ventana para calcular ganancias/pérdidas promedio.</li>
+                    <li><strong>Nivel Máximo (Sobrecompra):</strong> Por defecto 70. RSI por encima indica activo "caro" o sobrecalentado.</li>
+                    <li><strong>Nivel Mínimo (Sobreventa):</strong> Por defecto 30. RSI por debajo indica activo "barato" o sobrecastigado.</li>
+                    <li><strong>Umbral de Fuerza:</strong> Por defecto 55. Nivel intermedio para detectar continuación alcista sin llegar a sobrecompra.</li>
+                </ul>
+                
+                <h6 class="text-dark"><strong>Señales Disponibles (Activables independientemente):</strong></h6>
+                
+                <div class="ps-3 border-start border-info">
+                    <p class="mb-2"><strong class="text-success">🟢 COMPRA - Lógica OR (cualquiera activa la compra):</strong></p>
+                    <ul class="small mb-3">
+                        <li><strong>Mínimo (Giro desde Sobreventa):</strong> RSI toca valle local (< nivel mínimo) y cruza hacia arriba → Rebote después de sobrecorrección.</li>
+                        <li><strong>Ascendente:</strong> RSI está subiendo → Recuperación de momentum, entrada en recuperación.</li>
+                        <li><strong>Fuerza Pura:</strong> RSI > Umbral de Fuerza → Continuación alcista sin esperar sobreventa (más agresivo).</li>
+                    </ul>
+                    
+                    <p class="mb-2"><strong class="text-danger">🔴 VENTA / BLOQUEO - Lógica AND:</strong></p>
+                    <ul class="small mb-3">
+                        <li><strong>Máximo (Sobrecompra):</strong> RSI toca pico local (> nivel máximo) → Realización de ganancias + bloquea nuevas compras.</li>
+                        <li><strong>Descendente:</strong> RSI está bajando → Pérdida de momentum + bloquea nuevas compras.</li>
+                    </ul>
+                </div>
+                
+                <div class="alert alert-warning alert-sm mt-3 mb-3">
+                    <strong>💡 Reflexión sobre Máximo + Descendente:</strong><br>
+                    <small>Similar a EMA, cuando RSI toca un pico (máximo), la siguiente vela suele estar más baja (descendente). Ambos casi siempre ocurren juntos. Considera usar solo uno para simplificar tu estrategia.</small>
+                </div>
+                
+                <div class="alert alert-success alert-sm mb-3">
+                    <strong>✅ Diferencia con EMA (Protección Hardcoded):</strong><br>
+                    <small>
+                        • <strong>EMA:</strong> Tiene un <strong>veto hardcoded permanente</strong> → Si EMA Lenta está descendiendo, BLOQUEA todas las compras sin importar configuración.<br>
+                        • <strong>RSI:</strong> <strong>NO tiene vetos hardcoded</strong> → Los bloqueos solo ocurren si TÚ activas los switches "Máximo" o "Descendente". Sin ellos, RSI nunca bloqueará compras por sí solo.
+                    </small>
+                </div>
+                
+                <h6 class="text-dark"><strong>Ejemplos de Combinaciones:</strong></h6>
+                <ul class="small mb-3">
+                    <li><strong>Mínimo + Máximo:</strong> Estrategia de reversión clásica → Compra en valles, vende en picos.</li>
+                    <li><strong>Ascendente solo:</strong> Agresivo → Compra cada vez que RSI sube (sin esperar sobreventa).</li>
+                    <li><strong>Fuerza Pura (>55) sin bloqueos:</strong> Muy agresivo → Sigue la tendencia alcista continuamente.</li>
+                    <li><strong>Solo bloqueos sin señales de compra:</strong> ⚠️ Incompatible → 0 trades (no hay cómo entrar).</li>
+                </ul>
+                
+                <div class="alert alert-info alert-sm mb-0">
+                    <strong>💡 Comportamiento SIN Switches Activados:</strong><br>
+                    <small>
+                        Si activas RSI PERO no marcas ningún switch (Mínimo, Ascendente, Máximo, Descendente):<br>
+                        • <strong>COMPRA:</strong> ✅ SÍ genera señales → cuando <code>RSI > Umbral de Fuerza</code> (default 55). Es el modo "Fuerza Pura".<br>
+                        • <strong>VENTA:</strong> ❌ NO genera ventas técnicas → solo saldrá por Stop Loss.<br>
+                        • <strong>BLOQUEOS:</strong> ❌ NO bloquea compras → puede entrar incluso en RSI alto.<br>
+                        <strong>Resultado:</strong> Estrategia agresiva de seguimiento de tendencia alcista sin protecciones.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="row">
     <div class="col-6 border-end">
@@ -55,54 +134,43 @@
     </div>
 
     <div class="col-6">
-        <h4 class="mb-3 text-dark">Señales de Compra y Cierres</h4>
-        <p class="text-muted small">Marca qué condiciones pueden generar compra (OR) o rechazarla (AND).</p>
+        <h4 class="mb-3 text-dark">Señales de Compra y Venta</h4>
+        <p class="text-muted small">Activa los tipos de señal que deseas usar. Ver modal de ayuda para detalles.</p>
 
-        <h5 class="mt-4 text-success">🟢 Señales de COMPRA (Lógica OR - Si cumple CUALQUIERA)</h5>
-        <p class="text-muted small mb-2">Marca las condiciones que pueden generar una compra.</p>
+        <h5 class="mt-4 text-success">🟢 Señales de Compra (OR)</h5>
         
-        <div class="form-check mb-2">
+        <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" id="rsi_minimo" name="rsi_minimo" value="true" 
                    {% if config.get('rsi_minimo') == 'True' or config.get('rsi_minimo') == True %}checked{% endif %}>
-            <label class="form-check-label" for="rsi_minimo">
-                <strong>Mínimo (Sobreventa):</strong> Compra cuando RSI toca valle local (RSI &lt; {{ config.rsi_low_level }})
+            <label class="form-check-label fw-bold" for="rsi_minimo">
+                Mínimo (Giro desde Sobreventa)
             </label>
         </div>
 
-        <div class="form-check mb-4">
+        <div class="form-check form-switch mb-4">
             <input class="form-check-input" type="checkbox" id="rsi_ascendente" name="rsi_ascendente" value="true" 
                    {% if config.get('rsi_ascendente') == 'True' or config.get('rsi_ascendente') == True %}checked{% endif %}>
-            <label class="form-check-label" for="rsi_ascendente">
-                <strong>Ascendente:</strong> Compra cuando RSI está subiendo (se recupera del valle)
+            <label class="form-check-label fw-bold" for="rsi_ascendente">
+                Ascendente (Recuperación)
             </label>
         </div>
 
-        <h5 class="mt-4 text-danger">🔴 Señales de BLOQUEO/VENTA (Lógica AND - Rechaza si cumple CUALQUIERA)</h5>
-        <p class="text-muted small mb-2">Marca las condiciones que pueden rechazar la compra o cerrar posición abierta.</p>
+        <h5 class="mt-4 text-danger">🔴 Señales de Venta (OR) / Bloqueos (AND)</h5>
         
-        <div class="form-check mb-2">
+        <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" id="rsi_maximo" name="rsi_maximo" value="true" 
                    {% if config.get('rsi_maximo') == 'True' or config.get('rsi_maximo') == True %}checked{% endif %}>
-            <label class="form-check-label" for="rsi_maximo">
-                <strong>Máximo (Sobrecompra):</strong> Rechaza compra / Vende si RSI toca pico (RSI &gt; {{ config.rsi_high_level }})
+            <label class="form-check-label fw-bold" for="rsi_maximo">
+                Máximo (Sobrecompra)
             </label>
         </div>
 
-        <div class="form-check mb-4">
+        <div class="form-check form-switch mb-4">
             <input class="form-check-input" type="checkbox" id="rsi_descendente" name="rsi_descendente" value="true" 
                    {% if config.get('rsi_descendente') == 'True' or config.get('rsi_descendente') == True %}checked{% endif %}>
-            <label class="form-check-label" for="rsi_descendente">
-                <strong>Descendente:</strong> Rechaza compra / Vende si RSI está bajando (pierde fuerza)
+            <label class="form-check-label fw-bold" for="rsi_descendente">
+                Descendente (Pérdida Momentum)
             </label>
-        </div>
-
-        <div class="alert alert-info mt-3">
-            <small>
-                <strong>💡 Ejemplos de combinaciones:</strong><br>
-                ✓ <em>Mínimo + Máximo</em>: Compra en valles, vende en picos<br>
-                ✓ <em>Ascendente sin deniegos</em>: Agresivo, compra cada vez que sube<br>
-                ⚠️ <em>Solo deniegos sin señales</em>: 0 trades (incompatible)<br>
-            </small>
         </div>
     </div>
 </div>

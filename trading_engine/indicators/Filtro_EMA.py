@@ -206,4 +206,15 @@ def check_ema_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
     if getattr(strategy_self, 'ema_slow_maximo', False) and strategy_self.ema_slow_maximo_STATE:
         return True, "VENTA: Máximo en EMA Lenta"
 
+    # ======================================================================
+    # OPCIÓN 3: Cruce descendente (EMA Rápida cruza por debajo de EMA Lenta)
+    # ======================================================================
+    # Si el usuario tiene habilitado el cruce de EMA para señales (mismo flag usado en compra),
+    # interpretamos que un cruce descendente debe producir una venta técnica.
+    if getattr(strategy_self, 'ema_cruce_signal', False) and strategy_self.ema_fast_series is not None and strategy_self.ema_slow_series is not None:
+        # Usamos 'crossover' invirtiendo el orden para detectar cruce hacia abajo
+        cond_tendencia_crossdown = crossover(strategy_self.ema_slow_series, strategy_self.ema_fast_series)
+        if cond_tendencia_crossdown:
+            return True, "VENTA: EMA Cruce Rápida/Lenta (CrossDown)"
+
     return False, None

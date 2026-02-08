@@ -1,5 +1,87 @@
-<h2 class="mb-3">Parámetros de Medias Móviles Exponenciales (EMA)</h2>
-<p class="alert alert-info">Define la señal de cruce y activa múltiples filtros de estado de forma simultánea para mayor flexibilidad.</p>
+<div class="d-flex align-items-center gap-2 mb-3">
+    <h2 class="mb-0">Parámetros de Medias Móviles Exponenciales (EMA)</h2>
+    <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#emaInfoModal">
+        <i class="bi bi-info-circle"></i> ℹ️ Ayuda
+    </button>
+</div>
+
+<!-- Modal con información EMA -->
+<div class="modal fade" id="emaInfoModal" tabindex="-1" aria-labelledby="emaInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="emaInfoModalLabel">📊 Media Móvil Exponencial (EMA) - Guía Completa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>¿Qué es la EMA?</strong> La Media Móvil Exponencial es un indicador de tendencia que sigue los cambios de precio recientes. Usa dos períodos: rápida (sensible) y lenta (suave).</p>
+                
+                <h6 class="mt-4 text-dark"><strong>Parámetros Configurables:</strong></h6>
+                <ul class="mb-3">
+                    <li><strong>Período EMA Rápida:</strong> Por defecto 5. Detecta cambios rápidos (utilizado en cruces).</li>
+                    <li><strong>Período EMA Lenta:</strong> Por defecto 30. Define la tendencia general (utilizado en filtros de estado).</li>
+                </ul>
+                
+                <h6 class="text-dark"><strong>Señales Disponibles (Activables independientemente):</strong></h6>
+                
+                <div class="ps-3 border-start border-warning">
+                    <p class="mb-2"><strong class="text-success">🟢 COMPRA - Lógica OR (cualquiera activa la compra):</strong></p>
+                    <ul class="small mb-3">
+                        <li><strong>Cruce Ascendente:</strong> EMA Rápida cruza por encima de EMA Lenta → Cambio de tendencia al alza.</li>
+                        <li><strong>Mínimo:</strong> EMA Lenta detecta un mínimo local → Rebote después de caída (reversal).</li>
+                        <li><strong>Ascendente:</strong> EMA Lenta está subiendo confirmado → Tendencia alcista continua.</li>
+                    </ul>
+                    
+                    <p class="mb-2"><strong class="text-danger">🔴 VENTA / BLOQUEO - Lógica AND:</strong></p>
+                    <ul class="small mb-3">
+                        <li><strong>Cruce Descendente:</strong> EMA Rápida cruza por debajo de EMA Lenta → Cambio de tendencia a la baja.</li>
+                        <li>
+                            <strong>Máximo Local + Descendente (Casi Lo Mismo):</strong><br>
+                            <span class="text-danger">⚠️ Nota importante:</span> Cuando la EMA Lenta toca un pico (máximo), por definición la siguiente vela estará más baja, lo que ya constituye "descendente". Ambos casi siempre ocurren juntos.<br>
+                            <span class="text-danger">↳ VENTA:</span> Cierra posiciones abiertas en ambos casos<br>
+                            <span class="text-danger">↳ BLOQUEO:</span> Evita nuevas compras mientras esté bajando después del pico.
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="alert alert-warning alert-sm mt-3 mb-3">
+                    <strong>💡 Reflexión sobre redundancia:</strong><br>
+                    <small>Técnicamente, "Máximo" y "Descendente" son casi idénticos a nivel de bloqueo de compras, ya que un máximo detectado implica que ya estamos bajando. Si encuentras que ambos se activan juntos en tus backtests, considera usar solo uno para simplificar tu estrategia.</small>
+                </div>
+                
+                <div class="alert alert-danger alert-sm mb-3">
+                    <strong>⚠️ PROTECCIÓN HARDCODED (Veto Permanente):</strong><br>
+                    <small>
+                        <strong>IMPORTANTE:</strong> La EMA Lenta tiene un <strong>veto de seguridad hardcoded</strong> que SIEMPRE está activo:<br>
+                        • Si <code>ema_slow_descendente_STATE = True</code> (EMA está bajando) → <strong>BLOQUEA TODAS LAS COMPRAS</strong><br>
+                        • Este bloqueo ocurre <strong>independientemente</strong> de si activaste o no el switch "Descendente"<br>
+                        • Es una protección permanente del código para evitar compras en tendencias bajistas<br>
+                        • <strong>Diferencia con RSI:</strong> RSI NO tiene vetos hardcoded, solo respeta los switches que actives
+                    </small>
+                </div>
+                
+                <hr class="my-3">
+                
+                <div class="alert alert-info alert-sm mb-3">
+                    <strong>💡 Comportamiento SIN Switches Activados:</strong><br>
+                    <small>
+                        Si NO activas ningún switch de EMA (Cruce, Mínimo, Ascendente, Máximo, Descendente):<br>
+                        • <strong>Modo:</strong> Sistema entra en <strong>Buy & Hold</strong><br>
+                        • <strong>COMPRA:</strong> ✅ En mínimos automáticos (<code>ema_slow_minimo_STATE</code> o <code>ema_slow_ascendente_STATE</code>)<br>
+                        • <strong>VENTA:</strong> ❌ Solo por Stop Loss (sin ventas técnicas)<br>
+                        • <strong>VETO HARDCODED:</strong> ⚠️ Sigue activo → NO comprará si EMA Lenta está descendiendo<br>
+                        <strong>Resultado:</strong> Estrategia pasiva con protección contra bajadas fuertes.
+                    </small>
+                </div>
+                
+                <p class="small text-muted mb-0"><strong>Diferencia clave con RSI:</strong> EMA sin switches = B&H con veto | RSI sin switches = Fuerza Pura agresiva (>55)</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="row">
     <div class="col-6 border-end">
@@ -31,41 +113,41 @@
     </div>
 
     <div class="col-6">
-        <h4 class="mb-3 text-dark">Filtros de Estado (Lógica Aditiva)</h4>
-        <p class="text-muted small">Puedes activar varias opciones. Funcionarán como señales OR para la entrada.</p>
+        <h4 class="mb-3 text-dark">Filtros de Estado</h4>
+        <p class="text-muted small">Activa los tipos de señal que deseas usar. Ver recuadro anterior para detalles.</p>
 
-        <h5 class="mt-4 text-success">Lógica de Compra</h5>
+        <h5 class="mt-4 text-success">🟢 Signals de Compra (OR)</h5>
         <div class="row mb-2">
-            <div class="col-6">
+            <div class="col-12 mb-3">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="ema_slow_minimo" name="ema_slow_minimo" value="True"
                            {% if config.ema_slow_minimo == 'True' %}checked{% endif %}>
-                    <label class="form-check-label" for="ema_slow_minimo">Mínimo (Giro)</label>
+                    <label class="form-check-label fw-bold" for="ema_slow_minimo">Mínimo Local</label>
                 </div>
             </div>
-            <div class="col-6">
+            <div class="col-12">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="ema_slow_ascendente" name="ema_slow_ascendente" value="True"
                            {% if config.ema_slow_ascendente == 'True' %}checked{% endif %}>
-                    <label class="form-check-label" for="ema_slow_ascendente">Ascendente</label>
+                    <label class="form-check-label fw-bold" for="ema_slow_ascendente">Tendencia Alcista</label>
                 </div>
             </div>
         </div>
 
-        <h5 class="mt-4 text-danger">Lógica de Venta / Bloqueo</h5>
+        <h5 class="mt-4 text-danger">🔴 Señales de Venta (OR) / Bloqueos (AND)</h5>
         <div class="row">
-            <div class="col-6">
+            <div class="col-12 mb-3">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="ema_slow_maximo" name="ema_slow_maximo" value="True"
                            {% if config.ema_slow_maximo == 'True' %}checked{% endif %}>
-                    <label class="form-check-label" for="ema_slow_maximo">Máximo (Techo)</label>
+                    <label class="form-check-label fw-bold" for="ema_slow_maximo">Máximo Local (Venta + Bloqueo)</label>
                 </div>
             </div>
-            <div class="col-6">
+            <div class="col-12">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="ema_slow_descendente" name="ema_slow_descendente" value="True"
                            {% if config.ema_slow_descendente == 'True' %}checked{% endif %}>
-                    <label class="form-check-label" for="ema_slow_descendente">Decreciente</label>
+                    <label class="form-check-label fw-bold" for="ema_slow_descendente">Tendencia Bajista (Venta + Veto)</label>
                 </div>
             </div>
         </div>
