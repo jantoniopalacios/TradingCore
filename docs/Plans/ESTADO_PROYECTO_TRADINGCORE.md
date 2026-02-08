@@ -148,9 +148,28 @@ Todos los escenarios terminaron correctos, y trades ordenados cronologicamente.
 
 ---
 
-## 10) Proximos pasos sugeridos
+## 8) Validacion MACD (9 de febrero de 2026)
 
-1) Continuar auditoria de indicadores restantes (MACD, Stochastic, Bollinger, Volume, MoS) usando el plan RDVD.
+### ✅ Completado
+- Script validate_macd_complete.py: 10 escenarios exitosos
+- Modal Bootstrap con documentacion completa en _tab_macd.html
+- Verificado: compras por MACD Fuerte (cruce), ventas por Maximo/Descendente
+- Switches funcionan correctamente: minimo, maximo, ascendente, descendente
+- Parametros alternativos validados (8/17/9 rápido, 16/36/12 lento)
+- Orden cronológico confirmado en todos los tests
+- Commit: 11aa307
+
+### 🔍 Hallazgos
+- MACD sin switches activa compras automaticas por cruce simple (útil para automation)
+- Máximo bloquea compras + vende en picos (protección contra sobrecompra)
+- Descendente bloquea compras + vende cuando pierde impulso
+- Sin veto hardcoded como EMA (más flexible)
+
+---
+
+## 9) Proximos pasos sugeridos
+
+1) Auditar indicadores restantes (Stochastic, Bollinger, Volume, MoS) usando MACD como template.
 2) Crear scripts de diagnostico para asignacion de parametros en configuracion.
 3) Ejecutar backtests de stress con varios simbolos y periodos.
 4) Revisar warnings de MkDocs para eventualmente volver a `--strict`.
@@ -158,7 +177,7 @@ Todos los escenarios terminaron correctos, y trades ordenados cronologicamente.
 
 ---
 
-## 11) Como retomar rapido este contexto
+## 10) Como retomar rapido este contexto
 
 Al volver al proyecto:
 1) Leer este archivo de estado.
@@ -171,12 +190,15 @@ Al volver al proyecto:
 ## 12) Archivos clave a recordar
 
 - trading_engine/indicators/Filtro_EMA.py
+- trading_engine/indicators/Filtro_MACD.py
 - trading_engine/core/Backtest_Runner.py
 - scenarios/BacktestWeb/templates/_tab_ema.html
 - scenarios/BacktestWeb/templates/_tab_rsi.html
+- scenarios/BacktestWeb/templates/_tab_macd.html
 - scripts/test_single_ema_cruce_sell.py
 - scripts/test_nke_exact_params.py
 - scripts/validate_rsi_complete.py
+- scripts/validate_macd_complete.py
 - docs/Index/00_INDEX_DOCUMENTACION.md
 - .github/workflows/docs.yml
 - docs/Plans/PLAN_VALIDACION_INTEGRAL_PROYECTO.md
