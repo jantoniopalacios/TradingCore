@@ -184,8 +184,8 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
     Bloquea TODAS las compras si RSI está por debajo del umbral de fuerza.
     Similar al veto hardcoded de EMA descendente, pero basado en nivel absoluto.
     
-    IMPORTANTE: Solo se aplica si hay switches RSI activos (Mínimo, Ascendente, Máximo, Descendente).
-    Si RSI está activado pero sin switches, este filtro NO afecta (retorna True siempre).
+    IMPORTANTE: Este filtro SIEMPRE se aplica cuando RSI está activado.
+    No depende de switches - el umbral funciona independientemente.
     
     Parameters
     ----------
@@ -195,7 +195,7 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
     Returns
     -------
     bool
-        False si RSI < threshold Y hay switches activos (BLOQUEA compras)
+        False si RSI < threshold (BLOQUEA compras)
         True en caso contrario (permite compras)
     """
     try:
@@ -203,19 +203,7 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
         if not getattr(strategy_self, 'rsi', False):
             return True
         
-        # Verificar si hay ALGÚN switch RSI activo
-        tiene_switches_activos = (
-            getattr(strategy_self, 'rsi_minimo', False) or
-            getattr(strategy_self, 'rsi_ascendente', False) or
-            getattr(strategy_self, 'rsi_maximo', False) or
-            getattr(strategy_self, 'rsi_descendente', False)
-        )
-        
-        # Si no hay switches activos, no aplicar filtro (RSI es pasivo)
-        if not tiene_switches_activos:
-            return True
-        
-        # Hay switches activos: aplicar filtro de Fuerza Pura
+        # El filtro SIEMPRE se aplica si RSI está ON (no depende de switches)
         rsi_ind = getattr(strategy_self, 'rsi_ind', None)
         if rsi_ind is None:
             # Sin datos RSI válidos, permitir
@@ -234,7 +222,7 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
         
         # Si umbral es 0 o negativo, desactivar el filtro
         if umbral <= 0:
-            return True
+            return True  # Permite todas las compras
         
         # Aplicar filtro de Fuerza Pura: bloquea si RSI < umbral
         rsi_actual = _last_value(rsi_ind)

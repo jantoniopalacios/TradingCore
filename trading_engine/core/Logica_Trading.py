@@ -267,17 +267,16 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     # ----------------------------------------------------------------------
     # --- 4. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
     # ----------------------------------------------------------------------
-    # Verificar si RSI tiene switches activos (solo cuenta como indicador técnico si tiene switches)
-    rsi_tiene_switches = (
+    # Verificar si RSI tiene switches de SEÑAL activos (solo estos cuentan como indicador "activo")
+    # Los switches de VENTA (máximo, descendente) NO bloquean B&H, solo cierran posiciones
+    rsi_tiene_switches_compra = (
         getattr(strategy_self, 'rsi_minimo', False) or
-        getattr(strategy_self, 'rsi_ascendente', False) or
-        getattr(strategy_self, 'rsi_maximo', False) or
-        getattr(strategy_self, 'rsi_descendente', False)
+        getattr(strategy_self, 'rsi_ascendente', False)
     )
     
     indicadores_tecnicos_activos = (
         strategy_self.ema_cruce_signal or
-        rsi_tiene_switches or  # RSI solo cuenta si tiene switches
+        rsi_tiene_switches_compra or  # RSI solo cuenta si tiene switches de COMPRA
         strategy_self.macd or 
         strategy_self.stoch_fast or 
         strategy_self.stoch_mid or 
