@@ -255,17 +255,29 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     # ----------------------------------------------------------------------
     
     # Bloquea compras si RSI está por debajo del umbral de fuerza (calidad insuficiente).
-    # Solo aplica si RSI tiene datos válidos
-    if strategy_self.rsi and hasattr(strategy_self, 'rsi_ind') and strategy_self.rsi_ind is not None:
-        if not apply_rsi_global_filter(strategy_self):
-            condicion_base_tecnica = False
+    # Solo aplica si RSI tiene datos válidos Y hay switches activos
+    try:
+        if strategy_self.rsi and hasattr(strategy_self, 'rsi_ind') and strategy_self.rsi_ind is not None:
+            if not apply_rsi_global_filter(strategy_self):
+                condicion_base_tecnica = False
+    except Exception:
+        # Error en filtro RSI: ignorar y continuar sin filtro
+        pass
 
     # ----------------------------------------------------------------------
     # --- 4. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
     # ----------------------------------------------------------------------
+    # Verificar si RSI tiene switches activos (solo cuenta como indicador técnico si tiene switches)
+    rsi_tiene_switches = (
+        getattr(strategy_self, 'rsi_minimo', False) or
+        getattr(strategy_self, 'rsi_ascendente', False) or
+        getattr(strategy_self, 'rsi_maximo', False) or
+        getattr(strategy_self, 'rsi_descendente', False)
+    )
+    
     indicadores_tecnicos_activos = (
         strategy_self.ema_cruce_signal or
-        strategy_self.rsi or 
+        rsi_tiene_switches or  # RSI solo cuenta si tiene switches
         strategy_self.macd or 
         strategy_self.stoch_fast or 
         strategy_self.stoch_mid or 
