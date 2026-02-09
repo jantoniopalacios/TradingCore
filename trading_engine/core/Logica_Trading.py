@@ -255,8 +255,10 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     # ----------------------------------------------------------------------
     
     # Bloquea compras si RSI está por debajo del umbral de fuerza (calidad insuficiente).
-    if not apply_rsi_global_filter(strategy_self):
-        condicion_base_tecnica = False
+    # Solo aplica si RSI tiene datos válidos
+    if strategy_self.rsi and hasattr(strategy_self, 'rsi_ind') and strategy_self.rsi_ind is not None:
+        if not apply_rsi_global_filter(strategy_self):
+            condicion_base_tecnica = False
 
     # ----------------------------------------------------------------------
     # --- 4. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
