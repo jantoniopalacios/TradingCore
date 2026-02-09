@@ -66,7 +66,7 @@ def check_rsi_buy_signal(strategy_self: 'StrategySelf', condicion_base_tecnica: 
     
     Dos tipos de señales:
     1. GIRO DESDE SOBREVENTA: RSI estaba bajo y cruza su nivel mínimo al alza
-    2. FUERZA PURA: RSI está por encima del threshold de fuerza
+    2. RSI ASCENDENTE: RSI está subiendo (momentum alcista)
     
     Parameters
     ----------
@@ -110,22 +110,13 @@ def check_rsi_buy_signal(strategy_self: 'StrategySelf', condicion_base_tecnica: 
                         condicion_base_tecnica = True
         
         # ════════════════════════════════════════════════════════════════════════════
-        # OPCIÓN 2: COMPRA POR FUERZA PURA (RSI por encima de threshold)
+        # OPCIÓN 2: COMPRA POR RSI ASCENDENTE
         # ════════════════════════════════════════════════════════════════════════════
         if strategy_self.rsi_ascendente:
             # Si el usuario activó que quiere comprar cuando RSI está ascendente
             if hasattr(strategy_self, 'rsi_ascendente_STATE') and strategy_self.rsi_ascendente_STATE:
                 if log_reason is None:  # No sobrescribir si ya hay razón anterior
                     log_reason = "RSI Ascendente"
-                condicion_base_tecnica = True
-        
-        # ════════════════════════════════════════════════════════════════════════════
-        # OPCIÓN 3: COMPRA POR FUERZA PURA (RSI > threshold)
-        # ════════════════════════════════════════════════════════════════════════════
-        if hasattr(strategy_self, 'rsi_strength_threshold') and strategy_self.rsi_strength_threshold is not None:
-            if rsi_actual is not None and rsi_actual > float(strategy_self.rsi_strength_threshold):
-                if log_reason is None:  # No sobrescribir si ya hay razón
-                    log_reason = "RSI Fuerza Pura"
                 condicion_base_tecnica = True
     
     return condicion_base_tecnica, log_reason
@@ -165,3 +156,37 @@ def check_rsi_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
             return True, "VENTA RSI Descendente"
     
     return False, None
+
+# ----------------------------------------------------------------------
+# --- Filtro Global de Fuerza (Bloqueo) ---
+# ----------------------------------------------------------------------
+def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
+    """
+    Filtro global de RSI: FUERZA PURA.
+    
+    Bloquea TODAS las compras si RSI está por debajo del umbral de fuerza.
+    Similar al veto hardcoded de EMA descendente, pero basado en nivel absoluto.
+    
+    Este filtro está SIEMPRE ACTIVO (no requiere switch).
+    
+    Parameters
+    ----------
+    strategy_self : StrategySelf
+        Instancia de la estrategia con RSI.
+
+    Returns
+    -------
+    bool
+        False si RSI < threshold (BLOQUEA compras)
+        True en caso contrario (permite compras)
+    """
+    if strategy_self.rsi and strategy_self.rsi_ind is not None:
+        rsi_actual = _last_value(strategy_self.rsi_ind)
+        
+        # Filtro de Fuerza Pura: Solo permite compras si RSI > threshold
+        if hasattr(strategy_self, 'rsi_strength_threshold') and strategy_self.rsi_strength_threshold is not None:
+            if rsi_actual is not None and rsi_actual < float(strategy_self.rsi_strength_threshold):
+                # RSI por debajo del umbral de fuerza → BLOQUEO
+                return False
+    
+    return True  # Permite la operación

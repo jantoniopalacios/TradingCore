@@ -15,7 +15,7 @@ from trading_engine.utils.Calculos_Tecnicos import verificar_estado_indicador
 
 # --- NUEVAS IMPORTACIONES DE MÓDULOS (Lógica Delegada) ---
 from trading_engine.indicators.Filtro_EMA import update_ema_state, check_ema_buy_signal, apply_ema_global_filter, check_ema_sell_signal
-from trading_engine.indicators.Filtro_RSI import update_rsi_state, check_rsi_buy_signal, check_rsi_sell_signal
+from trading_engine.indicators.Filtro_RSI import update_rsi_state, check_rsi_buy_signal, apply_rsi_global_filter, check_rsi_sell_signal
 from trading_engine.indicators.Filtro_MACD import update_macd_state, check_macd_buy_signal, check_macd_sell_signal
 from trading_engine.indicators.Filtro_Stochastic import update_oscillator_state, check_oscillator_buy_signal, check_oscillator_sell_signal
 from trading_engine.indicators.Filtro_MoS import update_mos_state, apply_mos_filter
@@ -251,7 +251,15 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     condicion_base_tecnica = apply_ema_global_filter(strategy_self, condicion_base_tecnica)
 
     # ----------------------------------------------------------------------
-    # --- 3. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
+    # --- 3. FILTRO GLOBAL RSI FUERZA PURA (Condición AND) ---
+    # ----------------------------------------------------------------------
+    
+    # Bloquea compras si RSI está por debajo del umbral de fuerza (calidad insuficiente).
+    if not apply_rsi_global_filter(strategy_self):
+        condicion_base_tecnica = False
+
+    # ----------------------------------------------------------------------
+    # --- 4. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
     # ----------------------------------------------------------------------
     indicadores_tecnicos_activos = (
         strategy_self.ema_cruce_signal or
