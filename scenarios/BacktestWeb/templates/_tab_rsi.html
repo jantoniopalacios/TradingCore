@@ -43,18 +43,19 @@
                 <div class="alert alert-primary alert-sm mt-3 mb-3">
                     <strong>🛑 Filtro Global de Fuerza Pura (SIEMPRE ACTIVO):</strong><br>
                     <small>
-                        <strong>RSI < Umbral de Fuerza → BLOQUEA todas las compras</strong><br>
+                        <strong>Cuando RSI está activado, el filtro global se activa automáticamente:</strong><br>
+                        <strong>RSI < Umbral de Fuerza → BLOQUEA todas las compras</strong> (incluidas las de EMA, MACD y otros indicadores)<br>
                         Este filtro funciona como guardabarrera de calidad: solo permite entrar cuando el mercado tiene suficiente fuerza alcista. 
-                        Similar al veto hardcoded de EMA descendente, pero basado en nivel absoluto de RSI.<br>
+                        Similar al veto hardcoded de EMA descendente, pero basado en nivel absoluto de RSI y configurable.<br>
                         <strong>⚠️ No requiere activar ningún switch</strong> → Está SIEMPRE operativo mientras RSI esté activado.
                     </small>
                     <hr class="my-2">
                     <small>
                         <strong>🎯 Estrategias por Umbral:</strong><br>
-                        • <strong>Umbral 20-25</strong> (por debajo del nivel mínimo 30): Permite estrategias de <strong>reversión desde sobreventa</strong>. Señal Mínimo operativa.<br>
-                        • <strong>Umbral 50-55</strong> (por encima del nivel mínimo): Solo compra con <strong>momentum alcista fuerte</strong>. Señal Mínimo bloqueada, favorece Ascendente.<br>
                         • <strong>Umbral 0</strong>: Desactiva el filtro completamente. Permite compras sin restricción de fuerza.<br>
-                        <strong>💡 Tip:</strong> Ajusta el umbral según tu perfil: agresivo (bajo) vs conservador (alto).
+                        • <strong>Umbral 20-25</strong> (por debajo del nivel mínimo 30): Muy agresivo, bloquea solo extremos de debilidad. Permite estrategias de <strong>reversión desde sobreventa</strong>. Señal Mínimo operativa.<br>
+                        • <strong>Umbral 50-55</strong> (por encima del nivel mínimo): Conservador, solo compra con <strong>momentum alcista fuerte</strong>. Señal Mínimo bloqueada, favorece Ascendente.<br>
+                        <strong>💡 Tip:</strong> Ajusta el umbral según tu perfil: agresivo (bajo) vs conservador (alto). Usa 0 para desactivar el filtro.
                     </small>
                 </div>
                 
@@ -67,26 +68,26 @@
                     <strong>✅ Diferencia con EMA (Protección Hardcoded):</strong><br>
                     <small>
                         • <strong>EMA:</strong> Tiene un <strong>veto hardcoded permanente</strong> → Si EMA Lenta está descendiendo, BLOQUEA todas las compras sin importar configuración.<br>
-                        • <strong>RSI:</strong> Tiene un <strong>filtro global de Fuerza Pura (siempre activo)</strong> → Si RSI < Umbral de Fuerza, BLOQUEA todas las compras sin importar switches activados. Los switches "Máximo" y "Descendente" agregan bloqueos adicionales opcionales.
+                        • <strong>RSI:</strong> Tiene un <strong>filtro global de Fuerza Pura (siempre activo pero CONFIGURABLE)</strong> → Si RSI está activo Y RSI < Umbral de Fuerza, BLOQUEA todas las compras. <strong>Diferencia clave:</strong> Puedes ajustar el umbral (incluso ponerlo en 0 para desactivarlo). EMA no es configurable.
                     </small>
                 </div>
                 
                 <h6 class="text-dark"><strong>Ejemplos de Combinaciones:</strong></h6>
                 <ul class="small mb-3">
-                    <li><strong>Mínimo + Máximo:</strong> Estrategia de reversión clásica → Compra en valles, vende en picos.</li>
-                    <li><strong>Ascendente solo:</strong> Agresivo → Compra cada vez que RSI sube (sin esperar sobreventa).</li>
-                    <li><strong>Sin switches (solo filtro Fuerza Pura):</strong> Conservador → Solo compra cuando RSI>55, sin señales específicas de entrada. Espera para vender solo por Stop Loss.</li>
-                    <li><strong>Solo bloqueos sin señales de compra:</strong> ⚠️ Incompatible → 0 trades (no hay cómo entrar).</li>
+                    <li><strong>Mínimo + Máximo + Umbral 25:</strong> Estrategia de reversión clásica → Compra en valles (con fuerza mínima), vende en picos.</li>
+                    <li><strong>Ascendente solo + Umbral 55:</strong> Conservador → Solo compra cuando RSI sube Y tiene fuerza fuerte.</li>
+                    <li><strong>Sin switches + Umbral 0:</strong> RSI pasivo → No genera señales, no bloquea. Solo monitoreo.</li>
+                    <li><strong>Sin switches + Umbral 55:</strong> Filtro puro → RSI no genera señales propias pero BLOQUEA compras de EMA/MACD si RSI<55.</li>
                 </ul>
                 
                 <div class="alert alert-info alert-sm mb-0">
                     <strong>💡 Comportamiento SIN Switches Activados:</strong><br>
                     <small>
                         Si activas RSI PERO no marcas ningún switch (Mínimo, Ascendente, Máximo, Descendente):<br>
-                        • <strong>COMPRA:</strong> ❌ NO genera señales de entrada → PERO el filtro de Fuerza Pura sigue activo. Si usas modo Buy & Hold, solo comprará cuando RSI>55.<br>
+                        • <strong>COMPRA:</strong> ❌ NO genera señales de entrada propias → RSI no propone compras por sí solo.<br>
                         • <strong>VENTA:</strong> ❌ NO genera ventas técnicas → solo saldrá por Stop Loss.<br>
-                        • <strong>BLOQUEOS:</strong> ✅ SÍ bloquea compras → cuando RSI < Umbral de Fuerza (filtro global siempre activo).<br>
-                        <strong>Resultado:</strong> Sin otros indicadores técnicos activos, necesitarás al menos una señal de compra (Mínimo o Ascendente) para generar trades.
+                        • <strong>BLOQUEOS:</strong> ⚠️ SÍ puede bloquear → El filtro de Fuerza Pura está ACTIVO. Si RSI < Umbral, bloqueará compras de EMA, MACD u otros indicadores. <strong>Usa Umbral=0 para desactivar bloqueos.</strong><br>
+                        <strong>Resultado:</strong> RSI sin switches funciona como filtro de calidad global. No genera operaciones pero puede vetarlas.
                     </small>
                 </div>
             </div>

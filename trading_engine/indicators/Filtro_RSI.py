@@ -48,12 +48,26 @@ def update_rsi_state(strategy_self: 'StrategySelf', verificar_estado_indicador_f
     None
         Actualiza los atributos de estado de la instancia `strategy_self` directamente.
     """
-    if strategy_self.rsi and strategy_self.rsi_ind is not None:
-        estado_rsi = verificar_estado_indicador_func(strategy_self.rsi_ind)
-        strategy_self.rsi_minimo_STATE = estado_rsi['minimo']
-        strategy_self.rsi_maximo_STATE = estado_rsi['maximo']
-        strategy_self.rsi_ascendente_STATE = estado_rsi['ascendente']
-        strategy_self.rsi_descendente_STATE = estado_rsi['descendente']
+    try:
+        if strategy_self.rsi and strategy_self.rsi_ind is not None:
+            estado_rsi = verificar_estado_indicador_func(strategy_self.rsi_ind)
+            strategy_self.rsi_minimo_STATE = estado_rsi['minimo']
+            strategy_self.rsi_maximo_STATE = estado_rsi['maximo']
+            strategy_self.rsi_ascendente_STATE = estado_rsi['ascendente']
+            strategy_self.rsi_descendente_STATE = estado_rsi['descendente']
+        else:
+            # Si RSI no está activo o no hay datos, initializar estados en False
+            strategy_self.rsi_minimo_STATE = False
+            strategy_self.rsi_maximo_STATE = False
+            strategy_self.rsi_ascendente_STATE = False
+            strategy_self.rsi_descendente_STATE = False
+    except Exception as e:
+        # Error en actualización de estado: inicializar en False para no bloquear
+        strategy_self.rsi_minimo_STATE = False
+        strategy_self.rsi_maximo_STATE = False
+        strategy_self.rsi_ascendente_STATE = False
+        strategy_self.rsi_descendente_STATE = False
+        # Log silencioso del error (no rompe la estrategia)
 
 # ----------------------------------------------------------------------
 # --- Lógica de Compra (Señales OR) ---
@@ -91,7 +105,7 @@ def check_rsi_buy_signal(strategy_self: 'StrategySelf', condicion_base_tecnica: 
         # ════════════════════════════════════════════════════════════════════════════
         # OPCIÓN 1: COMPRA POR GIRO DESDE SOBREVENTA (Cruce al alza del bajo_level)
         # ════════════════════════════════════════════════════════════════════════════
-        if strategy_self.rsi_minimo:
+        if getattr(strategy_self, 'rsi_minimo', False):
             # Si el usuario activó que quiere comprar en mínimos (sobreventa)
             # Verificar si el RSI está en estado de mínimo Y si cruza hacia arriba
             
@@ -112,7 +126,7 @@ def check_rsi_buy_signal(strategy_self: 'StrategySelf', condicion_base_tecnica: 
         # ════════════════════════════════════════════════════════════════════════════
         # OPCIÓN 2: COMPRA POR RSI ASCENDENTE
         # ════════════════════════════════════════════════════════════════════════════
-        if strategy_self.rsi_ascendente:
+        if getattr(strategy_self, 'rsi_ascendente', False):
             # Si el usuario activó que quiere comprar cuando RSI está ascendente
             if hasattr(strategy_self, 'rsi_ascendente_STATE') and strategy_self.rsi_ascendente_STATE:
                 if log_reason is None:  # No sobrescribir si ya hay razón anterior
@@ -145,14 +159,17 @@ def check_rsi_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
     """
     
     # Verificar si alguno de los deniegos está activo
-    if strategy_self.rsi and hasattr(strategy_self, 'rsi_maximo_STATE') and hasattr(strategy_self, 'rsi_descendente_STATE'):
+    if strategy_self.rsi:
+        # Inicializar estados si no existen (defensivo)
+        maximo_state = getattr(strategy_self, 'rsi_maximo_STATE', False)
+        descendente_state = getattr(strategy_self, 'rsi_descendente_STATE', False)
         
         # Cierre si RSI alcanza máximo (sobrecompra)
-        if strategy_self.rsi_maximo and strategy_self.rsi_maximo_STATE:
+        if getattr(strategy_self, 'rsi_maximo', False) and maximo_state:
             return True, "VENTA RSI Máximo (Sobrecompra)"
         
         # Cierre si RSI desciende
-        if strategy_self.rsi_descendente and strategy_self.rsi_descendente_STATE:
+        if getattr(strategy_self, 'rsi_descendente', False) and descendente_state:
             return True, "VENTA RSI Descendente"
     
     return False, None
@@ -167,7 +184,8 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
     Bloquea TODAS las compras si RSI está por debajo del umbral de fuerza.
     Similar al veto hardcoded de EMA descendente, pero basado en nivel absoluto.
     
-    Este filtro está SIEMPRE ACTIVO (no requiere switch).
+    Este filtro está SIEMPRE ACTIVO cuando RSI está activado (no requiere switch).
+    EXCEPCIÓN: Si Umbral = 0 o no configurado, el filtro se desactiva completamente.
     
     Parameters
     ----------
@@ -180,13 +198,33 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
         False si RSI < threshold (BLOQUEA compras)
         True en caso contrario (permite compras)
     """
-    if strategy_self.rsi and strategy_self.rsi_ind is not None:
-        rsi_actual = _last_value(strategy_self.rsi_ind)
+    # Si RSI no está activado, no bloquear
+    if not strategy_self.rsi:
+        return True
         
-        # Filtro de Fuerza Pura: Solo permite compras si RSI > threshold
-        if hasattr(strategy_self, 'rsi_strength_threshold') and strategy_self.rsi_strength_threshold is not None:
-            if rsi_actual is not None and rsi_actual < float(strategy_self.rsi_strength_threshold):
-                # RSI por debajo del umbral de fuerza → BLOQUEO
-                return False
+    if strategy_self.rsi_ind is not None:
+        # Verificar si el umbral está configurado
+        if hasattr(strategy_self, 'rsi_strength_threshold'):
+            umbral_raw = strategy_self.rsi_strength_threshold
+            
+            # Si el umbral es None o vacío, desactivar el filtro
+            if umbral_raw is None or umbral_raw == '':
+                return True
+            
+            try:
+                umbral = float(umbral_raw)
+                
+                # Si umbral es 0 o negativo, desactivar el filtro COMPLETAMENTE
+                if umbral <= 0:
+                    return True  # Permite todas las compras
+                
+                # Aplicar filtro de Fuerza Pura solo si umbral > 0
+                rsi_actual = _last_value(strategy_self.rsi_ind)
+                if rsi_actual is not None and rsi_actual < umbral:
+                    # RSI por debajo del umbral de fuerza → BLOQUEO
+                    return False
+            except (ValueError, TypeError):
+                # Si hay error de conversión, no bloquear
+                return True
     
     return True  # Permite la operación
