@@ -206,31 +206,51 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
         # El filtro SIEMPRE se aplica si RSI está ON (no depende de switches)
         rsi_ind = getattr(strategy_self, 'rsi_ind', None)
         if rsi_ind is None:
-            # Sin datos RSI válidos, permitir
+            # DEBUG: Sin datos RSI válidos
+            print("DEBUG RSI: rsi_ind es None")
             return True
             
         rsi_strength_threshold = getattr(strategy_self, 'rsi_strength_threshold', None)
         if rsi_strength_threshold is None or rsi_strength_threshold == '':
-            # Sin umbral configurado, permitir
+            # DEBUG: Sin umbral configurado
+            print("DEBUG RSI: umbral no configurado")
             return True
         
         try:
             umbral = float(rsi_strength_threshold)
         except (ValueError, TypeError):
-            # Error al convertar umbral, permitir
+            # DEBUG: Error al convertir umbral
+            print(f"DEBUG RSI: error al convertir umbral '{rsi_strength_threshold}'")
             return True
         
         # Si umbral es 0 o negativo, desactivar el filtro
         if umbral <= 0:
+            print(f"DEBUG RSI: umbral={umbral} <= 0, filtro desactivado")
             return True  # Permite todas las compras
         
+    # ======================================================================
+    # --- FILTRO GLOBAL DE VETO (HARDCODEADO): EMA Descendente BLOQUEA TODO ---
+    # ======================================================================
         # Aplicar filtro de Fuerza Pura: bloquea si RSI < umbral
         rsi_actual = _last_value(rsi_ind)
-        if rsi_actual is not None and rsi_actual < umbral:
-            return False  # BLOQUEA
+        if rsi_actual is not None:
+            resultado = rsi_actual >= umbral
+            fecha = getattr(strategy_self, 'data', None)
+            fecha_str = ""
+            if fecha is not None and hasattr(fecha, 'index') and len(fecha.index) > 0:
+                try:
+                    fecha_str = f" [{fecha.index[-1]}]"
+                except:
+                    pass
+            print(f"DEBUG RSI{fecha_str}: RSI={rsi_actual:.2f}, umbral={umbral}, permite={resultado}")
+            if not resultado:
+                return False  # BLOQUEA
+        else:
+            print("DEBUG RSI: rsi_actual es None")
         
         return True  # Permite
         
-    except Exception:
+    except Exception as e:
         # Error no controlado: permitir por defecto (seguridad)
+        print(f"DEBUG RSI: Exception en filtro - {e}")
         return True

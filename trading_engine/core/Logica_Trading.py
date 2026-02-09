@@ -251,21 +251,7 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     condicion_base_tecnica = apply_ema_global_filter(strategy_self, condicion_base_tecnica)
 
     # ----------------------------------------------------------------------
-    # --- 3. FILTRO GLOBAL RSI FUERZA PURA (Condición AND) ---
-    # ----------------------------------------------------------------------
-    
-    # Bloquea compras si RSI está por debajo del umbral de fuerza (calidad insuficiente).
-    # Solo aplica si RSI tiene datos válidos Y hay switches activos
-    try:
-        if strategy_self.rsi and hasattr(strategy_self, 'rsi_ind') and strategy_self.rsi_ind is not None:
-            if not apply_rsi_global_filter(strategy_self):
-                condicion_base_tecnica = False
-    except Exception:
-        # Error en filtro RSI: ignorar y continuar sin filtro
-        pass
-
-    # ----------------------------------------------------------------------
-    # --- 4. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
+    # --- 3. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
     # ----------------------------------------------------------------------
     # Verificar si RSI tiene switches de SEÑAL activos (solo estos cuentan como indicador "activo")
     # Los switches de VENTA (máximo, descendente) NO bloquean B&H, solo cierran posiciones
@@ -291,7 +277,22 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
                 technical_reasons['B&H'] = "B&H Mínimo"
 
     # ----------------------------------------------------------------------
-    # --- 4. FILTRO DE VOLUMEN (Condición AND Excluyente) ---
+    # --- 4. FILTRO GLOBAL RSI FUERZA PURA (Condición AND) ---
+    # ----------------------------------------------------------------------
+    
+    # Bloquea compras si RSI está por debajo del umbral de fuerza (calidad insuficiente).
+    # Se aplica DESPUÉS de B&H para que el umbral afecte también a señales Buy & Hold.
+    # Solo aplica si RSI tiene datos válidos
+    try:
+        if strategy_self.rsi and hasattr(strategy_self, 'rsi_ind') and strategy_self.rsi_ind is not None:
+            if not apply_rsi_global_filter(strategy_self):
+                condicion_base_tecnica = False
+    except Exception:
+        # Error en filtro RSI: ignorar y continuar sin filtro
+        pass
+
+    # ----------------------------------------------------------------------
+    # --- 5. FILTRO DE VOLUMEN (Condición AND Excluyente) ---
     # ----------------------------------------------------------------------
     volume_condition_met, volume_log_reason = apply_volume_filter(strategy_self)
     
@@ -316,6 +317,17 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     
     # Compra si: (Señal Técnica Fuerte) AND (Condición Fundamental Válida)
     if condicion_base_tecnica and cond_mos_valida:
+        
+        # DEBUG: Log RSI en el momento de la compra
+        if hasattr(strategy_self, 'rsi_ind') and strategy_self.rsi_ind is not None:
+            try:
+                from trading_engine.indicators.Filtro_RSI import _last_value
+                rsi_valor = _last_value(strategy_self.rsi_ind)
+                umbral_rsi = getattr(strategy_self, 'rsi_strength_threshold', 'N/A')
+                fecha = strategy_self.data.index[-1] if hasattr(strategy_self.data, 'index') else 'N/A'
+                print(f"🔵 COMPRA EJECUTADA [{fecha}]: RSI={rsi_valor:.2f}, Umbral={umbral_rsi}, Señales={list(technical_reasons.keys())}")
+            except Exception as e:
+                print(f"Error en debug compra: {e}")
         
         strategy_self.buy()
 

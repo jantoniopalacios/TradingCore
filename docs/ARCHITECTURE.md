@@ -75,6 +75,13 @@ Consolidación de Razones: Si un indicador emite una señal, añade su métrica 
 
 Ejecución: Solo si se cumplen las condiciones lógicas (AND/OR configurados), el Motor devuelve el control al Escenario para ejecutar la orden.
 
+# 5.3. Orden de Filtros RSI y Buy & Hold
+Para evitar que el modo Buy & Hold invalide filtros de calidad, el flujo de compra aplica RSI como filtro global DESPUES de que B&H haya generado la señal.
+
+- Buy & Hold puede generar condicion_base_tecnica si no hay indicadores de COMPRA activos.
+- El filtro RSI (Fuerza Pura) se aplica al final y puede bloquear la compra incluso si B&H activo.
+- El veto EMA descendente se mantiene como bloqueo absoluto previo a la decision final.
+
 # 5.2. El Diccionario de Trazabilidad (technical_reasons)
 Para evitar el comportamiento de "caja negra", el motor implementa un sistema de inyección de texto dinámico. Esto permite que el registro de operaciones sea humano-legible:
 
