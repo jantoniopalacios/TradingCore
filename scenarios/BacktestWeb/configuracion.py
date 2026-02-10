@@ -166,6 +166,12 @@ def asignar_parametros_a_system(config_data: dict, rutas: dict):
     System.stoploss_swing_lookback = get_param('stoploss_swing_lookback', 10, int)
     System.stoploss_swing_buffer = get_param('stoploss_swing_buffer', 1.0, float)
     
+    # Filtro de Volatilidad por ATR
+    System.atr_enabled = get_param('atr_enabled', False, bool)
+    System.atr_period = get_param('atr_period', 14, int)
+    System.atr_min = get_param('atr_min', 2.0, float)
+    System.atr_max = get_param('atr_max', 5.0, float)
+    
     System.filtro_fundamental = get_param('filtro_fundamental', False, bool)
     System.enviar_mail = get_param('enviar_mail', False, bool)
     System.destinatario_email = get_param('destinatario_email', '', str)

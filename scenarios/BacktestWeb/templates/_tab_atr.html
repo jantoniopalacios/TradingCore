@@ -1,0 +1,195 @@
+<div class="d-flex align-items-center gap-2 mb-3">
+    <h2 class="mb-0">Parámetros de Filtro ATR (Average True Range)</h2>
+    <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#atrInfoModal">
+        <i class="bi bi-info-circle"></i> ℹ️ Ayuda
+    </button>
+</div>
+
+<!-- Modal con información ATR -->
+<div class="modal fade" id="atrInfoModal" tabindex="-1" aria-labelledby="atrInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="atrInfoModalLabel">📊 Average True Range (ATR) - Guía de Volatilidad</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6 class="mt-4 text-dark"><strong>¿Qué es el ATR?</strong></h6>
+                <p>
+                    El <strong>Average True Range (ATR)</strong> mide la volatilidad del activo calculando el promedio de los 
+                    <strong>"rangos verdaderos"</strong> de los últimos N períodos. Es un indicador que muestra cuánto se está moviendo 
+                    el precio en promedio, independientemente de la dirección.
+                </p>
+                
+                <div class="alert alert-info alert-sm mb-3">
+                    <strong>⚡ True Range (TR) = max(</strong><br/>
+                    • High - Low (rango del día)<br/>
+                    • |High - Close anterior| (gap alcista)<br/>
+                    • |Low - Close anterior| (gap bajista)<br/>
+                    <strong>)</strong>
+                </div>
+
+                <h6 class="text-dark"><strong>¿Por qué usar ATR como filtro?</strong></h6>
+                <ul class="small mb-3">
+                    <li><strong>ATR bajo (< mínimo)</strong>: Mercado estancado sin movimiento. Evita trades en consolidaciones donde no hay oportunidad.</li>
+                    <li><strong>ATR en rango óptimo</strong>: Volatilidad saludable. Equilibrio entre movimiento y estabilidad.</li>
+                    <li><strong>ATR alto (> máximo)</strong>: Mercado caótico o en pánico. Demasiado ruido: fácil saltarse stops.</li>
+                </ul>
+
+                <h6 class="text-dark"><strong>Parámetros Configurables:</strong></h6>
+                <ul class="small mb-3">
+                    <li><strong>Período ATR:</strong> Número de velas para calcular el promedio (típicamente 14). Valores bajos → más sensible, valores altos → más suave.</li>
+                    <li><strong>ATR Mínimo:</strong> Umbral inferior. Si ATR actual < mínimo, BLOQUEA compra (mercado muy plano).</li>
+                    <li><strong>ATR Máximo:</strong> Umbral superior. Si ATR actual > máximo, BLOQUEA compra (mercado muy volátil).</li>
+                </ul>
+
+                <h6 class="text-dark"><strong>Estrategias Recomendadas por Activo:</strong></h6>
+                <table class="table table-sm table-bordered mb-3">
+                    <tr>
+                        <th>Activo</th>
+                        <th>Volatilidad Típica</th>
+                        <th>ATR Min - Max Recomendado</th>
+                        <th>Lógica</th>
+                    </tr>
+                    <tr>
+                        <td><strong>AAPL, JNJ</strong></td>
+                        <td>Baja</td>
+                        <td>1.0 - 3.0</td>
+                        <td>Rango ajustado, mercados más tranquilos</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NKE, COST</strong></td>
+                        <td>Media</td>
+                        <td>2.0 - 5.0</td>
+                        <td><strong>Default (recomendado)</strong>: Balance ideal</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NVDA, TSLA</strong></td>
+                        <td>Alta</td>
+                        <td>3.0 - 7.0</td>
+                        <td>Rango amplio, tolerancia mayor volatilidad</td>
+                    </tr>
+                    <tr>
+                        <td><strong>BTC, Cripto</strong></td>
+                        <td>Muy Alta</td>
+                        <td>5.0 - 15.0</td>
+                        <td>Rango muy amplio, espacio para movimientos</td>
+                    </tr>
+                </table>
+
+                <h6 class="text-dark"><strong>Ejemplos Prácticos:</strong></h6>
+                <div class="ps-3 border-start border-warning">
+                    <p class="mb-2"><strong>Escenario 1: NKE con ATR=1.5, Mín=2.0</strong></p>
+                    <small>❌ Compra BLOQUEADA: "ATR 1.5 < Mínimo 2.0 (poca volatilidad)"<br/>Interpretación: El mercado está muy plano, es mejor esperar movimiento.</small>
+                    
+                    <p class="mb-2 mt-3"><strong>Escenario 2: NKE con ATR=3.0, Mín=2.0, Máx=5.0</strong></p>
+                    <small>✅ Compra PERMITIDA: "ATR en rango [2.0-5.0]"<br/>Interpretación: Volatilidad óptima, condiciones adecuadas.</small>
+                    
+                    <p class="mb-2 mt-3"><strong>Escenario 3: NKE con ATR=6.0, Máx=5.0</strong></p>
+                    <small>❌ Compra BLOQUEADA: "ATR 6.0 > Máximo 5.0 (exceso volatilidad)"<br/>Interpretación: Mercado muy volátil/caótico, esperar normalización.</small>
+                </div>
+
+                <div class="alert alert-success alert-sm mt-4 mb-0">
+                    <strong>💡 Consejo de Uso:</strong><br/>
+                    <small>
+                        Mantén el ATR activado como filtro de CALIDAD, similar a cómo el RSI filtra por fuerza. Primero ajusta Min/Max según el activo, 
+                        luego realiza backtests comparando CON filtro vs SIN filtro. Típicamente verás: menos trades, menos pérdidas por ruido, 
+                        pero también menos oportunidades. Balance es clave.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-6">
+        <h4 class="mb-3 text-primary">Configuración ATR</h4>
+
+        <div class="row row-control align-items-center mb-3">
+            <div class="col-6"><label for="atr_enabled" class="form-check-label fw-bold">Activar ATR:</label></div>
+            <div class="col-4">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="atr_enabled" name="atr_enabled" value="True" 
+                           {% if config.atr_enabled == 'True' or config.atr_enabled == True %}checked{% endif %}>
+                </div>
+            </div>
+            <div class="col-2">
+                <span class="text-muted small"><a href="#" title="Habilita el filtro de rango de volatilidad" data-bs-toggle="tooltip">?</a></span>
+            </div>
+        </div>
+
+        <div class="row row-control align-items-center mb-3">
+            <div class="col-6"><label for="atr_period" class="form-label">Período ATR:</label></div>
+            <div class="col-4">
+                <input type="number" class="form-control" id="atr_period" name="atr_period" min="1" max="50" value="{{ config.atr_period if config.atr_period else 14 }}">
+            </div>
+            <div class="col-2">
+                <span class="text-muted small"><a href="#" title="Períodos para calcular el promedio (por defecto 14)" data-bs-toggle="tooltip">?</a></span>
+            </div>
+        </div>
+        <p class="text-muted small ms-5">Rango típico: 5-20. Más bajo = más sensible, más alto = más suave.</p>
+
+        <div class="row row-control align-items-center mb-3">
+            <div class="col-6"><label for="atr_min" class="form-label text-success">ATR Mínimo:</label></div>
+            <div class="col-4">
+                <input type="number" class="form-control" id="atr_min" name="atr_min" step="0.1" min="0.1" max="20.0" value="{{ config.atr_min if config.atr_min else 2.0 }}">
+            </div>
+            <div class="col-2">
+                <span class="text-muted small"><a href="#" title="ATR debe estar por encima de este valor" data-bs-toggle="tooltip">?</a></span>
+            </div>
+        </div>
+        <p class="text-muted small ms-5">Evita mercados estancados. Default: 2.0</p>
+
+        <div class="row row-control align-items-center mb-2">
+            <div class="col-6"><label for="atr_max" class="form-label text-danger">ATR Máximo:</label></div>
+            <div class="col-4">
+                <input type="number" class="form-control" id="atr_max" name="atr_max" step="0.1" min="0.1" max="20.0" value="{{ config.atr_max if config.atr_max else 5.0 }}">
+            </div>
+            <div class="col-2">
+                <span class="text-muted small"><a href="#" title="ATR debe estar por debajo de este valor" data-bs-toggle="tooltip">?</a></span>
+            </div>
+        </div>
+        <p class="text-muted small ms-5">Evita mercados caóticos. Default: 5.0</p>
+    </div>
+
+    <div class="col-6">
+        <h4 class="mb-3 text-dark">Variables de Acceso Rápido</h4>
+        
+        <div class="alert alert-info alert-sm mb-3">
+            <strong>Presets Recomendados:</strong><br/>
+            <small>
+                <button type="button" class="btn btn-sm btn-outline-primary me-2 mt-2" onclick="document.getElementById('atr_min').value = 1.0; document.getElementById('atr_max').value = 3.0;">
+                    Baja Vol (1.0-3.0)
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary me-2 mt-2" onclick="document.getElementById('atr_min').value = 2.0; document.getElementById('atr_max').value = 5.0;">
+                    🎯 Defecto (2.0-5.0)
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="document.getElementById('atr_min').value = 3.0; document.getElementById('atr_max').value = 7.0;">
+                    Alta Vol (3.0-7.0)
+                </button>
+            </small>
+        </div>
+
+        <div class="alert alert-warning alert-sm mb-3">
+            <strong>⚠️ Relación con otros filtros:</strong><br/>
+            <small>
+                ATR actúa como un filtro AND en el flujo de decisión:<br/>
+                • Si ATR está <strong>fuera de rango</strong> → Compra bloqueada<br/>
+                • Se aplica <strong>después de RSI</strong> y <strong>antes de volumen</strong><br/>
+                • Independiente de indicadores técnicos (EMA, RSI, MACD, etc.)
+            </small>
+        </div>
+
+        <div class="alert alert-success alert-sm">
+            <strong>💡 Caso de Uso:</strong><br/>
+            <small>
+                Activa ATR si observas que el backtest genera muchos trades en períodos estancados 
+                o muy volátiles. Filtra "ruido" y mejora la calidad de las operaciones.
+            </small>
+        </div>
+    </div>
+</div>

@@ -24,6 +24,9 @@ from trading_engine.indicators.Filtro_Volume import update_volume_state, apply_v
 # 🟢 NUEVA IMPORTACIÓN: Bandas de Bollinger
 from trading_engine.indicators.Filtro_BollingerBands import update_bb_state, check_bb_buy_signal, check_bb_sell_signal
 
+# 🟡 NUEVA IMPORTACIÓN: Filtro ATR (Volatilidad)
+from trading_engine.indicators.Filtro_ATR import apply_atr_range_filter
+
 # Importación para tipado (asumiendo que System es la clase que se usa como self)
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -292,7 +295,19 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
         pass
 
     # ----------------------------------------------------------------------
-    # --- 5. FILTRO DE VOLUMEN (Condición AND Excluyente) ---
+    # --- 5. FILTRO DE VOLATILIDAD POR ATR (Condición AND) ---
+    # ----------------------------------------------------------------------
+    atr_permit, atr_log_reason = apply_atr_range_filter(strategy_self)
+    
+    if not atr_permit:
+        # ATR fuera de rango permitido, abortamos la señal de compra
+        return
+    
+    if atr_log_reason:
+        technical_reasons['ATR'] = atr_log_reason
+
+    # ----------------------------------------------------------------------
+    # --- 6. FILTRO DE VOLUMEN (Condición AND Excluyente) ---
     # ----------------------------------------------------------------------
     volume_condition_met, volume_log_reason = apply_volume_filter(strategy_self)
     
@@ -303,7 +318,7 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     if volume_log_reason: technical_reasons['Volume'] = volume_log_reason 
 
     # ----------------------------------------------------------------------
-    # --- 5. FILTRO FUNDAMENTAL (Margen de Seguridad - Condición AND) ---
+    # --- 7. FILTRO FUNDAMENTAL (Margen de Seguridad - Condición AND) ---
     # ----------------------------------------------------------------------
     cond_mos_valida, mos_log_reason = apply_mos_filter(strategy_self)
 
@@ -312,7 +327,7 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
         return
     
     # ----------------------------------------------------------------------
-    # --- 6. DECISIÓN FINAL DE COMPRA ---
+    # --- 8. DECISIÓN FINAL DE COMPRA ---
     # ----------------------------------------------------------------------
     
     # Compra si: (Señal Técnica Fuerte) AND (Condición Fundamental Válida)

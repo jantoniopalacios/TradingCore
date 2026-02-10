@@ -169,6 +169,12 @@ class System(Strategy):
     stoploss_swing_lookback = 10  # Período para calcular swing low
     stoploss_swing_buffer = 1.0   # Buffer en $ absolutos del swing low
     
+    # Filtro de Volatilidad por ATR (Rango de Volatilidad)
+    atr_enabled = False
+    atr_period = 14          # Período para calcular ATR (por defecto 14)
+    atr_min = 2.0            # ATR mínimo permitido (evita mercados estancados)
+    atr_max = 5.0            # ATR máximo permitido (evita exceso volatilidad)
+    
     # Atributos estáticos para gestión de rutas (inicializados en configuracion.py)
     DATA_FILES_PATH = None
     FULLRATIO_PATH = None
