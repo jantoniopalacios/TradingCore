@@ -164,6 +164,11 @@ class System(Strategy):
     # Stop Loss Dinámico (Global)
     stoploss_percentage_below_close = None
     
+    # Stop Loss por Swing (Opcional)
+    stoploss_swing_enabled = False
+    stoploss_swing_lookback = 10  # Período para calcular swing low
+    stoploss_swing_buffer = 1.0   # Buffer en $ absolutos del swing low
+    
     # Atributos estáticos para gestión de rutas (inicializados en configuracion.py)
     DATA_FILES_PATH = None
     FULLRATIO_PATH = None

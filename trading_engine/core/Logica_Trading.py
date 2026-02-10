@@ -510,6 +510,23 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     # 2. Calcular el nuevo SL basado en el máximo
     new_stop_loss = strategy_self.max_price * (1 - strategy_self.stoploss_percentage_below_close)
 
+    # 2b. Stop Loss por Swing (opcional)
+    if getattr(strategy_self, 'stoploss_swing_enabled', False):
+        try:
+            lookback = int(getattr(strategy_self, 'stoploss_swing_lookback', 10))
+            buffer_abs = float(getattr(strategy_self, 'stoploss_swing_buffer', 1.0))
+            if lookback < 1:
+                lookback = 1
+            if len(strategy_self.data.Low) >= 1:
+                lookback = min(lookback, len(strategy_self.data.Low))
+                swing_low = min(strategy_self.data.Low[-lookback:])
+                swing_stop = swing_low - buffer_abs
+                # Usar el stop mas restrictivo (mas alto)
+                if swing_stop > new_stop_loss:
+                    new_stop_loss = swing_stop
+        except Exception:
+            pass
+
     # 3. Actualiza el SL solo si ha subido (Trailing)
     if strategy_self.my_stop_loss is None or new_stop_loss > strategy_self.my_stop_loss:
         old_stop_loss = strategy_self.my_stop_loss

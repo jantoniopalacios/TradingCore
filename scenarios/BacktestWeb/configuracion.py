@@ -160,6 +160,12 @@ def asignar_parametros_a_system(config_data: dict, rutas: dict):
     System.cash = get_param('cash', 10000, int)
     System.commission = get_param('commission', 0.0, float)
     System.stoploss_percentage_below_close = get_param('stoploss_percentage_below_close', 0.0, float)
+    
+    # Stop Loss por Swing
+    System.stoploss_swing_enabled = get_param('stoploss_swing_enabled', False, bool)
+    System.stoploss_swing_lookback = get_param('stoploss_swing_lookback', 10, int)
+    System.stoploss_swing_buffer = get_param('stoploss_swing_buffer', 1.0, float)
+    
     System.filtro_fundamental = get_param('filtro_fundamental', False, bool)
     System.enviar_mail = get_param('enviar_mail', False, bool)
     System.destinatario_email = get_param('destinatario_email', '', str)

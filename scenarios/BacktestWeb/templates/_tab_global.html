@@ -78,6 +78,33 @@
     <div class="col-2"><span class="text-muted small">{% if comments.stoploss_percentage_below_close %}<a href="#" title="{{ comments.stoploss_percentage_below_close }}" data-bs-toggle="tooltip">?</a>{% endif %}</span></div>
 </div>
 
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4"><label for="stoploss_swing_enabled" class="form-check-label">Usar SL por Swing:</label></div>
+    <div class="col-6">
+        <input type="checkbox" class="form-check-input" id="stoploss_swing_enabled" name="stoploss_swing_enabled" value="1"
+               {% if config.stoploss_swing_enabled %}checked{% endif %}>
+    </div>
+    <div class="col-2"><span class="text-muted small"><a href="#" title="Activar Stop Loss dinámico basado en niveles de swing bajo" data-bs-toggle="tooltip">?</a></span></div>
+</div>
+
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4"><label for="stoploss_swing_lookback" class="form-label">Lookback (velas):</label></div>
+    <div class="col-6">
+        <input type="number" class="form-control" id="stoploss_swing_lookback" name="stoploss_swing_lookback" min="1" max="50" 
+               value="{{ config.stoploss_swing_lookback if config.stoploss_swing_lookback else 10 }}">
+    </div>
+    <div class="col-2"><span class="text-muted small"><a href="#" title="Períodos para calcular el swing bajo (por defecto 10)" data-bs-toggle="tooltip">?</a></span></div>
+</div>
+
+<div class="row row-control align-items-center mb-4">
+    <div class="col-4"><label for="stoploss_swing_buffer" class="form-label">Buffer Swing ($):</label></div>
+    <div class="col-6">
+        <input type="number" class="form-control" id="stoploss_swing_buffer" name="stoploss_swing_buffer" step="0.1" min="0.1" max="10.0"
+               value="{{ config.stoploss_swing_buffer if config.stoploss_swing_buffer else 1.0 }}">
+    </div>
+    <div class="col-2"><span class="text-muted small"><a href="#" title="Buffer en dólares por debajo del swing bajo (por defecto 1.0)" data-bs-toggle="tooltip">?</a></span></div>
+</div>
+
 <h4 class="mb-3 text-primary border-bottom pb-2">Opciones de Ejecución y Correo</h4>
 
 <div class="row row-control align-items-center mb-2">
