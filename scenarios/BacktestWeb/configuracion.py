@@ -201,6 +201,11 @@ def asignar_parametros_a_system(config_data: dict, rutas: dict):
     System.rsi_buy_logic = get_param('rsi_buy_logic', 'None')
     System.rsi_sell_logic = get_param('rsi_sell_logic', 'None')
 
+    # --- Trailing Stop Loss Dinámico por RSI ---
+    System.rsi_trailing_limit = get_param('rsi_trailing_limit', None, float)
+    System.trailing_pct_below = get_param('trailing_pct_below', None, float)
+    System.trailing_pct_above = get_param('trailing_pct_above', None, float)
+
     # --- 4. MACD ---
     System.macd = get_param('macd', False, bool)
     System.macd_fast = get_param('macd_fast', 12, int)

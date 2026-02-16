@@ -413,10 +413,12 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     # 1. CALCULAR Y ACTUALIZAR ESTADOS
     _actualizar_estados_indicadores(strategy_self)
 
+
     final_stop_loss = strategy_self.my_stop_loss
 
     close_position = False
     descripcion_cierre = "N/A"
+
     
     # Lógica de Control: Solo ejecuta cierre técnico si hay indicadores activos.
     indicadores_tecnicos_activos = (
@@ -522,8 +524,31 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     current_high = strategy_self.data.High[-1]
     strategy_self.max_price = max(strategy_self.max_price, current_high)
     
-    # 2. Calcular el nuevo SL basado en el máximo
-    new_stop_loss = strategy_self.max_price * (1 - strategy_self.stoploss_percentage_below_close)
+
+    # 2. Calcular el nuevo SL basado en el máximo, usando trailing dinámico por RSI si está configurado
+    trailing_pct = strategy_self.stoploss_percentage_below_close
+    rsi_val = None
+    try:
+        rsi_ind = getattr(strategy_self, 'rsi_ind', None)
+        if rsi_ind is not None:
+            try:
+                rsi_val = rsi_ind.iloc[-1]
+            except Exception:
+                rsi_val = rsi_ind[-1]
+    except Exception:
+        rsi_val = None
+
+    rsi_trailing_limit = getattr(strategy_self, 'rsi_trailing_limit', None)
+    trailing_pct_below = getattr(strategy_self, 'trailing_pct_below', None)
+    trailing_pct_above = getattr(strategy_self, 'trailing_pct_above', None)
+
+    if rsi_val is not None and rsi_trailing_limit is not None:
+        if trailing_pct_below is not None and rsi_val <= rsi_trailing_limit:
+            trailing_pct = trailing_pct_below / 100.0 if trailing_pct_below > 1 else trailing_pct_below
+        elif trailing_pct_above is not None and rsi_val > rsi_trailing_limit:
+            trailing_pct = trailing_pct_above / 100.0 if trailing_pct_above > 1 else trailing_pct_above
+
+    new_stop_loss = strategy_self.max_price * (1 - trailing_pct)
 
     # 2b. Stop Loss por Swing (opcional)
     if getattr(strategy_self, 'stoploss_swing_enabled', False):

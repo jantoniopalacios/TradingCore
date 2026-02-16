@@ -55,6 +55,12 @@ class System(Strategy):
     rsi_ascendente = False
     rsi_descendente = False
 
+
+    # Trailing Stop Loss Dinámico por RSI
+    rsi_trailing_limit = None  # Límite de RSI para cambiar el trailing
+    trailing_pct_below = None  # % SL si RSI <= límite
+    trailing_pct_above = None  # % SL si RSI > límite
+
     # ESTOCÁSTICOS
     stoch_fast = None; stoch_fast_period = None; stoch_fast_smooth = None; stoch_fast_low_level = None
     stoch_fast_high_level = None; stoch_fast_oversold = None
@@ -191,6 +197,11 @@ class System(Strategy):
         
         # --- Variables de Logging y Ticker ---
         self.trades_list = []
+
+        # --- Trailing Stop Loss Dinámico por RSI ---
+        self.rsi_trailing_limit = self.rsi_trailing_limit
+        self.trailing_pct_below = self.trailing_pct_below
+        self.trailing_pct_above = self.trailing_pct_above
 
         # 2. INICIALIZACIÓN DE VARIABLES DE ESTADO
         # Es necesario definir estas variables aquí para que existan cuando 

@@ -15,6 +15,22 @@
             </div>
             <div class="modal-body">
                 <p><strong>¿Qué es el RSI?</strong> Es un oscilador de momentum que mide la velocidad y magnitud de los cambios de precio en una escala de 0 a 100. Identifica condiciones de sobrecompra (overbought) y sobreventa (oversold).</p>
+
+                <div class="alert alert-secondary mt-4 mb-4">
+                    <strong>⚡ Trailing Stop Loss Dinámico por RSI</strong><br>
+                    <ul class="mb-1">
+                        <li>Permite definir dos porcentajes de trailing stop loss dinámico según el valor del RSI.</li>
+                        <li>Configura un <strong>límite de RSI</strong> (por ejemplo, 40).</li>
+                        <li>Si el RSI es <strong>menor o igual</strong> al límite, se aplica el <strong>primer %</strong> de trailing stop loss.</li>
+                        <li>Si el RSI es <strong>mayor</strong> que el límite, se aplica el <strong>segundo %</strong> de trailing stop loss.</li>
+                        <li>El stop loss se recalcula automáticamente en cada vela según el valor actual del RSI y los parámetros configurados.</li>
+                        <li>Ejemplo: Si el límite es 40, el %1 es 2% y el %2 es 0.8%, entonces:<br>
+                            &nbsp;&nbsp;• Si RSI ≤ 40, el trailing SL será 2% bajo el máximo.<br>
+                            &nbsp;&nbsp;• Si RSI &gt; 40, el trailing SL será 0.8% bajo el máximo.</li>
+                        <li>Esto permite proteger más agresivamente cuando el RSI está débil y dejar correr la posición cuando el momentum es fuerte.</li>
+                    </ul>
+                    <span class="text-muted small">El trailing stop loss por RSI es totalmente automático y sustituye al trailing global solo si los parámetros están configurados.</span>
+                </div>
                 
                 <h6 class="mt-4 text-dark"><strong>Parámetros Configurables:</strong></h6>
                 <ul class="mb-3">
@@ -177,6 +193,46 @@
                 Ascendente (Recuperación)
             </label>
         </div>
+
+        <hr>
+        <hr>
+        <h6 class="text-primary">Trailing Stop Loss Dinámico por RSI</h6>
+        <div class="row row-control align-items-center mb-2">
+            <div class="col-6">
+                <label for="rsi_trailing_limit" class="form-label">Límite RSI para Trailing:</label>
+                <span class="text-muted small">Si RSI ≤ este valor, se aplica el primer %; si RSI &gt; este valor, el segundo %.</span>
+            </div>
+            <div class="col-4">
+                <input type="number" class="form-control" id="rsi_trailing_limit" name="rsi_trailing_limit" min="0" max="100" value="{{ config.rsi_trailing_limit }}">
+            </div>
+            <div class="col-2">
+                <span class="text-muted small">{%- if comments.rsi_trailing_limit -%}<a href="#" title="{{ comments.rsi_trailing_limit }}">?</a>{%- endif -%}</span>
+            </div>
+        </div>
+        <div class="row row-control align-items-center mb-2">
+            <div class="col-6">
+                <label for="trailing_pct_below" class="form-label">% Trailing SL si RSI ≤ límite:</label>
+            </div>
+            <div class="col-4">
+                <input type="number" class="form-control" id="trailing_pct_below" name="trailing_pct_below" min="0" max="100" step="0.01" value="{{ config.trailing_pct_below }}">
+            </div>
+            <div class="col-2">
+                <span class="text-muted small">%</span>
+            </div>
+        </div>
+        <div class="row row-control align-items-center mb-2">
+            <div class="col-6">
+                <label for="trailing_pct_above" class="form-label">% Trailing SL si RSI &gt; límite:</label>
+            </div>
+            <div class="col-4">
+                <input type="number" class="form-control" id="trailing_pct_above" name="trailing_pct_above" min="0" max="100" step="0.01" value="{{ config.trailing_pct_above }}">
+            </div>
+            <div class="col-2">
+                <span class="text-muted small">%</span>
+            </div>
+        </div>
+        <p class="text-muted small ms-5">El trailing stop loss se ajusta automáticamente según el RSI y los valores configurados.</p>
+        <p class="text-muted small ms-5">Estos stops por RSI tienen prioridad máxima y sobrescriben cualquier otro stop loss cuando están configurados.</p>
 
         <h5 class="mt-4 text-danger">🔴 Señales de Venta (OR) / Bloqueos (AND)</h5>
         
