@@ -97,23 +97,28 @@ def run_multi_symbol_backtest(
     
     # Definición de columnas requeridas (usando la constante de core)
     # NOTA: Asegúrate de que REQUIRED_COLS esté definido en trading_engine.core.constants
-    try:
-        required_cols = REQUIRED_COLS
-    except NameError:
-        required_cols = ["Open", "High", "Low", "Close", "Volume", "Margen de seguridad", "LTM EPS"]
-        logger.warning("REQUIRED_COLS no definida en constants.py. Usando default.")
-
+    # Determina columnas requeridas según config
+    fundamental_active = params_generales.get('Margen_Seguridad_Active', False)
+    base_cols = ["Open", "High", "Low", "Close", "Volume"]
+    fundamental_cols = ["Margen de seguridad", "LTM EPS"]
 
     for symbol in symbols_to_process:
         logger.info(f"--- Procesando (Runner): {symbol} ---")
-        
         data_for_symbol = stocks_data.get(symbol)
         if data_for_symbol is None:
             logger.warning(f"Símbolo {symbol}: Datos no encontrados. Saltando.")
             continue
-            
-        data_clean = data_for_symbol[required_cols].copy().dropna()
-        
+
+        # Selecciona columnas según si el filtro fundamental está activo
+        if fundamental_active:
+            required_cols = base_cols + fundamental_cols
+        else:
+            required_cols = base_cols
+
+        # Solo filtra columnas que existan en el DataFrame
+        cols_present = [col for col in required_cols if col in data_for_symbol.columns]
+        data_clean = data_for_symbol[cols_present].copy().dropna()
+
         if data_clean.empty or len(data_clean) < required_period:
             logger.warning(f"Símbolo {symbol}: Datos insuficientes después de limpieza ({len(data_clean)} velas). Mínimo requerido: {required_period}. Saltando.")
             continue

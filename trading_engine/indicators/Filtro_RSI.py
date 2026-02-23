@@ -207,25 +207,25 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
         rsi_ind = getattr(strategy_self, 'rsi_ind', None)
         if rsi_ind is None:
             # DEBUG: Sin datos RSI válidos
-            print("DEBUG RSI: rsi_ind es None")
+            # print("DEBUG RSI: rsi_ind es None")
             return True
             
         rsi_strength_threshold = getattr(strategy_self, 'rsi_strength_threshold', None)
         if rsi_strength_threshold is None or rsi_strength_threshold == '':
             # DEBUG: Sin umbral configurado
-            print("DEBUG RSI: umbral no configurado")
+            # print("DEBUG RSI: umbral no configurado")
             return True
         
         try:
             umbral = float(rsi_strength_threshold)
         except (ValueError, TypeError):
             # DEBUG: Error al convertir umbral
-            print(f"DEBUG RSI: error al convertir umbral '{rsi_strength_threshold}'")
+            # print(f"DEBUG RSI: error al convertir umbral '{rsi_strength_threshold}'")
             return True
         
         # Si umbral es 0 o negativo, desactivar el filtro
         if umbral <= 0:
-            print(f"DEBUG RSI: umbral={umbral} <= 0, filtro desactivado")
+            # print(f"DEBUG RSI: umbral={umbral} <= 0, filtro desactivado")
             return True  # Permite todas las compras
         
     # ======================================================================
@@ -242,7 +242,7 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
                     fecha_str = f" [{fecha.index[-1]}]"
                 except:
                     pass
-            print(f"DEBUG RSI{fecha_str}: RSI={rsi_actual:.2f}, umbral={umbral}, permite={resultado}")
+            # print(f"DEBUG RSI{fecha_str}: RSI={rsi_actual:.2f}, umbral={umbral}, permite={resultado}")
             if not resultado:
                 return False  # BLOQUEA
         else:
@@ -252,5 +252,5 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
         
     except Exception as e:
         # Error no controlado: permitir por defecto (seguridad)
-        print(f"DEBUG RSI: Exception en filtro - {e}")
+        # print(f"DEBUG RSI: Exception en filtro - {e}")
         return True
