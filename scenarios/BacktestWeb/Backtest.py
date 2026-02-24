@@ -101,28 +101,29 @@ def ejecutar_backtest(config_dict: dict):
             return None, None, {}
         logger.info(f"✅ Datos descargados: {len(stocks_data)} registros")
 
-        logger.info("[5/9] Procesando datos fundamentales")
-        try:
-            financial_data = manage_fundamental_data(
-                simbolos_df, 
-                config_final.get('ALPHA_VANTAGE_KEY', "TU_KEY_POR_DEFECTO"), 
-                fundamentals_path
-            )
-            logger.info("✅ Datos fundamentales procesados")
-        except Exception as e:
-            logger.warning(f"⚠️  Error en datos fundamentales (continuando): {e}")
-            financial_data = None
-        
-        logger.info("[6/9] Calculando ratios OHLCV")
-        try:
-            stocks_data = calcular_fullratio_OHLCV(
-                stocks_data, 
-                financial_data, 
-                output_path=config_final.get('full_ratio_path')
-            )
-            logger.info("✅ Ratios calculados")
-        except Exception as e:
-            logger.warning(f"⚠️  Error en ratios (continuando con datos básicos): {e}")
+        financial_data = None
+        if filtro_fundamental:
+            logger.info("[5/9] Procesando datos fundamentales")
+            try:
+                financial_data = manage_fundamental_data(
+                    simbolos_df, 
+                    config_final.get('ALPHA_VANTAGE_KEY', "TU_KEY_POR_DEFECTO"), 
+                    fundamentals_path
+                )
+                logger.info("✅ Datos fundamentales procesados")
+            except Exception as e:
+                logger.warning(f"⚠️  Error en datos fundamentales (continuando): {e}")
+                financial_data = None
+            logger.info("[6/9] Calculando ratios OHLCV")
+            try:
+                stocks_data = calcular_fullratio_OHLCV(
+                    stocks_data, 
+                    financial_data, 
+                    output_path=config_final.get('full_ratio_path')
+                )
+                logger.info("✅ Ratios calculados")
+            except Exception as e:
+                logger.warning(f"⚠️  Error en ratios (continuando con datos básicos): {e}")
 
         # 6. Selección y Filtros
         simbolos_a_procesar = simbolos_df["Symbol"].tolist()
@@ -214,6 +215,89 @@ def ejecutar_backtest(config_dict: dict):
 
         elapsed = time.time() - start_time
         logger.info(f"✨ Ciclo completado exitosamente en {elapsed:.2f}s")
+
+        # --- ENVÍO DE MAIL DE RECOMENDACIONES SI ESTÁ ACTIVADO ---
+        enviar_mail = config_final.get('enviar_mail', False)
+        destinatario_email = config_final.get('destinatario_email', None)
+        usuario_nombre = user_mode
+        if enviar_mail and destinatario_email:
+            try:
+                # Construir tabla de recomendaciones SOLO para activos procesados
+                activos_procesados = resultados_df['Symbol'].tolist() if resultados_df is not None else []
+                # Recomendación: última operación realizada por el backtest para cada activo
+                recomendaciones = []
+                for symbol in activos_procesados:
+                    trades_symbol = trades_df[trades_df['Symbol'] == symbol] if not trades_df.empty else None
+                    reco = 'Sin operaciones'
+                    fecha_op = ''
+                    if trades_symbol is not None and not trades_symbol.empty:
+                        # Buscar la última operación (por fecha de cierre si existe, si no por fecha de entrada)
+                        if 'Exit Time' in trades_symbol.columns and trades_symbol['Exit Time'].notnull().any():
+                            last_trade = trades_symbol.sort_values('Exit Time').iloc[-1]
+                            fecha_op = str(last_trade['Exit Time'])
+                        elif 'Fecha' in trades_symbol.columns:
+                            last_trade = trades_symbol.sort_values('Fecha').iloc[-1]
+                            fecha_op = str(last_trade['Fecha'])
+                        elif 'Entry Time' in trades_symbol.columns:
+                            last_trade = trades_symbol.sort_values('Entry Time').iloc[-1]
+                            fecha_op = str(last_trade['Entry Time'])
+                        else:
+                            last_trade = trades_symbol.iloc[-1]
+                            fecha_op = ''
+                        # Determinar tipo de última operación
+                        if 'Tipo' in last_trade:
+                            tipo = str(last_trade['Tipo']).strip().lower()
+                            if tipo == 'compra':
+                                reco = 'Compra'
+                            elif tipo == 'venta':
+                                reco = 'Venta'
+                            else:
+                                reco = str(last_trade['Tipo'])
+                        elif 'Side' in last_trade:
+                            if last_trade['Side'] == 'buy':
+                                reco = 'Compra'
+                            elif last_trade['Side'] == 'sell':
+                                reco = 'Venta'
+                            else:
+                                reco = str(last_trade['Side'])
+                        elif 'Operacion' in last_trade:
+                            op = str(last_trade['Operacion']).lower()
+                            if 'compra' in op:
+                                reco = 'Compra'
+                            elif 'venta' in op:
+                                reco = 'Venta'
+                            else:
+                                reco = str(last_trade['Operacion'])
+                        else:
+                            reco = 'Operación'
+                    recomendaciones.append((symbol, reco, fecha_op))
+                # Ordenar por fecha_op descendente (más reciente primero)
+                def parse_fecha(fecha):
+                    try:
+                        return pd.to_datetime(fecha)
+                    except Exception:
+                        return pd.NaT
+                recomendaciones.sort(key=lambda x: parse_fecha(x[2]), reverse=True)
+
+                now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+                subject = f"Recomendaciones cartera {usuario_nombre} {now_str}"
+                header = f"{now_str} - Recomendaciones cartera {usuario_nombre}\n"
+                # Formato de tabla de texto plano
+                col1, col2, col3 = 'Activo', 'Ultima operación', 'Fecha Última Operación'
+                ancho1 = max(len(col1), max((len(str(s)) for s,_,_ in recomendaciones), default=6))
+                ancho2 = max(len(col2), max((len(str(r)) for _,r,_ in recomendaciones), default=13))
+                ancho3 = max(len(col3), max((len(str(f)) for _,_,f in recomendaciones), default=22))
+                sep = f"{'-'*ancho1} {'-'*ancho2} {'-'*ancho3}"
+                table = f"{col1.ljust(ancho1)} {col2.ljust(ancho2)} {col3.ljust(ancho3)}\n{sep}\n"
+                for symbol, reco, fecha_op in recomendaciones:
+                    table += f"{str(symbol).ljust(ancho1)} {str(reco).ljust(ancho2)} {str(fecha_op).ljust(ancho3)}\n"
+                body = header + '\n' + table
+                mail_config_path = str(project_root / "trading_engine" / "utils" / "Config" / "setup_mail.env")
+                send_email(subject, body, destinatario_email, config_path=mail_config_path)
+                logger.info(f"✉️  Mail de recomendaciones enviado a {destinatario_email}")
+            except Exception as e:
+                logger.error(f"❌ Error enviando mail de recomendaciones: {e}")
+
         return resultados_df, trades_df, diccionario_graficos_html
     
     except Exception as e:

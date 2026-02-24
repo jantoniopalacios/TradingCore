@@ -340,7 +340,7 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
                 rsi_valor = _last_value(strategy_self.rsi_ind)
                 umbral_rsi = getattr(strategy_self, 'rsi_strength_threshold', 'N/A')
                 fecha = strategy_self.data.index[-1] if hasattr(strategy_self.data, 'index') else 'N/A'
-                print(f"🔵 COMPRA EJECUTADA [{fecha}]: RSI={rsi_valor:.2f}, Umbral={umbral_rsi}, Señales={list(technical_reasons.keys())}")
+                # print(f"🔵 COMPRA EJECUTADA [{fecha}]: RSI={rsi_valor:.2f}, Umbral={umbral_rsi}, Señales={list(technical_reasons.keys())}")
             except Exception as e:
                 print(f"Error en debug compra: {e}")
         
