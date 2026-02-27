@@ -91,6 +91,11 @@ class ResultadoBacktest(db.Model):
     fecha_ejecucion = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relación: Un backtest tiene muchos trades detallados
+    # La relación inversa se define en la clase Trade con backref='backtest'
+    # Esta relación permite acceder a los trades de un backtest fácilmente: backtest.trades
+    # Además, la opción cascade="all, delete-orphan" asegura que si un backtest es eliminado, 
+    # todos sus trades asociados también lo sean automáticamente, manteniendo la integridad 
+    # de la base de datos.
     trades = db.relationship('Trade', backref='backtest', cascade='all, delete-orphan')
 """
 #  --- NUEVA TABLA DE TRADES DETALLADOS ---
