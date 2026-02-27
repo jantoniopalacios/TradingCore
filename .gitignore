@@ -58,3 +58,8 @@ data_pg/
 postgres_bin.zip
 logfile.txt
 test_conn.py
+
+# Ignorar archivos de backup de bases de datos
+*.dump
+*.bak
+backup_*
