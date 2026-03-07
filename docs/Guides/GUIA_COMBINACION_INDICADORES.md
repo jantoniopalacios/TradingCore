@@ -1,170 +1,55 @@
-````markdown
-# 🔀 Combinación de Indicadores: EMA + RSI + MACD - Guía Estratégica
+# Guia de combinacion de indicadores
 
-## 1️⃣ EL PROBLEMA: Indicadores Individuales vs Combinados
+## Objetivo
+Definir combinaciones de indicadores que reduzcan falsos positivos y mejoren la calidad de entrada en backtest.
 
-### Sin Confirmación (1 indicador):
-```
-EMA SOLO:
-╔═══════════════════════════════════════════════════════════════╗
-║ Compra en cada cruce → MUCHOS FALSOS POSITIVOS               ║
-║ Ejemplo: NKE con ema_cruce_signal = True                     ║
-║ Cruces: 18 en 3 meses = 6 por mes = SOBRE-TRADING           ║
-║ Resultado: -44% (como vimos)                                 ║
-╚═══════════════════════════════════════════════════════════════╝
-```
+## Problema tipico
+Usar un unico indicador (por ejemplo, solo cruce EMA) puede producir sobre-trading en mercados laterales.
 
----
+## Combinaciones recomendadas
+- `EMA + RSI`: confirmacion de tendencia y momentum.
+- `EMA + MACD`: confirmacion de tendencia con sesgo mas fuerte.
+- `EMA + RSI + ATR`: añade control de volatilidad para filtrar extremos.
 
-## 2️⃣ MATRIZ DE COMBINACIONES
+## Regla base sugerida
+Entrada si se cumple:
+1. señal tecnica principal (EMA/RSI/MACD, logica OR).
+2. filtros globales (logica AND): tendencia, momentum, volatilidad, volumen, MoS.
 
-```
-┌─────────────┬──────────────┬────────────────┬──────────────┐
-│ Combo       │ Señal        │ Confirmación   │ Resultado    │
-├─────────────┼──────────────┼────────────────┼──────────────┤
-│ EMA + RSI   │ EMA cruza    │ RSI > 50       │ ⭐⭐⭐⭐      │
-│             │              │ (momentum)     │ RECOMENDADO  │
-├─────────────┼──────────────┼────────────────┼──────────────┤
-│ EMA + MACD  │ EMA cruza    │ MACD en cruz   │ ⭐⭐⭐⭐⭐    │
-│             │              │ (tendencia)    │ MÁS FUERTE   │
-└─────────────┴──────────────┴────────────────┴──────────────┘
-```
+## Filtro ATR por perfil de activo
+El ATR debe calibrarse por tipo de volatilidad.
 
----
+| Perfil | ATR Min | ATR Max | Ejemplos |
+| :--- | ---: | ---: | :--- |
+| Baja volatilidad | 0.5 | 3.5 | NKE, WMT, JNJ |
+| Media volatilidad | 1.5 | 5.0 | AAPL, MSFT, COST |
+| Alta volatilidad | 2.0 | 7.0 | NVDA, TSLA, AMD |
+| Especulativo | 3.0 | 15.0 | BTC, MEME |
 
-## 3️⃣ COMBO RECOMENDADA #1: EMA + RSI (Para NKE)
+## Caso NKE
+Diagnostico historico: el rango `2.0-5.0` bloquea exceso de oportunidades para NKE.
 
-### Lógica:
-```
-COMPRA si:
-1. EMA Rápida > EMA Lenta        (tendencia)
-   AND                                          
-2. RSI > 50 O RSI cruza 30       (momentum)
-```
-
----
-
-## 4️⃣ FILTROS DE CALIDAD: ATR (Volatilidad)
-
-### ¿Qué es ATR?
-**Average True Range** mide la volatilidad promedio del activo. Sirve como **filtro de calidad** para evitar:
-- ❌ Mercados estancados (ATR muy bajo)
-- ❌ Mercados caóticos (ATR muy alto)
-
-### Calibración por Perfil de Activo
-
-```
-┌─────────────────────┬──────────┬──────────┬────────────────────┐
-│ Tipo de Activo      │ ATR Min  │ ATR Max  │ Ejemplos           │
-├─────────────────────┼──────────┼──────────┼────────────────────┤
-│ Baja Volatilidad    │   0.5    │   3.5    │ NKE, WMT, JNJ, KO  │
-│ Media Volatilidad   │   1.5    │   5.0    │ AAPL, MSFT, COST   │
-│ Alta Volatilidad    │   2.0    │   7.0    │ NVDA, TSLA, AMD    │
-│ Cripto/Especulativo │   3.0    │  15.0    │ BTC, MEME stocks   │
-└─────────────────────┴──────────┴──────────┴────────────────────┘
-```
-
-### ⚠️ IMPORTANTE: Caso NKE
-
-**Problema detectado (Feb 2026):**
-- Parámetros por defecto (2.0-5.0) bloqueaban **98% de oportunidades** en NKE
-- Solo 2 compras permitidas en 18 años
-- Rango histórico real de NKE: **0.5-2.0** (bajo), con picos COVID en 7.0-10.0
-
-**Solución para activos de baja volatilidad:**
+Configuracion orientativa:
 ```python
-# Configuración NKE/WMT/JNJ:
+ema_fast_period = 10
+ema_slow_period = 30
+rsi_period = 14
+rsi_strength_threshold = 54
 atr_enabled = True
+atr_period = 14
 atr_min = 0.5
 atr_max = 4.0
+volume_active = True
+volume_avg_multiplier = 1.0
 ```
 
-### Cómo Usar ATR en la Estrategia
+## Flujo operativo recomendado
+1. Ejecutar baseline sin ATR.
+2. Probar ATR amplio (`0.1-20.0`) para validar logica.
+3. Ajustar ATR por activo.
+4. Comparar `Return`, `Win Rate`, `Max Drawdown` y `Total Trades`.
 
-**Paso 1:** Analiza el ATR histórico del activo
-- Ejecuta backtest con ATR desactivado
-- Revisa logs para ver rango típico de ATR
-- Clasifica activo: bajo/medio/alto
-
-**Paso 2:** Configura rangos apropiados
-- Bajo: 0.5-4.0
-- Medio: 1.5-5.0
-- Alto: 2.0-7.0
-
-**Paso 3:** Valida con 3-phase testing
-1. ATR desactivado (baseline)
-2. ATR muy amplio 0.1-20.0 (validar lógica)
-3. ATR calibrado (evaluar efectividad)
-
----
-
-## 5️⃣ ESTRATEGIA COMPLETA: EMA + RSI + ATR
-
-### Configuración Multi-Filtro
-
-```
-┌────────────────────────────────────────────────────────┐
-│                   FLUJO DE DECISIÓN                    │
-└────────────────────────────────────────────────────────┘
-
-1. SEÑAL DE ENTRADA (OR logic):
-   ✓ EMA cruza arriba
-   ✓ RSI rebota desde sobreventa
-   ✓ MACD cruza positivo
-   → Si alguno = TRUE → Continuar
-
-2. FILTRO DE TENDENCIA (AND logic):
-   ✓ EMA rápida > EMA lenta
-   → Si FALSE → BLOCK
-
-3. FILTRO DE MOMENTUM (AND logic):
-   ✓ RSI > umbral (ej: 54)
-   → Si FALSE → BLOCK
-
-4. FILTRO DE VOLATILIDAD (AND logic):
-   ✓ atr_min ≤ ATR ≤ atr_max
-   → Si FALSE → BLOCK
-
-5. FILTROS ADICIONALES:
-   ✓ Volume > mínimo
-   ✓ Margin of Safety
-   → Si todos OK → COMPRA
-```
-
-### Ejemplo Práctico: NKE
-
-**Parámetros recomendados:**
-```python
-# EMAs
-ema_rapida = 10
-ema_lenta = 30
-
-# RSI
-rsi_periodo = 14
-rsi_umbral = 54.0
-
-# ATR (CALIBRADO PARA NKE)
-atr_enabled = True
-atr_periodo = 14
-atr_min = 0.5    # ← Ajustado para baja volatilidad
-atr_max = 4.0    # ← Captura rango normal + recuperaciones
-
-# Volume
-volume_enabled = True
-volume_min_ratio = 1.0
-```
-
-**Resultado esperado:**
-- Menos trades que solo EMA (filtros funcionando)
-- Win rate mejorado (mejor calidad de entradas)
-- Drawdown controlado (evita mercados caóticos)
-
----
-
-## 6️⃣ REFERENCIAS
-
+## Referencias
 - [Diagnóstico Filtro ATR](../Diagnosis/DIAGNOSTICO_FILTRO_ATR_VOLATILIDAD.md)
-- [Test NKE](./TEST_NKE_README.md)
-- [Quick Start BacktestWeb](./QUICK_START_BACKTEST_WEB.md)
-
-````
+- [Guía de prueba NKE](./GUIDE_TEST_NKE.md)
+- [Quick Start Web](./QUICK_START_BACKTEST_WEB.md)

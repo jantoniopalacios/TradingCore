@@ -1,44 +1,44 @@
-# 📈 TradingCore: Motor Central y Arquitectura Modular
+# TradingCore: Motor Central y Arquitectura Modular
 
 Este repositorio contiene la arquitectura central (Motor) para múltiples escenarios de trading (Backtesting, Live Trading, Web Apps).
 
 ---
 
-## 🚀 Inicio Rápido (Escenario Local)
+## Inicio Rapido (Backtest Web)
 
-Para ejecutar el escenario de Backtesting Local:
+Para ejecutar la aplicación web de backtesting desde la raíz del repo:
 
-1.  **Navegar al Escenario:**
-    ```bash
-    cd scenarios/BacktestLocal
-    ```
-2.  **Crear y Activar Entorno Virtual:**
-    ```bash
-    python -m venv .venv
-    .\.venv\Scripts\activate
-    ```
-3.  **Instalar Motor Central y Dependencias:**
-    ```bash
-    pip install -r requirements.txt
-    pip install -e ../../engines/trading_engine # Instala el motor
-    ```
-4.  **Ejecutar el Backtest:**
-    ```bash
-    python test_backtest.py
-    ```
+1. **Activar entorno virtual:**
+   ```bash
+   .\.venv\Scripts\activate
+   ```
+2. **Instalar dependencias (si aplica):**
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **Iniciar servidor Flask:**
+   ```bash
+   python scenarios/BacktestWeb/app.py
+   ```
+4. **Abrir la aplicación:**
+   ```text
+   http://localhost:5000
+   ```
 
-## 🛠️ Estructura del Repositorio
+## Estructura del Repositorio
 
 | Directorio | Contenido |
 | :--- | :--- |
-| `engines/trading_engine/` | **El Motor Central** (Lógica de Trading). Código reutilizable. |
-| `scenarios/BacktestLocal/` | Proyecto de backtesting local, que consume el motor. |
-| `scenarios/TradingWebLive/` | (Futuro) Proyecto de ejecución en vivo (web o API). |
+| `trading_engine/` | **El Motor Central** (Lógica de Trading). Código reutilizable. |
+| `scenarios/BacktestWeb/` | Aplicación Flask para lanzar backtests y consultar resultados. |
+| `scripts/` | Scripts de validación y pruebas funcionales del motor. |
 
 ---
 
-## 💡 Documentación Detallada
+## Documentacion Detallada
 
-Para comprender la **Arquitectura, Clases, Interfaces y Diseño Funcional** del motor, consulte:
+Documentación recomendada:
 
-➡️ **[ARCHITECTURE.md](ARCHITECTURE.md)**
+- Arquitectura canónica: **[ARCHITECTURE.md](ARCHITECTURE.md)**
+- Flujo web de ejecución: **[Architecture/FLUJO_ARQUITECTURA_MEJORADO.md](Architecture/FLUJO_ARQUITECTURA_MEJORADO.md)**
+- Índice general: **[Index/00_INDEX_DOCUMENTACION.md](Index/00_INDEX_DOCUMENTACION.md)**

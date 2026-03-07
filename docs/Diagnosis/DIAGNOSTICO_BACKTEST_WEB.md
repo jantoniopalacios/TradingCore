@@ -1,15 +1,14 @@
-````markdown
-# 🔧 DIAGNÓSTICO: Backtest desde Web No Genera Resultados
+# Diagnostico: Backtest web no genera resultados
 
 ## Problema Reportado
-El backtest funciona correctamente desde **línea de comandos** (`test_backtest_nke_final.py`) pero **falla silenciosamente desde la web**.
+El backtest funcionaba por linea de comandos, pero fallaba silenciosamente al lanzarse desde la web.
 
-## ✅ Cambios Implementados
+## Cambios implementados
 
-### 1. **Backtest.py** - Función `ejecutar_backtest()`
-**Problema identificado:** Sin manejo de excepciones en operaciones críticas.
+### 1. `Backtest.py` - `ejecutar_backtest()`
+Problema identificado: falta de manejo de excepciones en operaciones criticas.
 
-**Solución aplicada:**
+Solucion aplicada:
 - Agregado try-catch comprehensivo alrededor de toda la función
 - Logging detallado en cada paso (9 pasos identificados)
 - Validaciones explícitas en cada fase:
@@ -23,19 +22,19 @@ El backtest funciona correctamente desde **línea de comandos** (`test_backtest_
   - Resultados guardados en BD ✓
 - Traceback completo en logs de errores
 
-### 2. **main_bp.py** - Función `run_backtest_and_save()`
-**Problema identificado:** Sin logging en la función que ejecuta el hilo.
+### 2. `main_bp.py` - `run_backtest_and_save()`
+Problema identificado: falta de logging en la funcion de hilo.
 
-**Solución aplicada:**
+Solucion aplicada:
 - Agregado logger estructurado
 - Validaciones explícitas de resultados
 - Manejo de errores de sesión DB
 - Mensajes informativos en cada fase
 
-### 3. **main_bp.py** - Función `launch_strategy()`
-**Problema identificado:** Sin detalles de lo que se está enviando al motor.
+### 3. `main_bp.py` - `launch_strategy()`
+Problema identificado: baja trazabilidad de configuracion enviada al motor.
 
-**Solución aplicada:**
+Solucion aplicada:
 - Logging de configuración inicial
 - Detalles de parámetros:
   - Usuario y ID
@@ -45,12 +44,10 @@ El backtest funciona correctamente desde **línea de comandos** (`test_backtest_
 - Confirmación al iniciar hilo
 - Traceback en caso de error
 
----
+## Como diagnosticar problemas
 
-## 🔍 Cómo Diagnosticar Problemas
-
-### Paso 1: Activar Logs en Detalle
-Edita tu archivo de configuración de Flask (probablemente `app.py` o `__init__.py`) y asegúrate de que logging esté bien configurado:
+### Paso 1: Activar logs en detalle
+Verificar configuracion de logging en Flask (`app.py` o `__init__.py`):
 
 ```python
 import logging
@@ -77,7 +74,7 @@ logging.getLogger("BacktestExecution").setLevel(logging.DEBUG)
 logging.getLogger("LaunchStrategy").setLevel(logging.DEBUG)
 ```
 
-### Paso 2: Monitorear Logs en Tiempo Real
+### Paso 2: Monitorear logs en tiempo real
 
 **Opción A: Desde PowerShell (recomendado)**
 ```powershell
@@ -94,14 +91,14 @@ tail -f .\logs\trading_app.log
 tail -f ./logs/trading_app.log
 ```
 
-### Paso 3: Ejecutar desde Web y Observar
+### Paso 3: Ejecutar desde web y observar
 
 1. **Abre la aplicación web**
 2. **Configura los parámetros** (símbolos, periodos, indicadores)
 3. **Haz clic en "Lanzar Backtest"**
 4. **Monitorea los logs** en tiempo real
 
-Los logs ahora mostrarán:
+Ejemplo de logs esperados:
 ```
 [LAUNCH] Usuario admin lanzando backtest...
 [LAUNCH] Cargando configuración base para admin
@@ -138,11 +135,9 @@ Guardando resultados en base de datos
 ✨ Ciclo completado exitosamente en 15.32s
 ```
 
----
+## Errores comunes y soluciones
 
-## 🚨 Errores Comunes y Soluciones
-
-### Error: "Usuario no registrado"
+### Usuario no registrado
 ```
 ❌ Usuario 'admin' no registrado en BD.
 ```
@@ -150,7 +145,7 @@ Guardando resultados en base de datos
 - Verifica que el usuario existe en la tabla `usuarios`
 - Comprueba que la sesión tiene `user_mode` correcto
 
-### Error: "No tiene símbolos asignados"
+### Usuario sin simbolos
 ```
 ⚠️  Usuario 'admin' no tiene símbolos asignados
 ```
@@ -158,7 +153,7 @@ Guardando resultados en base de datos
 - Ve a la interfaz web y asegúrate de que el usuario tiene al menos 1 símbolo seleccionado
 - Verifica en BD que la tabla `simbolos` tiene registros con `usuario_id` correcto
 
-### Error: "Sin datos históricos descargados"
+### Sin datos historicos descargados
 ```
 ❌ Sin datos históricos descargados
 ```
@@ -168,7 +163,7 @@ Guardando resultados en base de datos
 - Revisa si hay archivos CSV en `Data_files/`
 - Aumenta los logs en `Data_download.py`
 
-### Error: "El motor de backtest no retornó resultados"
+### Motor sin resultados
 ```
 ⚠️  El motor de backtest no retornó resultados
 ```
@@ -177,7 +172,7 @@ Guardando resultados en base de datos
 - Verifica que la clase Strategy está configurada correctamente
 - Asegúrate de que hay datos válidos para backtest
 
-### Error: "Error guardando resultado"
+### Error guardando resultado
 ```
 ❌ Error calculando la sesión ... para Symbol NKE: 
 ```
@@ -186,11 +181,9 @@ Guardando resultados en base de datos
 - Comprueba que tablas existen: `resultados_backtest`, `trades`
 - Revisa si hay violaciones UK/FK en BD
 
----
+## Estructura de logs recomendada
 
-## 📊 Estructura de Logs Recomendada
-
-Crear este archivo en la raíz del proyecto: **`logging_config.py`**
+Archivo sugerido en la raiz: `logging_config.py`.
 
 ```python
 import logging
@@ -240,14 +233,12 @@ def setup_logging(app=None):
     
     return root_logger
 
-# Usar en app.py:
+# Uso en app.py:
 # from logging_config import setup_logging
 # setup_logging(app)
 ```
 
----
-
-## ✅ Checklist de Diagnóstico
+## Checklist de diagnostico
 
 - [ ] **Logs configurados** - Verifica que `logging_config.py` está activo
 - [ ] **Directorio logs existe** - `./logs/` debe existir y ser escribible
@@ -258,9 +249,7 @@ def setup_logging(app=None):
 - [ ] **Permisos de archivo** - Carpetas `Data_files/`, `Graph/`, `logs/` son escribibles
 - [ ] **Variables de entorno** - `data_files_path`, `graph_dir` configurados en config
 
----
-
-## 🚀 Próximos Pasos
+## Proximos pasos
 
 1. **Implementa logging según estructura recomendada**
 2. **Lanza un backtest desde web**
@@ -268,23 +257,19 @@ def setup_logging(app=None):
 4. **Identifica el punto exacto donde falla**
 5. **Reporta el error específico** con logs relevantes
 
-Con estos cambios, **cualquier error será visible en los logs**.
+Con esta estructura, el punto de fallo queda visible en logs.
 
----
+## Notas tecnicas
 
-## 📝 Notas Técnicas
-
-### Por qué pueden fallar silenciosamente en web:
+### Por que pueden fallar silenciosamente en web
 1. **Flask/Gunicorn captura excepciones** sin mostrarlas
 2. **Hilos separados** no comparten stderr/stdout
 3. **Sesiones de BD** en hilo separado requieren contexto especial
 4. **Buffering de output** en servidores web
 
-### Cómo se soluciona:
-- ✅ Try-catch en todos los niveles
-- ✅ Logging con FileHandler (escribe a archivo)
-- ✅ Traceback capturado y registrado
-- ✅ Validaciones explícitas entre pasos
-- ✅ Contexto de app preservado en hilos
-
-````
+### Como se soluciona
+- try-catch en todos los niveles
+- logging con `FileHandler`
+- traceback capturado y registrado
+- validaciones explicitas entre pasos
+- contexto Flask preservado en hilos

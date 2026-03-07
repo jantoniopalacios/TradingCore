@@ -1,9 +1,8 @@
-````markdown
-# 🔴 DIAGNÓSTICO: Problemas Críticos del Filtro RSI
+# Diagnostico: Problemas criticos del filtro RSI
 
-## Problema #1: Parámetros Faltantes en Configuración Web
+## 1. Parametros faltantes en configuracion web
 
-### ¿Qué espera el código RSI?
+### Que espera el codigo RSI
 
 ```python
 # En Filtro_RSI.py, línea 76-78:
@@ -11,7 +10,7 @@ cond_min_detect = strategy_self.rsi_minimo  # ← Espera este parámetro
 if hasattr(strategy_self, 'rsi_maximo') and strategy_self.rsi_maximo:  # ← Y este
 ```
 
-### ¿Qué proporciona la web?
+### Que proporciona la web
 
 Revisando `configuracion.py` líneas 175-183:
 ```python
@@ -26,7 +25,7 @@ System.rsi_sell_logic = get_param('rsi_sell_logic', 'None')
 # ❌ FALTA: rsi_minimo, rsi_maximo, rsi_ascendente, rsi_descendente
 ```
 
-### Resultado:
+### Resultado
 ```
 En estrategia_system.py (línea 54):
     rsi_minimo = False  # ← SIEMPRE False de clase
@@ -46,9 +45,9 @@ En check_rsi_buy_signal (línea 76):
 
 ---
 
-## Problema #2: Confusión de Variables
+## 2. Confusion de variables
 
-### Estado de Clase vs Estado Dinámico
+### Estado de clase vs estado dinamico
 
 ```
 En estrategia_system.py:
@@ -68,7 +67,7 @@ En estrategia_system.py:
 └─────────────────────────────────────────────────┘
 ```
 
-### ¿Cuál usa el Filtro RSI?
+### Que usa el filtro RSI
 
 ```python
 # Filtro_RSI.py línea 76:
@@ -80,7 +79,7 @@ cond_min_detect = strategy_self.rsi_minimo_STATE  # ← ESTADO calculado
 
 ---
 
-## Problema #3: Lógica Defectudosa de Cruce (Threshold)
+## 3. Logica defectuosa de cruce (threshold)
 
 ### En estrategia_system.py línea 274:
 
@@ -93,7 +92,7 @@ if self.rsi and self.rsi_period:
     )
 ```
 
-### Problema:
+### Problema
 ```
 1. rsi_threshold_ind es una LÍNEA CONSTANTE (siempre 30)
 2. Se pasa self.data.Close.s como argumento (pero lambda no lo usa)
@@ -112,9 +111,9 @@ crossover(strategy_self.rsi_ind, strategy_self.rsi_threshold_ind)
 
 ---
 
-## Problema #4: Lógica de Compra SIN Activación Correcta
+## 4. Logica de compra sin activacion correcta
 
-### Flujo actual (INEFECTIVO):
+### Flujo actual
 
 ```python
 # En Filtro_RSI.py, check_rsi_buy_signal()
@@ -138,7 +137,7 @@ if strategy_self.rsi and strategy_self.rsi_ind is not None:
                               # Esto SÍ puede ser True
 ```
 
-### Resultado:
+### Resultado
 ```
 ✓ RSI > 50 (threshold) → Puede generar compra
 ✗ RSI cruza 30 desde abajo → NO funciona (porque cond_min_detect es False)
@@ -146,7 +145,7 @@ if strategy_self.rsi and strategy_self.rsi_ind is not None:
 
 ---
 
-## Problema #5: Configuración Web NO Tiene Parámetros RSI Booleanos
+## 5. Configuracion web sin parametros RSI booleanos
 
 ### Lo que la web DEBERÍA proporcionar:
 
@@ -168,7 +167,7 @@ if strategy_self.rsi and strategy_self.rsi_ind is not None:
 
 ---
 
-## RESUMEN DE PROBLEMAS
+## Resumen de problemas
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -193,9 +192,9 @@ if strategy_self.rsi and strategy_self.rsi_ind is not None:
 
 ---
 
-## SOLUCIÓN NECESARIA (Para que funcione)
+## Solucion necesaria
 
-### Opción A: Agregar parámetros booleanos a web (Recomendado)
+### Opcion A: agregar parametros booleanos en web (recomendada)
 
 1. En `scenarios/BacktestWeb/configuracion.py`:
 ```python
@@ -214,7 +213,7 @@ System.rsi_descendente = get_param('rsi_descendente', False, bool)
 <label><input type="checkbox" name="rsi_descendente"> Rechaza si RSI baja</label>
 ```
 
-### Opción B: Simplificar Filtro_RSI.py (Más rápido)
+### Opcion B: simplificar `Filtro_RSI.py` (mas rapida)
 
 Cambiar lógica para usar solo:
 - `rsi_strength_threshold` (ÚNICO parámetro que funciona ahora)
@@ -232,9 +231,7 @@ if strategy_self.rsi_ind[-1] < strategy_self.rsi_low_level:
     → Si cruza arriba del low_level, COMPRA por giro
 ```
 
----
-
-## PRÓXIMOS PASOS
+## Proximos pasos
 
 ```
 1. ¿Quieres usar Opción A (completa) o Opción B (rápida)?
@@ -247,6 +244,4 @@ if strategy_self.rsi_ind[-1] < strategy_self.rsi_low_level:
 3. Después: Testear con datos reales
 ```
 
-¿Por cuál opción prefieres ir?
-
-````
+Seleccionar opcion, implementar cambios y revalidar con backtests de referencia.

@@ -1,235 +1,79 @@
-```markdown
-# 📊 Arquitectura del Flujo de Backtest - Web
+# Flujo de Arquitectura del Backtest Web
 
-## Diagrama de Flujo Mejorado
+Este documento describe el flujo operativo actual de `scenarios/BacktestWeb` y su comunicación con `trading_engine`.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     INTERFAZ WEB (Flask)                        │
-│  Usuario hace click: "Lanzar Backtest"                          │
-│  ════════════════════════════════════════                       │
-└──────────────────────┬──────────────────────────────────────────┘
-                       │
-                       ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  RUTA: /launch_strategy (POST)                                   │
-│  ════════════════════════════════════════════════════════════════ │
-│  ✅ Valida autenticación usuario                                 │
-│  ✅ Carga configuración base                                     │
-│  ✅ Procesa formulario (switches, parámetros)                   │
-│  ✅ Obtiene metadatos (user_id, tanda_id)                       │
-│  ✅ LOG: [LAUNCH] Usuario X lanzando backtest                   │
-│  ✅ Inicia HILO SEPARADO con contexto Flask                     │
-│  ⏱️  Retorna inmediatamente: {"status": "success"}              │
-└──────────────────────┬──────────────────────────────────────────┘
-                       │
-                       ▼ (EN HILO SEPARADO)
-┌──────────────────────────────────────────────────────────────────┐
-│  FUNCIÓN: run_backtest_and_save() [NUEVO LOGGING]               │
-│  ════════════════════════════════════════════════════════════════ │
-│  ✅ Crea contexto Flask para hilo                                │
-│  ✅ LOG: 🚀 INICIANDO BACKTEST                                  │
-│                                                                   │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │ LLAMADA: ejecutar_backtest(config_web)                    │  │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼ (CON LOGGING DE 9 PASOS)                │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  PASO [1/9]: Cargando configuración                       │  │
-│  │  ✅ Cargar datos base a disco                             │  │
-│  │  ✅ Mezclar con config_web                                │  │
-│  │  ✅ LOG: Configuración cargada                            │  │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼                                           │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  PASO [2/9]: Sincronizando System                         │  │
-│  │  ✅ asignar_parametros_a_system()                         │  │
-│  │  ✅ LOG: System sincronizado                              │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼                                           │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  PASO [3/9]: Buscando símbolos en BD                      │  │
-│  │  ✅ Usuario.query.filter_by(username=...)                 │  │
-│  │  ✅ Validar: usuario existe                               │  │
-│  │  ✅ Validar: usuario tiene símbolos                       │  │
-│  │  ✅ LOG: N símbolos encontrados                           │  │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼                                           │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  PASO [4/9]: Descargando datos históricos                 │  │
-│  │  ✅ descargar_datos_YF() → Yahoo Finance                  │  │
-│  │  ✅ Validar: stocks_data no vacío                         │  │
-│  │  ✅ LOG: N registros descargados                          │  │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼                                           │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  PASO [5/9]: Procesando datos fundamentales               │  │
-│  │  ⚠️  manage_fundamental_data() [OPTIONAL]                  │
-│  │  ✅ TRY-CATCH: Si falla, continúa                         │
-│  │  ✅ LOG: Datos fundamentales procesados o warning         │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼                                           │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  PASO [6/9]: Calculando ratios OHLCV                      │  │
-│  │  ✅ calcular_fullratio_OHLCV()                            │
-│  │  ✅ TRY-CATCH: Manejo individual                          │
-│  │  ✅ LOG: Ratios calculados                                │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼                                           │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  PASO [7/9]: Filtro Fundamental (opcional)                │
-│  │  ✅ generar_seleccion_activos() [SI ACTIVADO]             │
-│  │  ✅ LOG: Filtro aplicado o skipped                        │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼                                           │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  PASO [8/9]: Ejecutando Motor de Backtest                 │
-│  │  ✅ run_multi_symbol_backtest()                           │
-│  │  ✅ Validar: resultados_df no vacío                       │
-│  │  ✅ LOG: N resultados completados                         │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼                                           │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  PASO [9/9]: Generando gráficos Bokeh                     │
-│  │  ✅ Crear directorio si no existe                         │
-│  │  ✅ bt.plot(filename=..., open_browser=False)             │
-│  │  ✅ Validar: archivo generado existe                      │
-│  │  ✅ LOG: Gráficos guardados (html)                        │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼                                           │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │  PERSISTENCIA: Guardando en BD (PostgreSQL)               │
-│  │  ✅ Para cada resultado:                                   │
-│  │     - save_backtest_run()                                  │
-│  │     - stats, config, trades, gráfico HTML                 │
-│  │  ✅ VALIDAR: Resultados salvados correctamente            │
-│  │  ✅ LOG: N/N resultados guardados en BD                   │
-│  │  ⚠️  ERROR → ROLLBACK automático                          │
-│  └────────────────────────────────────────────────────────────┘  │
-│                       │                                           │
-│                       ▼                                           │
-│  ┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅┅  │
-│  ✨ ÉXITO: Ciclo completado en Xs                              │
-│  ✅ LOG: ✨ Ciclo completado exitosamente en 15.32s            │
-│                                                                   │
-│  ❌ ERROR EN CUALQUIER PASO:                                     │
-│  ✅ LOG: ❌ ERROR CRÍTICO - Traceback completo                  │
-│  ✅ DB: ROLLBACK automático                                     │
-│                                                                   │
-│  ❌ FINALMENTE: db.session.remove() [limpieza]                  │
-└──────────────────────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  LOGS: ./logs/trading_app.log [ARCHIVO ESCRITO]                  │
-│  ════════════════════════════════════════════════════════════════ │
-│  [2026-02-05 18:14:43] [LAUNCH] Usuario admin lanzando...       │
-│  [2026-02-05 18:14:43] [1/9] Cargando configuración...          │
-│  [2026-02-05 18:14:43] ✅ Configuración cargada                  │
-│  ...                                                             │
-│  [2026-02-05 18:14:58] ✨ Ciclo completado exitosamente         │
-│                                                                   │
-│  💾 PERSISTENCIA:                                                │
-│  - Tabla: resultados_backtest ✅ Actualizada                     │
-│  - Tabla: trades ✅ Actualizada                                  │
-│  - Archivo: ./Graph/SYMBOL_backtest.html ✅ Guardado             │
-└──────────────────────────────────────────────────────────────────┘
-                       │
-                       ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  RESULTADO FINAL                                                  │
-│  ════════════════════════════════════════════════════════════════ │
-│  ✅ Backtest completado                                          │
-│  ✅ Datos guardados en BD                                        │
-│  ✅ Gráficos generados                                           │
-│  ✅ Logs disponibles para auditoría                              │
-│  ✅ Usuario puede ver resultados en web                          │
-└──────────────────────────────────────────────────────────────────┘
+## 1. Flujo de ejecución
+
+```text
+Usuario (UI Flask)
+  -> POST /launch_strategy
+  -> main_bp.launch_strategy()
+  -> crea config_web + metadatos (user_id, tanda_id)
+  -> lanza hilo run_backtest_and_save(...)
+
+Hilo de ejecución
+  -> Backtest.ejecutar_backtest(config_web)
+     [1/9] Cargar configuración base de usuario
+     [2/9] Sincronizar atributos de System
+     [3/9] Cargar símbolos del usuario desde PostgreSQL
+     [4/9] Descargar OHLCV (Yahoo Finance)
+     [5/9] Procesar fundamentales (opcional)
+     [6/9] Calcular ratios OHLCV (opcional)
+     [7/9] Aplicar filtro fundamental (opcional)
+     [8/9] Ejecutar run_multi_symbol_backtest(...)
+     [9/9] Generar gráficos HTML por símbolo
+  -> Persistir resultados/trades con save_backtest_run(...)
+  -> db.session.remove()
 ```
 
----
+## 2. Comunicación entre módulos
 
-## 🔄 Comparación: Antes vs Después
+`main_bp.py`
+- Capa HTTP y sesión de usuario.
+- Normaliza formulario y construye `config_web`.
 
-### ANTES ❌
-```
-Usuario clica "Lanzar Backtest"
-    ↓
-Sin logging... Sin validaciones...
-    ↓
-Exception en algún lado (pero ¿dónde?)
-    ↓
-❌ SILENCIO TOTAL (No sé qué pasó)
-    ↓
-Usuario: "El backtest no genera resultados" 😞
-```
+`Backtest.py`
+- Orquestador de proceso.
+- Adapta datos para el motor y controla errores/logs.
 
-### DESPUÉS ✅
-```
-Usuario clica "Lanzar Backtest"
-    ↓
-LOG: [LAUNCH] Usuario X lanzando...
-    ↓
-LOG: [1/9] Cargando configuración...
-LOG: [2/9] Sincronizando System...
-LOG: [3/9] Buscando símbolos...
-... (9 pasos con validaciones)
-    ↓
-✅ LOG: ✨ Ciclo completado en 15.32s
-    ↓
-✅ Resultados en BD, gráficos generados
-    ↓
-Usuario: "Perfecto, veo todo en los logs" 😊
-```
+`estrategia_system.py`
+- Adaptador `System(Strategy)`.
+- Expone atributos de configuración y estados para lógica técnica.
 
----
+`Logica_Trading.py`
+- Coordinador de señales y gestión de posición.
+- Delega en módulos de `trading_engine/indicators/`.
 
-## 🎯 Ventajas de la Nueva Arquitectura
+`Backtest_Runner.py`
+- Ejecuta motor por símbolo y agrega resultados multi-símbolo.
 
-| Aspecto | Antes | Después |
-|---------|-------|---------|
-| **Visibilidad** | ❌ 0% - Sin logs | ✅ 100% - Logs completos |
-| **Debugging** | ❌ Imposible | ✅ Trivial (revisa logs) |
-| **Confianza** | ❌ Bajo ("¿funcionó?") | ✅ Alto ("Veo cada paso") |
-| **Mantenimiento** | ❌ Difícil | ✅ Fácil |
-| **Escalabilidad** | ❌ Problemática | ✅ Lista para Celery/RQ |
-| **Monitoreo** | ❌ Manual | ✅ Automático en logs |
+`database.py` + `DBStore.py`
+- Persistencia de `ResultadoBacktest` y `Trade`.
 
----
+## 3. Contratos clave
 
-## 📈 Métrica de Éxito
+Contrato de decisión en cada vela:
 
-**Antes:** Backtest web ❓ → No funciona
-**Después:** Backtest web ✨ → Genera resultados visibles + logs detallados
+1. `System.next()`
+2. Si hay posición: `manage_existing_position(self)`
+3. Si no hay posición: `check_buy_signal(self)`
 
-**Evidencia:**
-- ✅ Script test_backtest_nke_final.py ejecuta correctamente desde CLI
-- ✅ Códigos de verificación pasan (9/9 checks)
-- ✅ Sistema listo para web con logging completo
+Contrato de indicadores:
 
----
+- `update_*_state()` actualiza flags `*_STATE`.
+- `check_*_buy_signal()` y `check_*_sell_signal()` retornan señal + motivo.
+- `apply_*_filter()` aplica veto/permiso global cuando corresponde.
 
-## 🚀 Ready for Production
+## 4. Persistencia y trazabilidad
 
-```
-✅ Cambios implementados
-✅ Sistema verificado (9/9 checks)
-✅ Logging estructurado
-✅ Error handling completo
-✅ BD rollback automático
-✅ Documentación completa
+Persistencia principal:
 
-→ LISTO PARA PRODUCCIÓN ✨
-```
+- `usuarios.config_actual`: configuración viva por usuario.
+- `simbolos`: universo de activos.
+- `resultados_backtest`: métricas por símbolo/tanda.
+- `trades`: detalle de operaciones.
 
-```
+Trazabilidad:
+
+- Logging estructurado del ciclo completo.
+- Motivos técnicos consolidados en los registros de trade.

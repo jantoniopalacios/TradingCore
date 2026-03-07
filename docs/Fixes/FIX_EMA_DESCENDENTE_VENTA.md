@@ -1,10 +1,9 @@
-````markdown
-# Fix: EMA Descendente (Sell) Signals Not Triggering - RESOLVED ✓
+# Fix EMA Descendente: Señales de venta no disparaban
 
-## Problema Reportado
-Usuario configuró "descendente" (EMA descendiendo) para generar señales de venta, pero **0 operaciones se cerraban por ese motivo**.
+## Problema reportado
+Con `ema_slow_descendente=True`, no se cerraban operaciones por señal descendente.
 
-## Test de Validación Original
+## Validacion inicial
 ```
 Test: EMA Buy/Sell (Ascendente + Descendente)
 Configuración: ambas activas (True)
@@ -16,14 +15,13 @@ RESULTADO:
   EMA Descendente Trigger: 0 (0.0%)  ✗ NO FUNCIONA
 ```
 
-## Causa Raíz Identificada
+## Causa raiz
 
-### Problema 1: Falta asignación en configuracio.py
-En `scenarios/BacktestWeb/configuracion.py`, la función `asignar_parametros_a_system()` **no asignaba** los parámetros:
+En `scenarios/BacktestWeb/configuracion.py`, la funcion `asignar_parametros_a_system()` no asignaba:
 - `ema_slow_descendente`
 - `ema_slow_maximo`
 
-**Archivo:** `scenarios/BacktestWeb/configuracion.py` (línea 175)
+Archivo: `scenarios/BacktestWeb/configuracion.py`.
 
 **Código Anterior (incompleto):**
 ```python
@@ -43,10 +41,9 @@ if getattr(strategy_self, 'ema_slow_descendente', False) and strategy_self.ema_s
 
 El `getattr()` SIEMPRE devolvía `False` (el valor default) porque el atributo nunca se asignaba, incluso si el usuario activaba la opción en el formulario HTML.
 
-## Solución Aplicada
+## Solucion aplicada
 
-### Fix 1: Añadir asignaciones faltantes en configuracion.py
-**Archivo:** `scenarios/BacktestWeb/configuracion.py` (línea 174-177)
+Se añadieron asignaciones faltantes en `scenarios/BacktestWeb/configuracion.py`.
 
 **Código Nuevo (completo):**
 ```python
@@ -58,9 +55,9 @@ System.ema_buy_logic = get_param('ema_buy_logic', 'None')
 System.ema_sell_logic = get_param('ema_sell_logic', 'None')
 ```
 
-**Impacto:** Los parámetros ahora se leen correctamente desde el formulario Flask y se asignan a la clase `System`, permitiendo que `check_ema_sell_signal()` reciba `True` cuando el usuario activa "descendente".
+Impacto: los parametros del formulario Flask llegan correctamente a `System` y `check_ema_sell_signal()` puede evaluar la condicion real.
 
-## Validación Post-Fix
+## Validacion post-fix
 
 ### Test de Confirmación
 ```
@@ -76,31 +73,27 @@ RESULTADO DESPUÉS DEL FIX:
 TEST RESULT: PASS ✓
 ```
 
-### Comportamiento Esperado
+### Comportamiento esperado
 - ✅ Compras cuando `ema_slow_ascendente=True` y EMA sube → **37 operaciones (40.2%)**
 - ✅ Ventas cuando `ema_slow_descendente=True` y EMA baja → **10 operaciones (10.9%)**
 - ✅ Las 46 ventas se distribuyen entre: Descendente (10), StopLoss (~36)
 
-## Resumen de Cambios
+## Resumen de cambios
 
-### Modificados
+### Modificado
 - `scenarios/BacktestWeb/configuracion.py`: Líneas 174-177 (añadidas 2 líneas)
   - `System.ema_slow_descendente = get_param('ema_slow_descendente', False, bool)`
   - `System.ema_slow_maximo = get_param('ema_slow_maximo', False, bool)`
 
-### Sin Cambios (pero fueron revisados y validados)
+### Revisado sin cambios
 - `trading_engine/indicators/Filtro_EMA.py` - Lógica correcta, solo necesitaba recibir parámetro correcto
 - `trading_engine/core/Logica_Trading.py` - Flujo de gestión de posiciones correcto
 - HTML form `_tab_ema.html` - Ya tenía checkboxes correctos
 
-## Testing Adicional Realizado
+## Testing adicional
 1. Test con SOLO Ascendente activado → Genera COMPRAS ✓
 2. Test con SOLO Descendente activado → Genera VENTAS ✓  
 3. Test con AMBOS activados → Ciclo Buy/Sell completo ✓
 
 ## Conclusión
-El problema fue una **omisión en la asignación de parámetros de configuración**. Los parámetros HTML del formulario llegaban correctamente, pero no se asignaban al objeto `System` de la estrategia de backtesting, causando que la lógica de venta siempre recibiera valores por defecto (False).
-
-Con la adición de 2 líneas en `configuracion.py`, el sistema ahora funciona como se esperaba: **ambas señales (ascendente y descendente) generan operaciones según la configuración del usuario**.
-
-````
+El fallo fue una omision de mapeo de parametros de configuracion. Tras añadir las asignaciones en `configuracion.py`, las señales de venta descendente funcionan segun configuracion del usuario.

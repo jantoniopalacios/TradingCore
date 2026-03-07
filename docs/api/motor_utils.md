@@ -46,7 +46,6 @@ Módulo responsable de la conexión con APIs externas o fuentes de datos para la
         - descargar_datos_YF
         - manage_fundamental_data
         - download_fundamentals_AlphaV
-        - update_fundamentals_YF_overwrite
 
 ## Gráficos Financieros
 

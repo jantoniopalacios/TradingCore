@@ -28,11 +28,3 @@ Actualización de Estados: Se invocan las funciones update_xxx_state para sincro
 Evaluación Técnica: Se verifica si los filtros activos (EMA, RSI, BB, etc.) cumplen sus condiciones.
 
 Gestión de Posición: Si ya existe una posición abierta, el motor delega el control a manage_existing_position para evaluar salidas por Stop Loss, Take Profit o señales contrarias.
-
-::: trading_engine.core.Logica_Trading 
-  options: 
-    members: 
-      - check_buy_signal 
-      - manage_existing_position 
-      - _log_trade_action_sl_update 
-      - _actualizar_estados_indicadores

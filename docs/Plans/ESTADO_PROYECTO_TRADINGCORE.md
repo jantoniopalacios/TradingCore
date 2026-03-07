@@ -1,5 +1,8 @@
 # Estado del Proyecto TradingCore
 
+> Documento historico (snapshot de febrero 2026).
+> Para arquitectura vigente y flujo actual consultar `docs/ARCHITECTURE.md` y `docs/Architecture/FLUJO_ARQUITECTURA_MEJORADO.md`.
+
 **Fecha:** 8 de febrero de 2026  
 **Objetivo del estado:** Mantener contexto completo para continuar verificacion y ampliaciones sin perdida de informacion.
 
@@ -150,7 +153,7 @@ Todos los escenarios terminaron correctos, y trades ordenados cronologicamente.
 
 ## 8) Validacion MACD (9 de febrero de 2026)
 
-### ✅ Completado
+### Completado
 - Script validate_macd_complete.py: 10 escenarios exitosos
 - Modal Bootstrap con documentacion completa en _tab_macd.html
 - Verificado: compras por MACD Fuerte (cruce), ventas por Maximo/Descendente

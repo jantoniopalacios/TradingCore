@@ -1,9 +1,11 @@
-````markdown
-# ✨ RESUMEN FINAL: Backtest Web - ARREGLADO
+# Resumen final: Backtest web estabilizado
 
-## 📋 Lo Que Se Hizo
+> Documento historico (febrero 2026).
+> Ver estado actual en `docs/ARCHITECTURE.md`.
 
-### 🎯 Problema Original
+## Lo que se hizo
+
+### Problema original
 ```
 Usuario: "Si ejecuto el backtest desde la aplicación web no me genera resultados"
 Motor: Backtest funciona desde CLI ✅
@@ -11,7 +13,7 @@ Web: Backtest falla silenciosamente ❌
 Logs: No hay visibilidad de qué pasó
 ```
 
-### ✅ Solución Implementada
+### Solucion implementada
 ```
 Cambios mínimos, máximo impacto:
 - Función ejecutar_backtest() → Try-catch completo
@@ -19,11 +21,9 @@ Cambios mínimos, máximo impacto:
 - Función launch_strategy() → Detalles de configuración
 ```
 
----
+## Cambios realizados
 
-## 📊 Cambios Realizados
-
-### 1️⃣ Archivo: `scenarios/BacktestWeb/Backtest.py`
+### 1. `scenarios/BacktestWeb/Backtest.py`
 
 **Función: `ejecutar_backtest(config_dict: dict)`**
 
@@ -39,11 +39,9 @@ Cambios:
 - Manejo individual de errores con rollback BD
 - Traceback completo capturado en logs
 
----
+## Diagnostico completado
 
-## 🔍 Diagnóstico Completado
-
-**Script: `verificar_backtest_web.py`**
+Script: `scripts/verificar_backtest_web.py`.
 
 Verificación en 8 categorías:
 ```
@@ -60,17 +58,11 @@ RESULTADO: ✅ VERIFICACIÓN COMPLETA
 Sistema listo para backtest desde web ✨
 ```
 
----
+## Conclusion
 
-## 🎉 Conclusión
-
-✨ **El sistema está listo para ejecutar backtest desde la web con visibilidad completa de cualquier error.**
-
----
+El sistema quedo preparado para ejecutar backtest web con trazabilidad completa.
 
 **Fecha:** 5 de febrero de 2026
 **Estado:** ✅ COMPLETADO
 **Riesgo:** BAJO (cambios mínimos)
 **Impacto:** ALTO (visibilidad + funcionalidad)
-
-````

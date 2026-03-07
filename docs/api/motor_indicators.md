@@ -30,7 +30,7 @@ Este módulo contiene la implementación y la lógica de filtrado específica pa
         - check_macd_buy_signal
         - check_macd_sell_signal
 
-## Filtro MACD (Moving Average Convergence Divergence)
+## Filtro Stochastic (Fast, Mid, Slow)
 
 Este módulo contiene las funciones genéricas que se aplican a las diferentes versiones del oscilador Estocástico 
 (Rápido, Medio y Lento) que la estrategia utilice. Se utilizan prefijos dinámicos (e.g., `stoch_fast`) para 
@@ -64,9 +64,17 @@ Actúa como una condición AND para la entrada.
 ::: trading_engine.indicators.Filtro_Volume
     options:
       members:
-        - calculate_volume_ma
         - update_volume_state
         - apply_volume_filter
+
+## Filtro de Volatilidad ATR
+
+Filtra entradas por rango de volatilidad aceptable (ATR minimo y maximo).
+
+::: trading_engine.indicators.Filtro_ATR
+    options:
+      members:
+        - apply_atr_range_filter
 
 ## Filtro de Bandas de Bollinger (BB)
 Este filtro identifica condiciones de volatilidad y niveles de sobreventa/sobrecompra. A diferencia de otros indicadores, este módulo admite una lógica flexible definida por el parámetro bb_buy_crossover:
