@@ -286,6 +286,19 @@
                 }
             });
         });
+        // Fecha fin por defecto = ayer (solo si está vacía)
+        const fechaFinInput = document.querySelector('#end_date')
+            || document.querySelector('[name="end_date"]')
+            || document.querySelector('#fecha_fin')
+            || document.querySelector('[name="fecha_fin"]');
+        if (fechaFinInput && !fechaFinInput.value) {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            fechaFinInput.value = `${yyyy}-${mm}-${dd}`;
+        }
     });
 
     function openFile(url, filename) {
