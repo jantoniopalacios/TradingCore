@@ -35,6 +35,11 @@ python scenarios/BacktestWeb/app.py
 4. Activar indicadores de prueba (por ejemplo, EMA y MACD).
 5. Pulsar `Lanzar Backtest`.
 
+Nota sobre fechas:
+- `end_date` se inicializa por defecto en `ayer`.
+- `end_date` no se persiste en `config_actual` del usuario.
+- Si se modifica manualmente para una ejecución, ese valor aplica a la ejecución actual y queda trazado en los resultados guardados.
+
 Logs esperados (resumen):
 ```text
 [LAUNCH] Usuario ... lanzando backtest

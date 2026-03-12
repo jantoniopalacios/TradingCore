@@ -31,6 +31,7 @@ Hilo de ejecución
 `main_bp.py`
 - Capa HTTP y sesión de usuario.
 - Normaliza formulario y construye `config_web`.
+- Aplica política de fecha operativa: `end_date` por defecto a `ayer` y no persistente en `config_actual`.
 
 `Backtest.py`
 - Orquestador de proceso.
@@ -69,6 +70,7 @@ Contrato de indicadores:
 Persistencia principal:
 
 - `usuarios.config_actual`: configuración viva por usuario.
+- `end_date`: parámetro operativo no persistente en `config_actual`; se define por defecto como `ayer` en UI/backend y puede sobreescribirse por ejecución.
 - `simbolos`: universo de activos.
 - `resultados_backtest`: métricas por símbolo/tanda.
 - `trades`: detalle de operaciones.

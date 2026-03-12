@@ -9,6 +9,9 @@ from flask import (
     flash, session, jsonify, Response, send_from_directory, abort
 )
 from collections import deque
+from datetime import date, timedelta, datetime
+import logging
+import traceback
 
 # --- IMPORTACIONES ORIGINALES ---
 from ..file_handler import read_symbols_raw, write_symbols_raw, get_directory_tree
@@ -21,7 +24,6 @@ from ..Backtest import ejecutar_backtest
 
 from ..database import db, ResultadoBacktest, Trade, Usuario, Simbolo # Importa tus modelos
 from sqlalchemy import func
-from datetime import datetime
 
 main_bp = Blueprint('main', __name__) 
 
@@ -56,6 +58,8 @@ def index():
     # ================================================================
     if request.method == 'POST' and request.form.get('action') == 'save_config':
         form_data = request.form.to_dict()
+        if 'fecha_fin' in form_data and 'end_date' not in form_data:
+            form_data['end_date'] = form_data['fecha_fin']
         
         # 1. Guardar Símbolos (Tu lógica actual en DB que ya funciona)
         if 'symbols_content' in form_data:
@@ -75,7 +79,7 @@ def index():
                 flash(f"Error símbolos: {e}", "danger")
 
         # 2. Guardar Parámetros Técnicos en Usuario.config_actual
-        config_params = {k: v for k, v in form_data.items() if k not in ['symbols_content', 'action']}
+        config_params = {k: v for k, v in form_data.items() if k not in ['symbols_content', 'action', 'end_date', 'fecha_fin']}
 
         # --- LISTA MAESTRA DE SWITCHES (Basada en tus .html) ---
         lista_switches = [
@@ -135,6 +139,11 @@ def index():
                 val = getattr(System, attr)
                 if not callable(val):
                     config_para_web[attr] = str(val)
+
+    # Fecha fin operativa por defecto: siempre ayer en UI.
+    # No se persiste en config_actual para evitar arrastrar fechas historicas entre sesiones.
+    ayer = date.today() - timedelta(days=1)
+    config_para_web['end_date'] = ayer.isoformat()
 
     # Preparar símbolos para el textarea
     simbolos_db = Simbolo.query.filter_by(usuario_id=u.id).all() if u else []
@@ -277,9 +286,6 @@ def run_backtest_and_save(app_instance, config_web, user_mode):
                 logger.error(f"Error al limpiar sesión DB: {e}")
 
 #-- RUTA PARA LANZAR BACKTEST (POST) --
-import logging
-import traceback
-
 # Obtenemos el logger configurado en tu app
 logger = logging.getLogger(__name__)
 
@@ -310,6 +316,9 @@ def launch_strategy():
         
         # 2. Capturamos el formulario
         form_data = request.form.to_dict()
+        if 'fecha_fin' in form_data and 'end_date' not in form_data:
+            logger.warning("[LAUNCH] Se recibió 'fecha_fin' en POST legado; se normaliza a 'end_date'")
+            form_data['end_date'] = form_data['fecha_fin']
         config_web = {}
 
         # 1. Cargar valores por defecto de la clase System
@@ -344,6 +353,17 @@ def launch_strategy():
         for s in switches:
             if s not in form_data:
                 config_web[s] = False
+
+        # 5. Fallback backend obligatorio para end_date (ayer)
+        end_date_raw = (form_data.get('end_date') or '').strip()
+        if not end_date_raw or end_date_raw.lower() == 'none':
+            config_web['end_date'] = (date.today() - timedelta(days=1)).isoformat()
+        else:
+            try:
+                datetime.strptime(end_date_raw, "%Y-%m-%d")
+                config_web['end_date'] = end_date_raw
+            except ValueError:
+                return jsonify({"status": "error", "message": "end_date inválida. Formato esperado: YYYY-MM-DD"}), 400
 
         # 6. Metadatos cruciales para el motor
         config_web['user_id'] = u.id 

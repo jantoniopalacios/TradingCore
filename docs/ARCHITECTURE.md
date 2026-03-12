@@ -64,7 +64,7 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 ## 3. Flujo End-to-End
 
 1. El usuario guarda parámetros en la web.
-2. Se persiste configuración en `usuarios.config_actual` (JSON).
+2. Se persiste configuración en `usuarios.config_actual` (JSON), excepto parámetros operativos no persistentes (por ejemplo `end_date`).
 3. `launch_strategy()` prepara `config_web` y abre hilo de ejecución.
 4. `ejecutar_backtest()` mezcla configuración guardada y enviada.
 5. Obtiene símbolos del usuario (`simbolos`).
@@ -87,6 +87,7 @@ En cada vela:
 
 `usuarios`
 - Credenciales y `config_actual` JSON.
+- `config_actual` guarda la configuración funcional por usuario y omite campos operativos temporales (como `end_date`).
 
 `simbolos`
 - Universo de activos por usuario.
@@ -112,4 +113,5 @@ Para añadir un nuevo indicador o filtro:
 - El motor central concentra la lógica de decisión.
 - El escenario web orquesta, no duplica reglas de trading.
 - La trazabilidad de decisiones es parte del diseño (logs y razones técnicas).
-- La configuración se trata como dato persistente por usuario.
+- La configuración funcional se trata como dato persistente por usuario.
+- Parámetros operativos de ejecución puntual pueden ser no persistentes (ejemplo: `end_date` con valor por defecto dinámico `ayer`).
