@@ -42,6 +42,7 @@ Este índice lista la documentación canonicalizada dentro de `docs/`.
 
 - [PLAN_VALIDACION_BACKTESTS.md](../Plans/PLAN_VALIDACION_BACKTESTS.md)
 - [PLAN_VALIDACION_INTEGRAL_PROYECTO.md](../Plans/PLAN_VALIDACION_INTEGRAL_PROYECTO.md)
+- [PLAN_PROTECCION_CAPITAL_INICIAL.md](../Plans/PLAN_PROTECCION_CAPITAL_INICIAL.md)
 
 ## Estado
 

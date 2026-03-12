@@ -5,6 +5,8 @@ site_url: https://jantoniopalacios.github.io/TradingCore/
 nav:
   - Introducción: README.md
   - Arquitectura: ARCHITECTURE.md
+  - Planes:
+    - Proteccion de Capital Inicial: Plans/PLAN_PROTECCION_CAPITAL_INICIAL.md
   - Referencia API:
     - Motor Central: api/motor_core.md
     - Indicadores: api/motor_indicators.md
