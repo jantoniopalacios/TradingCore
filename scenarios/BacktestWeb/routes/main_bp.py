@@ -27,6 +27,85 @@ from sqlalchemy import func
 
 main_bp = Blueprint('main', __name__) 
 
+# Estado de ejecucion en memoria para mostrar progreso en UI sin refrescar.
+# Clave: username | Valor: dict de estado de la ultima ejecucion lanzada.
+BACKTEST_STATUS_BY_USER = {}
+BACKTEST_STATUS_LOCK = threading.Lock()
+
+
+def _utc_now_iso():
+    return datetime.utcnow().isoformat()
+
+
+def _init_backtest_status(user_mode, run_id, tanda_id):
+    with BACKTEST_STATUS_LOCK:
+        BACKTEST_STATUS_BY_USER[user_mode] = {
+            'run_id': run_id,
+            'tanda_id': tanda_id,
+            'status': 'queued',
+            'phase_index': 0,
+            'phase_total': 0,
+            'phase': 'En cola',
+            'message': 'Backtest en cola de ejecucion',
+            'events': [{
+                'timestamp': _utc_now_iso(),
+                'phase': 'En cola',
+                'message': 'Backtest en cola de ejecucion'
+            }],
+            'started_at': _utc_now_iso(),
+            'updated_at': _utc_now_iso(),
+            'finished_at': None,
+            'result_count': 0,
+            'error': None,
+        }
+
+
+def _append_backtest_event(user_mode, phase, message):
+    with BACKTEST_STATUS_LOCK:
+        state = BACKTEST_STATUS_BY_USER.get(user_mode)
+        if not state:
+            return
+        state['events'].append({
+            'timestamp': _utc_now_iso(),
+            'phase': str(phase),
+            'message': str(message),
+        })
+        state['events'] = state['events'][-120:]
+        state['updated_at'] = _utc_now_iso()
+
+
+def _set_backtest_progress(user_mode, phase_index, phase_total, phase, message, status='running'):
+    with BACKTEST_STATUS_LOCK:
+        state = BACKTEST_STATUS_BY_USER.get(user_mode)
+        if not state:
+            return
+        state['status'] = status
+        state['phase_index'] = int(phase_index)
+        state['phase_total'] = int(phase_total)
+        state['phase'] = str(phase)
+        state['message'] = str(message)
+        state['updated_at'] = _utc_now_iso()
+    _append_backtest_event(user_mode, phase, message)
+
+
+def _finish_backtest_status(user_mode, status, message, result_count=0, error=None):
+    with BACKTEST_STATUS_LOCK:
+        state = BACKTEST_STATUS_BY_USER.get(user_mode)
+        if not state:
+            return
+        state['status'] = status
+        state['message'] = str(message)
+        state['result_count'] = int(result_count or 0)
+        state['error'] = str(error) if error else None
+        state['finished_at'] = _utc_now_iso()
+        state['updated_at'] = _utc_now_iso()
+        state['events'].append({
+            'timestamp': _utc_now_iso(),
+            'phase': 'Finalizado' if status == 'completed' else 'Error',
+            'message': str(message),
+        })
+        state['events'] = state['events'][-120:]
+
 def obtener_usuarios_registrados():
     
     try:
@@ -250,29 +329,66 @@ def run_backtest_and_save(app_instance, config_web, user_mode):
     # En Postgres, cada hilo debe gestionar su propia sesión
     with app_instance.app_context():
         try:
+            _set_backtest_progress(
+                user_mode=user_mode,
+                phase_index=0,
+                phase_total=11,
+                phase='Inicializando',
+                message='Preparando recursos y contexto de base de datos',
+                status='running'
+            )
+
             logger.info(f"\n{'='*70}")
             logger.info(f"🚀 INICIANDO BACKTEST | Usuario: {user_mode} | Tanda: {config_web.get('tanda_id', 'N/A')}")
             logger.info(f"{'='*70}")
             
             # 1. Llamada al motor
             logger.info("Ejecutando motor de backtest...")
-            resultados_df, trades_df, graficos_dict = ejecutar_backtest(config_web)
+            resultados_df, trades_df, graficos_dict = ejecutar_backtest(
+                config_web,
+                progress_callback=lambda i, total, phase, msg: _set_backtest_progress(
+                    user_mode=user_mode,
+                    phase_index=i,
+                    phase_total=total,
+                    phase=phase,
+                    message=msg,
+                    status='running'
+                )
+            )
             
             # El motor hace el commit, pero limpiamos la sesión explícitamente
             db.session.remove()
             
             # 2. Validar resultados
             if resultados_df is not None and not resultados_df.empty:
+                _finish_backtest_status(
+                    user_mode=user_mode,
+                    status='completed',
+                    message=f"Backtest finalizado. {len(resultados_df)} resultados guardados.",
+                    result_count=len(resultados_df)
+                )
                 logger.info(f"✅ ÉXITO | {len(resultados_df)} resultados procesados")
                 logger.info(f"✅ Gráficos generados: {len(graficos_dict)}")
                 logger.info(f"{'='*70}\n")
                 print(f"✅ Backtest finalizado para {user_mode}. {len(resultados_df)} resultados guardados.")
             else:
+                _finish_backtest_status(
+                    user_mode=user_mode,
+                    status='completed',
+                    message='Backtest finalizado sin resultados para guardar.',
+                    result_count=0
+                )
                 logger.warning(f"⚠️  ADVERTENCIA | El backtest no generó resultados")
                 logger.warning(f"{'='*70}\n")
                 print(f"⚠️ El backtest para {user_mode} no generó resultados.")
 
         except Exception as e:
+            _finish_backtest_status(
+                user_mode=user_mode,
+                status='error',
+                message='Backtest interrumpido por error.',
+                error=e
+            )
             logger.error(f"\n{'='*70}")
             logger.error(f"❌ ERROR CRÍTICO EN BACKTEST | Usuario: {user_mode}")
             logger.error(f"Excepción: {type(e).__name__}: {str(e)}")
@@ -386,6 +502,8 @@ def launch_strategy():
         app_instance = current_app._get_current_object()
 
         logger.info(f"[LAUNCH] ✅ Iniciando hilo de backtest...")
+        run_id = f"{u.id}-{config_web['tanda_id']}-{int(datetime.utcnow().timestamp())}"
+        _init_backtest_status(user_mode=user_mode, run_id=run_id, tanda_id=config_web['tanda_id'])
         threading.Thread(
             target=run_backtest_and_save, 
             args=(app_instance, config_web, user_mode),
@@ -393,13 +511,32 @@ def launch_strategy():
         ).start()
 
         logger.info(f"[LAUNCH] Hilo iniciado correctamente")
-        return jsonify({"status": "success", "message": "Backtest iniciado. Revisa los logs para más detalles."})
+        return jsonify({
+            "status": "success",
+            "message": "Backtest iniciado.",
+            "run_id": run_id,
+            "tanda_id": config_web['tanda_id']
+        })
 
     except Exception as e:
         error_msg = f"ERROR CRÍTICO EN LAUNCH: {traceback.format_exc()}"
         logger.error(error_msg)
         print(f"❌ {error_msg}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@main_bp.route('/backtest_status', methods=['GET'])
+def backtest_status():
+    """Devuelve el estado de la ultima ejecucion de backtest del usuario en sesion."""
+    if not session.get('logged_in'):
+        return jsonify({"status": "error", "message": "No autenticado"}), 401
+
+    user_mode = session.get('user_mode')
+    with BACKTEST_STATUS_LOCK:
+        state = BACKTEST_STATUS_BY_USER.get(user_mode)
+        if not state:
+            return jsonify({"status": "idle", "message": "Sin ejecuciones recientes."})
+        return jsonify(state)
 
 #-- RUTA PARA VER ARCHIVOS DE LOGS --
 @main_bp.route('/view_file/<path:path>')

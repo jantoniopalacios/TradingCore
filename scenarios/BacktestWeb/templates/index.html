@@ -243,11 +243,41 @@
     </div>
 </div>
 
+<div class="modal fade" id="launchStatusModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h6 class="modal-title" id="launchStatusTitle"><i class="bi bi-activity me-2"></i>Progreso de Backtest</h6>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2 d-flex justify-content-between align-items-center">
+                    <strong id="launchStatusPhase">Iniciando...</strong>
+                    <span class="text-muted small" id="launchStatusPercent">0%</span>
+                </div>
+                <div class="progress mb-3" style="height: 10px;">
+                    <div id="launchStatusBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div class="alert alert-light border" id="launchStatusMessage">Preparando lanzamiento...</div>
+
+                <div class="border rounded p-2" style="max-height: 260px; overflow-y: auto; background: #f8fafc;">
+                    <div class="small text-muted mb-2">Fases ejecutadas</div>
+                    <ul id="launchStatusEvents" class="list-group list-group-flush"></ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="launchStatusOkBtn" class="btn btn-primary" data-bs-dismiss="modal" disabled>OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <form id="formDelete" method="POST" style="display:none;"></form>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+    let launchStatusPollTimer = null;
+
     // 1. LIMPIEZA Y PERSISTENCIA (Tu lógica original)
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('input').forEach(input => {
@@ -437,7 +467,88 @@
         return tableHtml + '</tbody></table>';
     }
 
-    // 4. LANZAR ESTRATEGIA (Tu lógica original)
+    function clearLaunchStatusPolling() {
+        if (launchStatusPollTimer) {
+            clearInterval(launchStatusPollTimer);
+            launchStatusPollTimer = null;
+        }
+    }
+
+    function renderLaunchStatus(data) {
+        const phaseEl = document.getElementById('launchStatusPhase');
+        const percentEl = document.getElementById('launchStatusPercent');
+        const barEl = document.getElementById('launchStatusBar');
+        const msgEl = document.getElementById('launchStatusMessage');
+        const eventsEl = document.getElementById('launchStatusEvents');
+        const okBtn = document.getElementById('launchStatusOkBtn');
+
+        const total = Number(data.phase_total || 0);
+        const current = Number(data.phase_index || 0);
+        const percent = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
+
+        phaseEl.textContent = data.phase || 'Procesando...';
+        percentEl.textContent = `${percent}%`;
+        barEl.style.width = `${percent}%`;
+        msgEl.textContent = data.message || 'Procesando backtest...';
+
+        if (data.status === 'error') {
+            barEl.classList.remove('bg-success');
+            barEl.classList.add('bg-danger');
+            barEl.classList.remove('progress-bar-animated');
+            msgEl.className = 'alert alert-danger border';
+            okBtn.disabled = false;
+            clearLaunchStatusPolling();
+        } else if (data.status === 'completed') {
+            barEl.classList.remove('bg-danger');
+            barEl.classList.add('bg-success');
+            barEl.classList.remove('progress-bar-animated');
+            barEl.style.width = '100%';
+            percentEl.textContent = '100%';
+            msgEl.className = 'alert alert-success border';
+            okBtn.disabled = false;
+            localStorage.setItem('activeTabKey', 'tab-historial');
+            clearLaunchStatusPolling();
+        } else {
+            barEl.classList.remove('bg-success', 'bg-danger');
+            barEl.classList.add('progress-bar-animated');
+            msgEl.className = 'alert alert-light border';
+            okBtn.disabled = true;
+        }
+
+        const events = Array.isArray(data.events) ? data.events : [];
+        eventsEl.innerHTML = events.slice().reverse().map(ev => {
+            const ts = (ev.timestamp || '').replace('T', ' ').slice(0, 19);
+            return `<li class="list-group-item px-2 py-1 border-0 bg-transparent">
+                <span class="text-muted small">${ts}</span>
+                <span class="badge bg-secondary ms-2">${ev.phase || 'Fase'}</span>
+                <span class="ms-2">${ev.message || ''}</span>
+            </li>`;
+        }).join('');
+    }
+
+    function startLaunchStatusPolling() {
+        clearLaunchStatusPolling();
+        const poll = () => {
+            fetch("{{ url_for('main.backtest_status') }}?t=" + Date.now())
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'idle') {
+                        return;
+                    }
+                    renderLaunchStatus(data);
+                })
+                .catch(() => {
+                    const msgEl = document.getElementById('launchStatusMessage');
+                    msgEl.className = 'alert alert-warning border';
+                    msgEl.textContent = 'No se pudo actualizar el progreso en este momento. Reintentando...';
+                });
+        };
+
+        poll();
+        launchStatusPollTimer = setInterval(poll, 1500);
+    }
+
+    // 4. LANZAR ESTRATEGIA (con modal de progreso)
     function lanzarEstrategia() {
         const launchBtn = document.querySelector('button[onclick="lanzarEstrategia()"]');
         const originalHtml = launchBtn.innerHTML;
@@ -447,6 +558,19 @@
         
         // 2. EMPAQUETAR LOS DATOS (Esto incluye lo de _tab_global.html, etc.)
         const formData = new FormData(formElement);
+
+        const launchStatusModalEl = document.getElementById('launchStatusModal');
+        const launchStatusModal = bootstrap.Modal.getOrCreateInstance(launchStatusModalEl);
+        document.getElementById('launchStatusPhase').textContent = 'Lanzando backtest...';
+        document.getElementById('launchStatusPercent').textContent = '0%';
+        document.getElementById('launchStatusBar').style.width = '0%';
+        document.getElementById('launchStatusBar').classList.remove('bg-success', 'bg-danger');
+        document.getElementById('launchStatusBar').classList.add('progress-bar-animated');
+        document.getElementById('launchStatusMessage').className = 'alert alert-light border';
+        document.getElementById('launchStatusMessage').textContent = 'Solicitando inicio al servidor...';
+        document.getElementById('launchStatusEvents').innerHTML = '';
+        document.getElementById('launchStatusOkBtn').disabled = true;
+        launchStatusModal.show();
 
         launchBtn.disabled = true;
         launchBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
@@ -459,19 +583,29 @@
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                localStorage.setItem('activeTabKey', 'tab-historial');
-                alert("✅ " + data.message);
-                location.reload();
+                startLaunchStatusPolling();
             } else {
-                alert("❌ Error: " + data.message);
+                document.getElementById('launchStatusMessage').className = 'alert alert-danger border';
+                document.getElementById('launchStatusMessage').textContent = 'Error: ' + (data.message || 'No se pudo iniciar el backtest.');
+                document.getElementById('launchStatusOkBtn').disabled = false;
             }
         })
-        .catch(err => alert("❌ Error de red: " + err))
+        .catch(err => {
+            document.getElementById('launchStatusMessage').className = 'alert alert-danger border';
+            document.getElementById('launchStatusMessage').textContent = 'Error de red: ' + err;
+            document.getElementById('launchStatusOkBtn').disabled = false;
+        })
         .finally(() => {
             launchBtn.disabled = false;
             launchBtn.innerHTML = originalHtml;
         });
     }
+
+    document.getElementById('launchStatusModal').addEventListener('hidden.bs.modal', () => {
+        clearLaunchStatusPolling();
+        // Al cerrar el modal, refrescamos para actualizar la vista de historial SQL.
+        location.reload();
+    });
 
     function toggleFolder(el) {
         const n = el.parentElement.querySelector(".nested");

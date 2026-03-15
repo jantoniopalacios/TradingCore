@@ -36,10 +36,30 @@ python scenarios/BacktestWeb/app.py
 5. Activar indicadores de prueba (por ejemplo, EMA y MACD).
 6. Pulsar `Lanzar Backtest`.
 
+## Paso 5: Seguir el progreso por fases (sin refresco manual)
+
+Al pulsar `Lanzar Backtest`, se abre un modal de progreso con:
+
+- Fase actual del proceso (por ejemplo: descarga de datos, motor, persistencia).
+- Barra de progreso porcentual.
+- Bitacora de eventos en tiempo real.
+- Boton `OK` bloqueado hasta que el proceso termine o falle.
+
+Comportamiento esperado:
+
+- Ya no es necesario refrescar la pantalla manualmente para saber si el backtest ha terminado.
+- Cuando el estado pasa a `completed` o `error`, el boton `OK` se habilita.
+- Al cerrar el modal (`OK`), la pagina se recarga para reflejar el historial SQL actualizado.
+
 Nota sobre fechas:
 - `end_date` se inicializa por defecto en `ayer`.
 - `end_date` no se persiste en `config_actual` del usuario.
 - Si se modifica manualmente para una ejecución, ese valor aplica a la ejecución actual y queda trazado en los resultados guardados.
+
+Nota tecnica de seguimiento:
+
+- El frontend consulta periodicamente el estado en `GET /backtest_status`.
+- El backend reporta fases desde el orquestador `ejecutar_backtest(..., progress_callback=...)`.
 
 Logs esperados (resumen):
 ```text

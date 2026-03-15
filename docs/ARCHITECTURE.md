@@ -45,9 +45,10 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 `scenarios/BacktestWeb/routes/main_bp.py`
 - Endpoints web de configuración, lanzamiento de backtest, consulta de resultados y logs.
 - `launch_strategy()` lanza ejecución asíncrona en hilo.
+- `backtest_status()` devuelve estado en vivo de la ejecución para la UI (fase, mensaje, eventos, estado final).
 
 `scenarios/BacktestWeb/Backtest.py`
-- `ejecutar_backtest(config_dict)`: orquestador operativo en 9 pasos.
+- `ejecutar_backtest(config_dict, progress_callback=None)`: orquestador operativo con reporte de progreso por fases.
 - Carga configuración, obtiene símbolos, descarga datos, ejecuta motor, genera gráficos y persiste resultados.
 
 `scenarios/BacktestWeb/estrategia_system.py`
@@ -66,12 +67,15 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 1. El usuario guarda parámetros en la web.
 2. Se persiste configuración en `usuarios.config_actual` (JSON), excepto parámetros operativos no persistentes (por ejemplo `end_date`).
 3. `launch_strategy()` prepara `config_web` y abre hilo de ejecución.
-4. `ejecutar_backtest()` mezcla configuración guardada y enviada.
+4. `launch_strategy()` inicializa estado de ejecución en memoria (run_id/tanda/status inicial).
+5. La UI consulta `GET /backtest_status` en polling para mostrar progreso por fases en el modal de lanzamiento.
+6. `ejecutar_backtest()` mezcla configuración guardada y enviada, y reporta hitos con callback.
 5. Obtiene símbolos del usuario (`simbolos`).
 6. Descarga datos de mercado (Yahoo Finance) y opcionalmente fundamentales/ratios.
 7. Ejecuta `run_multi_symbol_backtest(...)` con `System`.
 8. `System.next()` delega en `Logica_Trading` para decidir compra/venta por vela.
 9. Se guardan métricas, trades y gráficos en BD/HTML y se exponen en la UI.
+10. Al finalizar, se marca estado `completed` o `error`; el usuario confirma con `OK` y se recarga la vista para ver historial actualizado.
 
 ## 4. Patrón de Decisión de Señales
 

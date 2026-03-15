@@ -8,21 +8,32 @@ Este documento describe el flujo operativo actual de `scenarios/BacktestWeb` y s
 Usuario (UI Flask)
   -> POST /launch_strategy
   -> main_bp.launch_strategy()
-  -> crea config_web + metadatos (user_id, tanda_id)
+  -> crea config_web + metadatos (user_id, tanda_id, run_id)
+  -> inicializa estado en memoria (queued/running)
   -> lanza hilo run_backtest_and_save(...)
+  -> abre modal de progreso en UI
+
+UI (polling)
+  -> GET /backtest_status (cada ~1.5s)
+  -> renderiza fase actual + barra + eventos
+  -> habilita boton OK cuando status=completed/error
 
 Hilo de ejecución
-  -> Backtest.ejecutar_backtest(config_web)
-     [1/9] Cargar configuración base de usuario
-     [2/9] Sincronizar atributos de System
-     [3/9] Cargar símbolos del usuario desde PostgreSQL
-     [4/9] Descargar OHLCV (Yahoo Finance)
-     [5/9] Procesar fundamentales (opcional)
-     [6/9] Calcular ratios OHLCV (opcional)
-     [7/9] Aplicar filtro fundamental (opcional)
-     [8/9] Ejecutar run_multi_symbol_backtest(...)
-     [9/9] Generar gráficos HTML por símbolo
+  -> Backtest.ejecutar_backtest(config_web, progress_callback)
+     [1/11] Configuracion
+     [2/11] System
+     [3/11] Base de datos
+     [4/11] Datos de mercado
+     [5/11] Fundamentales (opcional)
+     [6/11] Filtros
+     [7/11] Motor
+     [8/11] Graficos
+     [9/11] Persistencia SQL
+     [10/11] Cierre
+     [11/11] Notificacion
+  -> actualiza estado en memoria por cada fase
   -> Persistir resultados/trades con save_backtest_run(...)
+  -> marcar estado final completed/error
   -> db.session.remove()
 ```
 
@@ -32,10 +43,13 @@ Hilo de ejecución
 - Capa HTTP y sesión de usuario.
 - Normaliza formulario y construye `config_web`.
 - Aplica política de fecha operativa: `end_date` por defecto a `ayer` y no persistente en `config_actual`.
+- Expone `GET /backtest_status` para seguimiento de ejecución en tiempo real desde la UI.
+- Gestiona estado de ejecución en memoria por usuario (`queued`, `running`, `completed`, `error`).
 
 `Backtest.py`
 - Orquestador de proceso.
 - Adapta datos para el motor y controla errores/logs.
+- Publica hitos de progreso de cada fase mediante callback opcional (`progress_callback`).
 
 `estrategia_system.py`
 - Adaptador `System(Strategy)`.
@@ -79,3 +93,4 @@ Trazabilidad:
 
 - Logging estructurado del ciclo completo.
 - Motivos técnicos consolidados en los registros de trade.
+- Estado operativo visible en la UI durante la ejecución (fase actual, mensaje y eventos recientes).

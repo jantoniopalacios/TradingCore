@@ -48,22 +48,31 @@ logger = logging.getLogger("Ejecucion")
 
 # ----------------------------------------------------------------------
 
-def ejecutar_backtest(config_dict: dict):
+def ejecutar_backtest(config_dict: dict, progress_callback=None):
     """
     Versión profesional: utiliza el contexto de Flask y evita re-imports.
     Con manejo completo de excepciones y logging detallado.
     """
     start_time = time.time()
     user_mode = config_dict.get('user_mode', 'invitado')
+
+    def _progress(phase_index, phase_total, phase, message):
+        if callable(progress_callback):
+            try:
+                progress_callback(phase_index, phase_total, phase, message)
+            except Exception as cb_err:
+                logger.warning(f"⚠️  Error reportando progreso: {cb_err}")
     
     try:
         # 1. Cargar configuración base y mezclar con la de la Web
+        _progress(1, 11, 'Configuracion', 'Cargando configuracion base y parametros web')
         logger.info(f"[1/9] Cargando configuración para usuario: {user_mode}")
         datos_base = cargar_y_asignar_configuracion(user_mode)
         config_final = {**datos_base, **config_dict}
         logger.info("✅ Configuración cargada")
 
         # 2. Sincronizar Clase Global System
+        _progress(2, 11, 'System', 'Sincronizando parametros globales de estrategia')
         logger.info("[2/9] Sincronizando parámetros System")
         asignar_parametros_a_system(config_final, config_final)
         logger.info("✅ System sincronizado")
@@ -79,6 +88,7 @@ def ejecutar_backtest(config_dict: dict):
         logger.info(f"🚀 Ejecución Web | Usuario: {user_mode} | Rango: {start_date} a {end_date} | Intervalo: {intervalo}")
 
         # 4. Lógica de Base de Datos
+        _progress(3, 11, 'Base de datos', 'Cargando simbolos configurados para el usuario')
         logger.info("[3/9] Buscando símbolos del usuario en BD")
         u_actual = Usuario.query.filter_by(username=user_mode).first()
         if not u_actual:
@@ -94,6 +104,7 @@ def ejecutar_backtest(config_dict: dict):
         logger.info(f"✅ {len(simbolos_df)} símbolos encontrados: {simbolos_df['Symbol'].tolist()}")
         
         # 5. Descarga y Procesamiento
+        _progress(4, 11, 'Datos de mercado', 'Descargando historicos desde Yahoo Finance')
         logger.info("[4/9] Descargando datos históricos de Yahoo Finance")
         stocks_data = descargar_datos_YF(simbolos_df, start_date, end_date, intervalo, data_files_path) 
         if stocks_data is None or stocks_data.empty:
@@ -103,6 +114,7 @@ def ejecutar_backtest(config_dict: dict):
 
         financial_data = None
         if filtro_fundamental:
+            _progress(5, 11, 'Fundamentales', 'Procesando datos fundamentales y ratios')
             logger.info("[5/9] Procesando datos fundamentales")
             try:
                 financial_data = manage_fundamental_data(
@@ -124,8 +136,11 @@ def ejecutar_backtest(config_dict: dict):
                 logger.info("✅ Ratios calculados")
             except Exception as e:
                 logger.warning(f"⚠️  Error en ratios (continuando con datos básicos): {e}")
+        else:
+            _progress(5, 11, 'Fundamentales', 'Filtro fundamental desactivado; se omite esta fase')
 
         # 6. Selección y Filtros
+        _progress(6, 11, 'Filtros', 'Aplicando filtros y seleccion final de activos')
         simbolos_a_procesar = simbolos_df["Symbol"].tolist()
         if filtro_fundamental:
             logger.info("[7/9] Aplicando filtro fundamental")
@@ -139,6 +154,7 @@ def ejecutar_backtest(config_dict: dict):
                 logger.warning(f"⚠️  Error en filtro fundamental: {e}")
 
         # 7. Motor de Backtest
+        _progress(7, 11, 'Motor', 'Ejecutando backtest multi-simbolo')
         logger.info("[8/9] Ejecutando motor de backtest multi-símbolo")
         stocks_data_dict = {
             s: stocks_data[stocks_data["Symbol"] == s] 
@@ -162,6 +178,7 @@ def ejecutar_backtest(config_dict: dict):
         logger.info(f"✅ Backtest completado: {len(resultados_df)} resultados")
 
         # 8. Renderizado de Gráficos (Bokeh)
+        _progress(8, 11, 'Graficos', 'Generando visualizaciones por activo')
         logger.info("[9/9] Generando gráficos")
         diccionario_graficos_html = {}
         graph_dir = Path(config_final.get('graph_dir'))
@@ -186,6 +203,7 @@ def ejecutar_backtest(config_dict: dict):
                 logger.error(f"  ❌ Error generando gráfico para {symbol}: {e}")
 
         # 9. Persistencia Delegada
+        _progress(9, 11, 'Persistencia', 'Guardando resultados y operaciones en SQL')
         logger.info("Guardando resultados en base de datos")
         if not resultados_df.empty:
             try:
@@ -214,6 +232,7 @@ def ejecutar_backtest(config_dict: dict):
             logger.warning("⚠️  No hay resultados para guardar")
 
         elapsed = time.time() - start_time
+        _progress(10, 11, 'Cierre', f'Ciclo principal completado en {elapsed:.2f}s')
         logger.info(f"✨ Ciclo completado exitosamente en {elapsed:.2f}s")
 
         # --- ENVÍO DE MAIL DE RECOMENDACIONES SI ESTÁ ACTIVADO ---
@@ -221,6 +240,7 @@ def ejecutar_backtest(config_dict: dict):
         destinatario_email = config_final.get('destinatario_email', None)
         usuario_nombre = user_mode
         if enviar_mail and destinatario_email:
+            _progress(11, 11, 'Notificacion', 'Enviando email de recomendaciones')
             try:
                 # Construir tabla de recomendaciones SOLO para activos procesados
                 activos_procesados = resultados_df['Symbol'].tolist() if resultados_df is not None else []
@@ -297,6 +317,8 @@ def ejecutar_backtest(config_dict: dict):
                 logger.info(f"✉️  Mail de recomendaciones enviado a {destinatario_email}")
             except Exception as e:
                 logger.error(f"❌ Error enviando mail de recomendaciones: {e}")
+        else:
+            _progress(11, 11, 'Notificacion', 'Envio de email desactivado')
 
         return resultados_df, trades_df, diccionario_graficos_html
     
