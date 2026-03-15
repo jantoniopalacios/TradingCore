@@ -197,14 +197,14 @@ def check_ema_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
     # ======================================================================
     # Si el usuario tiene el switch 'Descendente' activado en la UI para VENTA
     if getattr(strategy_self, 'ema_slow_descendente', False) and strategy_self.ema_slow_descendente_STATE:
-        return True, "VENTA: EMA Lenta Descendente"
+        return True, "EMA Lenta Descendente"
     
     # ======================================================================
     # OPCIÓN 2: Usuario seleccionó "Máximo" → Cierra si EMA toca máximo local
     # ======================================================================
     # Si el usuario tiene el switch 'Máximo' activado en la UI para VENTA
     if getattr(strategy_self, 'ema_slow_maximo', False) and strategy_self.ema_slow_maximo_STATE:
-        return True, "VENTA: Máximo en EMA Lenta"
+        return True, "Máximo en EMA Lenta"
 
     # ======================================================================
     # OPCIÓN 3: Cruce descendente (EMA Rápida cruza por debajo de EMA Lenta)
@@ -215,6 +215,6 @@ def check_ema_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
         # Usamos 'crossover' invirtiendo el orden para detectar cruce hacia abajo
         cond_tendencia_crossdown = crossover(strategy_self.ema_slow_series, strategy_self.ema_fast_series)
         if cond_tendencia_crossdown:
-            return True, "VENTA: EMA Cruce Rápida/Lenta (CrossDown)"
+            return True, "EMA Cruce Rápida/Lenta (CrossDown)"
 
     return False, None

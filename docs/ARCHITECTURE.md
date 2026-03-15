@@ -46,6 +46,7 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 - Endpoints web de configuración, lanzamiento de backtest, consulta de resultados y logs.
 - `launch_strategy()` lanza ejecución asíncrona en hilo.
 - `backtest_status()` devuelve estado en vivo de la ejecución para la UI (fase, mensaje, eventos, estado final).
+- El guardado de configuración soporta modo AJAX para persistir sin redirección completa.
 
 `scenarios/BacktestWeb/Backtest.py`
 - `ejecutar_backtest(config_dict, progress_callback=None)`: orquestador operativo con reporte de progreso por fases.
@@ -76,6 +77,12 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 8. `System.next()` delega en `Logica_Trading` para decidir compra/venta por vela.
 9. Se guardan métricas, trades y gráficos en BD/HTML y se exponen en la UI.
 10. Al finalizar, se marca estado `completed` o `error`; el usuario confirma con `OK` y se recarga la vista para ver historial actualizado.
+
+Notas de UX del formulario:
+
+- Navegar entre sub-pestañas de `Configuracion` no persiste automáticamente en base de datos.
+- `Guardar Config` es la acción explícita de persistencia de parámetros.
+- Los cambios no guardados permanecen en memoria del formulario mientras no exista recarga de página.
 
 ## 4. Patrón de Decisión de Señales
 

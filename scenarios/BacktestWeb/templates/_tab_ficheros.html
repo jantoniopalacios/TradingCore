@@ -39,10 +39,12 @@
                    class="btn btn-link btn-sm text-secondary p-0 hover-info">
                    <i class="bi bi-download"></i>
                 </a>
-                <button type="button" class="btn btn-link btn-sm text-secondary p-0 hover-danger" 
-                        onclick="confirmDelete(event, '{{ url_for('main.delete_file', path=item_path) }}', '{{ name }}')">
-                    <i class="bi bi-trash"></i>
-                </button>
+                {% if item_path.startswith('logs/') %}
+                  <button type="button" class="btn btn-link btn-sm text-secondary p-0 hover-danger" 
+                          onclick="confirmDelete(event, '{{ url_for('main.delete_file', path=item_path) }}', '{{ name }}')">
+                      <i class="bi bi-trash"></i>
+                  </button>
+                {% endif %}
               </div>
             </div>
           {% endif %}

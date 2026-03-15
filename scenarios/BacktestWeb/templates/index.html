@@ -111,6 +111,9 @@
         .nav-sub .nav-link:hover {
             background-color: rgba(255,255,255,0.5);
         }
+
+        /* Las sub-pestañas de Configuración NO tienen transición (cambio instantáneo, sin flash) */
+        #pane-config .tab-pane { transition: none !important; }
     </style>
 
 </head>
@@ -162,7 +165,7 @@
         <button type="button" onclick="lanzarEstrategia()" class="btn btn-primary w-100 fw-bold mb-3 shadow-sm">
             <i class="bi bi-play-fill me-1"></i> LANZAR BACKTEST
         </button>
-        <button type="submit" form="config-form" name="action" value="save_config" class="btn btn-outline-light btn-sm w-100 opacity-75 mb-4">
+        <button type="button" onclick="guardarConfig()" class="btn btn-outline-light btn-sm w-100 opacity-75 mb-4">
             <i class="bi bi-save me-1"></i> GUARDAR CONFIG
         </button>
         
@@ -190,24 +193,24 @@
             
             <div class="tab-pane fade show active" id="pane-config">
                 <div class="nav nav-pills nav-sub" id="subTabsConfig" role="tablist">
-                    <button class="nav-link active" id="tab-global" data-bs-toggle="pill" data-bs-target="#sub-global">Global</button>
-                    <button class="nav-link" id="tab-ema" data-bs-toggle="pill" data-bs-target="#sub-ema">EMA</button>
-                    <button class="nav-link" id="tab-rsi" data-bs-toggle="pill" data-bs-target="#sub-rsi">RSI</button>
-                    <button class="nav-link" id="tab-macd" data-bs-toggle="pill" data-bs-target="#sub-macd">MACD</button>
-                    <button class="nav-link" id="tab-atr" data-bs-toggle="pill" data-bs-target="#sub-atr">ATR</button>
-                    <button class="nav-link" id="tab-stoch" data-bs-toggle="pill" data-bs-target="#sub-stoch">Estocástico</button>
-                    <button class="nav-link" id="tab-bb" data-bs-toggle="pill" data-bs-target="#sub-bb">Bollinger</button>
-                    <button class="nav-link" id="tab-volume" data-bs-toggle="pill" data-bs-target="#sub-volume">Volumen</button>
+                    <button type="button" class="nav-link active" id="tab-global" data-bs-toggle="pill" data-bs-target="#sub-global">Global</button>
+                    <button type="button" class="nav-link" id="tab-ema" data-bs-toggle="pill" data-bs-target="#sub-ema">EMA</button>
+                    <button type="button" class="nav-link" id="tab-rsi" data-bs-toggle="pill" data-bs-target="#sub-rsi">RSI</button>
+                    <button type="button" class="nav-link" id="tab-macd" data-bs-toggle="pill" data-bs-target="#sub-macd">MACD</button>
+                    <button type="button" class="nav-link" id="tab-atr" data-bs-toggle="pill" data-bs-target="#sub-atr">ATR</button>
+                    <button type="button" class="nav-link" id="tab-stoch" data-bs-toggle="pill" data-bs-target="#sub-stoch">Estocástico</button>
+                    <button type="button" class="nav-link" id="tab-bb" data-bs-toggle="pill" data-bs-target="#sub-bb">Bollinger</button>
+                    <button type="button" class="nav-link" id="tab-volume" data-bs-toggle="pill" data-bs-target="#sub-volume">Volumen</button>
                 </div>
                 <div class="tab-content card-main">
-                    <div class="tab-pane fade show active" id="sub-global">{% include '_tab_global.html' %}</div>
-                    <div class="tab-pane fade" id="sub-ema">{% include '_tab_ema.html' %}</div>
-                    <div class="tab-pane fade" id="sub-rsi">{% include '_tab_rsi.html' %}</div>
-                    <div class="tab-pane fade" id="sub-macd">{% include '_tab_macd.html' %}</div>
-                    <div class="tab-pane fade" id="sub-atr">{% include '_tab_atr.html' %}</div>
-                    <div class="tab-pane fade" id="sub-stoch">{% include '_tab_stoch.html' %}</div>
-                    <div class="tab-pane fade" id="sub-bb">{% include '_tab_bb.html' %}</div>
-                    <div class="tab-pane fade" id="sub-volume">{% include '_tab_mos_volume.html' %}</div>
+                    <div class="tab-pane show active" id="sub-global">{% include '_tab_global.html' %}</div>
+                    <div class="tab-pane" id="sub-ema">{% include '_tab_ema.html' %}</div>
+                    <div class="tab-pane" id="sub-rsi">{% include '_tab_rsi.html' %}</div>
+                    <div class="tab-pane" id="sub-macd">{% include '_tab_macd.html' %}</div>
+                    <div class="tab-pane" id="sub-atr">{% include '_tab_atr.html' %}</div>
+                    <div class="tab-pane" id="sub-stoch">{% include '_tab_stoch.html' %}</div>
+                    <div class="tab-pane" id="sub-bb">{% include '_tab_bb.html' %}</div>
+                    <div class="tab-pane" id="sub-volume">{% include '_tab_mos_volume.html' %}</div>
                 </div>
             </div>
 
@@ -271,6 +274,15 @@
     </div>
 </div>
 
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 9999">
+    <div id="toastNotif" class="toast align-items-center border-0" role="alert" aria-live="assertive">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold" id="toastNotifBody">Guardado.</div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+        </div>
+    </div>
+</div>
+
 <form id="formDelete" method="POST" style="display:none;"></form>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -280,43 +292,34 @@
 
     // 1. LIMPIEZA Y PERSISTENCIA (Tu lógica original)
     document.addEventListener('DOMContentLoaded', () => {
+        // 1. Limpiar valores "None" de los inputs
         document.querySelectorAll('input').forEach(input => {
             if (input.value === "None") input.value = "";
         });
 
-        const savedTab = localStorage.getItem('activeTabKey');
-        if (savedTab) {
-            const triggerEl = document.querySelector(`#${savedTab}`);
-            if (triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
-        }
-
-        // PERSISTENCIA DE PESTAÑAS
-        const tabs = ['activeTabKey', 'activeSubTabKey'];
-        tabs.forEach(key => {
-            const savedTab = localStorage.getItem(key);
-            if (savedTab) {
-                const triggerEl = document.querySelector(`#${savedTab}`);
-                if (triggerEl) {
-                    const tab = new bootstrap.Tab(triggerEl);
-                    tab.show();
-                }
-            }
+        // 2. RESTAURAR PESTAÑAS GUARDADAS
+        // Sub-pestañas (pills) no tienen clase 'fade': el cambio es instantáneo, sin posibilidad de flash.
+        // Pestañas principales (tab) sí tienen 'fade', pero el cambio ocurre antes del primer render visible.
+        ['activeTabKey', 'activeSubTabKey'].forEach(key => {
+            const savedId = localStorage.getItem(key);
+            if (!savedId) return;
+            const btn = document.querySelector(`#${savedId}`);
+            if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
         });
 
-        // GUARDAR PESTAÑA AL HACER CLIC
+        // 3. GUARDAR PESTAÑA ACTIVA AL HACER CLIC
+        // Distinción por atributo: data-bs-toggle="tab" = pestaña lateral, "pill" = sub-pestaña.
+        // Esto evita que tab-historial se guarde en el bucket de sub-pestañas.
         document.querySelectorAll('button[data-bs-toggle="tab"], button[data-bs-toggle="pill"]').forEach(tabBtn => {
             tabBtn.addEventListener('shown.bs.tab', (e) => {
-                // Si es una pestaña principal (pane-...)
-                if (e.target.id.startsWith('btn-nav') || e.target.id.startsWith('tab-master')) {
-                    localStorage.setItem('activeTabKey', e.target.id);
-                } 
-                // Si es una sub-pestaña (global, ema, rsi...)
-                else {
-                    localStorage.setItem('activeSubTabKey', e.target.id);
-                }
+                const key = e.target.getAttribute('data-bs-toggle') === 'tab'
+                    ? 'activeTabKey'
+                    : 'activeSubTabKey';
+                localStorage.setItem(key, e.target.id);
             });
         });
-        // Fecha fin por defecto = ayer (solo si está vacía)
+
+        // 4. Fecha fin por defecto = ayer (solo si está vacía)
         const fechaFinInput = document.querySelector('#end_date')
             || document.querySelector('[name="end_date"]')
             || document.querySelector('#fecha_fin')
@@ -546,6 +549,35 @@
 
         poll();
         launchStatusPollTimer = setInterval(poll, 1500);
+    }
+
+    // GUARDAR CONFIG vía AJAX (sin recarga de página)
+    function guardarConfig() {
+        const formEl = document.getElementById('config-form');
+        const formData = new FormData(formEl);
+        formData.set('action', 'save_config');
+        const btn = document.querySelector('button[onclick="guardarConfig()"]');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
+
+        fetch("{{ url_for('main.index') }}", {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => showToast(data.status === 'success' ? 'success' : 'danger', data.message || 'Operación completada.'))
+        .catch(() => showToast('danger', 'Error de red al guardar la configuración.'))
+        .finally(() => { btn.disabled = false; btn.innerHTML = origHtml; });
+    }
+
+    function showToast(type, message) {
+        const toastEl = document.getElementById('toastNotif');
+        const toastBody = document.getElementById('toastNotifBody');
+        toastEl.className = `toast align-items-center text-bg-${type} border-0`;
+        toastBody.textContent = message;
+        bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 3500 }).show();
     }
 
     // 4. LANZAR ESTRATEGIA (con modal de progreso)

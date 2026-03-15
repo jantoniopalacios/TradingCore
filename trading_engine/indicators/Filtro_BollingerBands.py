@@ -92,6 +92,6 @@ def check_bb_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional[
         cond_sell_sma = crossunder(close_price, strategy_self.bb_sma_series) 
         
         if cond_sell_band or cond_sell_sma:
-            return True, "VENTA BB Extremo/Fin Tendencia"
+            return True, "BB Extremo/Fin Tendencia"
     
     return False, None

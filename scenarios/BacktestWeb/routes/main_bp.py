@@ -17,7 +17,7 @@ import traceback
 from ..file_handler import read_symbols_raw, write_symbols_raw, get_directory_tree
 from ..configuracion import (
     inicializar_configuracion_usuario,
-    cargar_y_asignar_configuracion, System, BACKTESTING_BASE_DIR
+    cargar_y_asignar_configuracion, System, BACKTESTING_BASE_DIR, PROJECT_ROOT
 ) 
 from trading_engine.core.constants import VARIABLE_COMMENTS
 from ..Backtest import ejecutar_backtest 
@@ -186,9 +186,13 @@ def index():
         try:
             u.config_actual = json.dumps(config_params) # Guardamos como JSON
             db.session.commit()
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"status": "success", "message": "✅ Configuración guardada correctamente."})
             flash("✅ Configuración guardada correctamente.", "success")
         except Exception as e:
             db.session.rollback()
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"status": "error", "message": f"Error al guardar: {e}"})
             flash(f"Error al guardar config: {e}", "danger")
 
         return redirect(url_for('main.index'))
@@ -274,8 +278,23 @@ def index():
     # SOLO escaneamos si el usuario es admin
     if user_mode == 'admin':
         logs_dir = BACKTESTING_BASE_DIR / "logs"
+        docs_dir = PROJECT_ROOT / "docs"
         if logs_dir.exists():
-            arbol_ficheros = get_directory_tree(logs_dir, is_admin=True)
+            arbol_ficheros.append({
+                "name": "logs",
+                "is_dir": True,
+                "children": get_directory_tree(logs_dir, is_admin=True),
+                "type": "Folder",
+                "path": "logs"
+            })
+        if docs_dir.exists():
+            arbol_ficheros.append({
+                "name": "docs",
+                "is_dir": True,
+                "children": get_directory_tree(docs_dir, is_admin=True),
+                "type": "Folder",
+                "path": "docs"
+            })
 
     return render_template(
         'index.html',
@@ -543,16 +562,38 @@ def backtest_status():
 def view_file(path):
     if not session.get('logged_in'):
         return "No autorizado", 401
-    
-    # 1. Normalizamos la ruta. 
-    # Si el frontend envía "logs/trading_app.log", evitamos duplicar "logs/logs/..."
-    if path.startswith("logs/"):
-        full_path = BACKTESTING_BASE_DIR / path
-    else:
-        full_path = BACKTESTING_BASE_DIR / "logs" / os.path.basename(path)
+
+    # Permitir lectura solo desde raíces controladas del explorador.
+    # Normalizamos separadores por robustez (URLs usan '/', pero protegemos casos mixtos)
+    normalized_path = str(path).replace('\\', '/')
+    path_obj = Path(normalized_path)
+    allowed_roots = {
+        "logs": (BACKTESTING_BASE_DIR / "logs").resolve(),
+        "docs": (PROJECT_ROOT / "docs").resolve(),
+    }
+
+    if not path_obj.parts:
+        return "Ruta inválida.", 400
+
+    root_key = path_obj.parts[0]
+    root_path = allowed_roots.get(root_key)
+    if root_path is None:
+        return "Ruta no permitida.", 403
+
+    relative_path = Path(*path_obj.parts[1:]) if len(path_obj.parts) > 1 else Path()
+    full_path = (root_path / relative_path).resolve()
+
+    # Evitar traversal fuera de la raíz permitida.
+    try:
+        full_path.relative_to(root_path)
+    except ValueError:
+        return "Ruta no permitida.", 403
 
     if not full_path.exists():
         return f"Archivo no encontrado en: {full_path}", 404
+
+    if full_path.is_dir():
+        return "La ruta seleccionada es un directorio.", 400
 
     try:
         # 2. IMPORTANTE: Usamos 'errors='replace' para caracteres extraños

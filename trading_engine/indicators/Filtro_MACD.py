@@ -120,6 +120,6 @@ def check_macd_sell_signal(strategy_self) -> Tuple[bool, Optional[str]]:
     if (strategy_self.macd_maximo and strategy_self.macd_maximo_STATE) or \
        (strategy_self.macd_descendente and strategy_self.macd_descendente_STATE):
         
-        return True, "VENTA MACD Máximo/Descendente"
+        return True, "MACD Máximo/Descendente"
     
     return False, None

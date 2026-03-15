@@ -365,8 +365,7 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
             log_parts.append(mos_log_reason)
 
         # Compilar la descripción final
-        descripcion_adicional = " (" + " | ".join(log_parts) + ")" if log_parts else ""
-        descripcion_compra = "COMPRA" + descripcion_adicional
+        descripcion_compra = " | ".join(log_parts) if log_parts else ""
         
         # Registro en trades_list
         strategy_self.trades_list.append({
@@ -504,7 +503,7 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
             strategy_self.trades_list.append({
                 "Symbol": strategy_self.ticker, 
                 "Tipo": "VENTA",
-                "Descripcion": descripcion_cierre, 
+                "Descripcion": descripcion_cierre,
                 "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
                 "Precio_Entrada": round(trade_obj.entry_price, 4) if trade_obj and trade_obj.entry_price is not None else "N/A",
                 "Stop_Loss_Inicial": round(final_stop_loss, 2) if final_stop_loss else "N/A", 
@@ -526,6 +525,8 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     
 
     # 2. Calcular el nuevo SL basado en el máximo, usando trailing dinámico por RSI si está configurado
+    # Guardamos el origen del stop para trazabilidad en el log de venta.
+    stop_source = "TrailingBase"
     trailing_pct = strategy_self.stoploss_percentage_below_close
     rsi_val = None
     try:
@@ -545,12 +546,17 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     if rsi_val is not None and rsi_trailing_limit is not None:
         if trailing_pct_below is not None and rsi_val <= rsi_trailing_limit:
             trailing_pct = trailing_pct_below / 100.0 if trailing_pct_below > 1 else trailing_pct_below
+            stop_source = "TrailingRSI<=Limite"
         elif trailing_pct_above is not None and rsi_val > rsi_trailing_limit:
             trailing_pct = trailing_pct_above / 100.0 if trailing_pct_above > 1 else trailing_pct_above
+            stop_source = "TrailingRSI>Limite"
 
     new_stop_loss = strategy_self.max_price * (1 - trailing_pct)
 
-    # 2a. Break-Even (opcional): protege el precio de entrada al alcanzar un umbral de ganancia
+    # 2a. Break-Even (opcional): suelo permanente en entry*(1-pct) + trailing libre al superar entry*(1+pct)
+    #   - Siempre: stop no puede bajar de entry*(1-pct)                → limita pérdida en todo momento
+    #   - Fase 1 (max < entry*(1+pct)): stop fijado exactamente en lower_stop (no trailing)
+    #   - Fase 2 (max >= entry*(1+pct)): trailing toma el control, pero lower_stop sigue siendo suelo
     if getattr(strategy_self, 'breakeven_enabled', False):
         try:
             trade_obj = strategy_self.trades[-1] if strategy_self.trades else None
@@ -561,11 +567,18 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
                 trigger_pct = float(trigger_pct)
                 trigger_pct = trigger_pct / 100.0 if trigger_pct > 1 else trigger_pct
                 if trigger_pct >= 0:
-                    be_trigger_price = entry_price * (1 + trigger_pct)
-                    if strategy_self.max_price >= be_trigger_price:
-                        # No permitir que el SL vuelva por debajo del precio de entrada
-                        if entry_price > new_stop_loss:
-                            new_stop_loss = entry_price
+                    upper_trigger = entry_price * (1 + trigger_pct)
+                    lower_stop    = entry_price * (1 - trigger_pct)
+                    if strategy_self.max_price < upper_trigger:
+                        # Fase 1: stop fijado en el suelo (no trailing aún)
+                        if lower_stop > new_stop_loss:
+                            new_stop_loss = lower_stop
+                            stop_source = "BreakEven"
+                    else:
+                        # Fase 2: trailing corre libre, pero lower_stop es suelo absoluto
+                        if lower_stop > new_stop_loss:
+                            new_stop_loss = lower_stop
+                            stop_source = "BreakEven"
         except Exception:
             pass
 
@@ -583,6 +596,7 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
                 # Usar el stop mas restrictivo (mas alto)
                 if swing_stop > new_stop_loss:
                     new_stop_loss = swing_stop
+                    stop_source = "Swing"
         except Exception:
             pass
 
@@ -610,7 +624,7 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
         strategy_self.trades_list.append({
             "Symbol": strategy_self.ticker, 
             "Tipo": "VENTA",
-            "Descripcion": "StopLoss", 
+            "Descripcion": f"StopLoss ({stop_source})", 
             "Fecha": strategy_self.data.index[-1].strftime('%Y-%m-%d %H:%M:%S'),
             "Precio_Entrada": round(trade_obj.entry_price, 4) if trade_obj and trade_obj.entry_price is not None else "N/A",
             "Stop_Loss_Inicial": round(final_stop_loss, 2) if final_stop_loss else "N/A", 

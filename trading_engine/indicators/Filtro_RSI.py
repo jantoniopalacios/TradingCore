@@ -166,11 +166,11 @@ def check_rsi_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
         
         # Cierre si RSI alcanza máximo (sobrecompra)
         if getattr(strategy_self, 'rsi_maximo', False) and maximo_state:
-            return True, "VENTA RSI Máximo (Sobrecompra)"
+            return True, "RSI Máximo (Sobrecompra)"
         
         # Cierre si RSI desciende
         if getattr(strategy_self, 'rsi_descendente', False) and descendente_state:
-            return True, "VENTA RSI Descendente"
+            return True, "RSI Descendente"
     
     return False, None
 

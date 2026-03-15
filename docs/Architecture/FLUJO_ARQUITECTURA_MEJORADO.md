@@ -18,6 +18,16 @@ UI (polling)
   -> renderiza fase actual + barra + eventos
   -> habilita boton OK cuando status=completed/error
 
+UI (configuracion)
+  -> cambio de sub-pestaña instantaneo (sin transicion `fade` en sub-panes)
+  -> no hay guardado automatico al navegar entre sub-pestañas
+  -> `Guardar Config` usa POST AJAX para persistir sin recarga completa
+
+UI (explorador de ficheros, solo admin)
+  -> muestra arbol combinado de `logs` y `docs`
+  -> permite abrir/descargar archivos de ambas rutas
+  -> borrado habilitado solo para archivos de `logs`
+
 Hilo de ejecución
   -> Backtest.ejecutar_backtest(config_web, progress_callback)
      [1/11] Configuracion
@@ -45,6 +55,8 @@ Hilo de ejecución
 - Aplica política de fecha operativa: `end_date` por defecto a `ayer` y no persistente en `config_actual`.
 - Expone `GET /backtest_status` para seguimiento de ejecución en tiempo real desde la UI.
 - Gestiona estado de ejecución en memoria por usuario (`queued`, `running`, `completed`, `error`).
+- En guardado de configuración, devuelve JSON cuando el request es AJAX (`X-Requested-With: XMLHttpRequest`).
+- En el visor web de archivos, restringe lectura a raíces controladas (`logs`, `docs`) y evita traversal fuera de esas rutas.
 
 `Backtest.py`
 - Orquestador de proceso.
@@ -94,3 +106,4 @@ Trazabilidad:
 - Logging estructurado del ciclo completo.
 - Motivos técnicos consolidados en los registros de trade.
 - Estado operativo visible en la UI durante la ejecución (fase actual, mensaje y eventos recientes).
+- Estado de pestañas (`activeTabKey` y `activeSubTabKey`) persistido en `localStorage` para mantener contexto visual.

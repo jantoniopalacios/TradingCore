@@ -225,7 +225,7 @@ def check_oscillator_sell_signal(strategy_self, prefix: str) -> Tuple[bool, Opti
        (descendente_setting and descendente_state):
         
         log_name = prefix.replace('_', ' ').title().replace('Stoch', 'Stoch')
-        return True, f"VENTA {log_name} Máximo/Descendente"
+        return True, f"{log_name} Máximo/Descendente"
     
     return False, None
 
