@@ -16,7 +16,75 @@
     }
 </style>
 
-<h2 class="mb-3">Parámetros Globales</h2>
+<div class="d-flex align-items-center gap-2 mb-3">
+    <h2 class="mb-0">Parámetros Globales</h2>
+    <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#globalInfoModal">
+        <i class="bi bi-info-circle"></i> ℹ️ Ayuda
+    </button>
+</div>
+
+<!-- Modal con información Global -->
+<div class="modal fade" id="globalInfoModal" tabindex="-1" aria-labelledby="globalInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="globalInfoModalLabel">⚙️ Parámetros Globales - Guía de Uso</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>
+                    Esta pestaña controla el marco general del backtest: rango temporal, capital, costes y gestión de riesgo.
+                    Una buena configuración aquí suele impactar más en drawdown que ajustar un indicador aislado.
+                </p>
+
+                <h6 class="mt-4 text-primary"><strong>1. Datos y contexto de ejecución</strong></h6>
+                <ul class="small mb-3">
+                    <li><strong>Fecha de Inicio / Fecha de Fin:</strong> definen la ventana histórica del test.</li>
+                    <li><strong>Intervalo:</strong> resolución de velas (`1h`, `1d`, `1wk`, etc.).</li>
+                    <li><strong>Capital Inicial (cash):</strong> base sobre la que se calcula rendimiento y drawdown.</li>
+                    <li><strong>Comisión (commission):</strong> coste por operación. Si es demasiado baja en pruebas, los resultados pueden ser irreales.</li>
+                </ul>
+
+                <h6 class="mt-4 text-primary"><strong>2. Protección de capital (riesgo)</strong></h6>
+                <ul class="small mb-3">
+                    <li><strong>Stop Loss (%):</strong> protección base de la posición.</li>
+                    <li><strong>SL por Swing:</strong> usa estructura del precio para colocar un stop más contextual.</li>
+                    <li><strong>Break-Even:</strong> al alcanzar una ganancia mínima, protege el precio de entrada para evitar que una operación ganadora termine en pérdida grande.</li>
+                </ul>
+
+                <div class="alert alert-warning small">
+                    <strong>Regla práctica:</strong> primero bajar drawdown, luego optimizar retorno. Una estrategia que gana mucho pero cae 40%+ suele ser difícil de sostener en real.
+                </div>
+
+                <h6 class="mt-4 text-primary"><strong>3. Ejemplos de configuración</strong></h6>
+
+                <p class="mb-1"><strong>Perfil conservador (prioriza proteger capital):</strong></p>
+                <ul class="small mb-3">
+                    <li>`stoploss_percentage_below_close = 0.04`</li>
+                    <li>`stoploss_swing_enabled = True`, `stoploss_swing_lookback = 12`, `stoploss_swing_buffer = 1.0`</li>
+                    <li>`breakeven_enabled = True`, `breakeven_trigger_pct = 0.02`</li>
+                </ul>
+
+                <p class="mb-1"><strong>Perfil balanceado (dejar correr con control):</strong></p>
+                <ul class="small mb-3">
+                    <li>`stoploss_percentage_below_close = 0.06`</li>
+                    <li>`stoploss_swing_enabled = True`, `stoploss_swing_lookback = 10`, `stoploss_swing_buffer = 0.8`</li>
+                    <li>`breakeven_enabled = True`, `breakeven_trigger_pct = 0.025`</li>
+                </ul>
+
+                <h6 class="mt-4 text-primary"><strong>4. Errores frecuentes</strong></h6>
+                <ul class="small mb-0">
+                    <li>Usar stop demasiado amplio y asumir que el indicador lo resolverá después.</li>
+                    <li>No activar break-even cuando hay muchas operaciones que pasan por beneficio y terminan perdiendo.</li>
+                    <li>Comparar resultados con distinto capital/comisión/fechas (comparación no válida).</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <h4 class="mb-3 text-primary border-bottom pb-2">Configuración de Datos y Reporte</h4>
 
@@ -103,6 +171,24 @@
                value="{{ config.stoploss_swing_buffer if config.stoploss_swing_buffer else 1.0 }}">
     </div>
     <div class="col-2"><span class="text-muted small"><a href="#" title="Buffer en dólares por debajo del swing bajo (por defecto 1.0)" data-bs-toggle="tooltip">?</a></span></div>
+</div>
+
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4"><label for="breakeven_enabled" class="form-check-label">Activar Break-Even:</label></div>
+    <div class="col-6">
+        <input type="checkbox" class="form-check-input" id="breakeven_enabled" name="breakeven_enabled" value="1"
+               {% if config.get('breakeven_enabled') == 'True' or config.get('breakeven_enabled') == True %}checked{% endif %}>
+    </div>
+    <div class="col-2"><span class="text-muted small">{% if comments.breakeven_enabled %}<a href="#" title="{{ comments.breakeven_enabled }}" data-bs-toggle="tooltip">?</a>{% endif %}</span></div>
+</div>
+
+<div class="row row-control align-items-center mb-4">
+    <div class="col-4"><label for="breakeven_trigger_pct" class="form-label">Trigger Break-Even (%):</label></div>
+    <div class="col-6">
+        <input type="number" class="form-control" id="breakeven_trigger_pct" name="breakeven_trigger_pct" step="0.01" min="0.0" max="100.0"
+               value="{{ config.breakeven_trigger_pct }}">
+    </div>
+    <div class="col-2"><span class="text-muted small">{% if comments.breakeven_trigger_pct %}<a href="#" title="{{ comments.breakeven_trigger_pct }}" data-bs-toggle="tooltip">?</a>{% endif %}</span></div>
 </div>
 
 <h4 class="mb-3 text-primary border-bottom pb-2">Opciones de Ejecución y Correo</h4>

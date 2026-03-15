@@ -33,6 +33,8 @@ VARIABLE_COMMENTS = {
     "cash": "Monto inicial de capital con el que comienza el backtest.",
     "commission": "Comisión de trading aplicada a cada operación (ej: 0.002 = 0.2%).",
     "stoploss_percentage_below_close": "Porcentaje de pérdida máxima por posición antes de vender automáticamente (Stop Loss).",
+    "breakeven_enabled": "Activa protección Break-Even: cuando la operación alcanza el umbral, el Stop Loss no vuelve por debajo del precio de entrada.",
+    "breakeven_trigger_pct": "Porcentaje de ganancia necesario para activar Break-Even (ej: 0.02 = 2% o 2 = 2%).",
     "enviar_mail": "Si está activo, se enviará un correo con el resumen de los resultados al finalizar la ejecución.",
     "destinatario_email": "Dirección(es) de correo electrónico a la que se enviarán los resultados.",
     

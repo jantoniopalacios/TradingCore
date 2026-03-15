@@ -550,6 +550,25 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
 
     new_stop_loss = strategy_self.max_price * (1 - trailing_pct)
 
+    # 2a. Break-Even (opcional): protege el precio de entrada al alcanzar un umbral de ganancia
+    if getattr(strategy_self, 'breakeven_enabled', False):
+        try:
+            trade_obj = strategy_self.trades[-1] if strategy_self.trades else None
+            entry_price = trade_obj.entry_price if trade_obj and trade_obj.entry_price is not None else None
+            trigger_pct = getattr(strategy_self, 'breakeven_trigger_pct', None)
+
+            if entry_price is not None and trigger_pct is not None:
+                trigger_pct = float(trigger_pct)
+                trigger_pct = trigger_pct / 100.0 if trigger_pct > 1 else trigger_pct
+                if trigger_pct >= 0:
+                    be_trigger_price = entry_price * (1 + trigger_pct)
+                    if strategy_self.max_price >= be_trigger_price:
+                        # No permitir que el SL vuelva por debajo del precio de entrada
+                        if entry_price > new_stop_loss:
+                            new_stop_loss = entry_price
+        except Exception:
+            pass
+
     # 2b. Stop Loss por Swing (opcional)
     if getattr(strategy_self, 'stoploss_swing_enabled', False):
         try:

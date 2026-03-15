@@ -165,6 +165,10 @@ def asignar_parametros_a_system(config_data: dict, rutas: dict):
     System.stoploss_swing_enabled = get_param('stoploss_swing_enabled', False, bool)
     System.stoploss_swing_lookback = get_param('stoploss_swing_lookback', 10, int)
     System.stoploss_swing_buffer = get_param('stoploss_swing_buffer', 1.0, float)
+
+    # Break-Even por protección de precio de entrada
+    System.breakeven_enabled = get_param('breakeven_enabled', False, bool)
+    System.breakeven_trigger_pct = get_param('breakeven_trigger_pct', None, float)
     
     # Filtro de Volatilidad por ATR
     System.atr_enabled = get_param('atr_enabled', False, bool)

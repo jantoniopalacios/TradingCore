@@ -174,6 +174,10 @@ class System(Strategy):
     stoploss_swing_enabled = False
     stoploss_swing_lookback = 10  # Período para calcular swing low
     stoploss_swing_buffer = 1.0   # Buffer en $ absolutos del swing low
+
+    # Break-Even por protección de precio de entrada (opcional)
+    breakeven_enabled = False
+    breakeven_trigger_pct = None
     
     # Filtro de Volatilidad por ATR (Rango de Volatilidad)
     atr_enabled = False

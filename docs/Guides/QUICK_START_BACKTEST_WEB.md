@@ -32,8 +32,9 @@ python scenarios/BacktestWeb/app.py
 1. Abrir `http://localhost:5000`.
 2. Iniciar sesion con un usuario registrado.
 3. Seleccionar simbolos (por ejemplo, `NKE`).
-4. Activar indicadores de prueba (por ejemplo, EMA y MACD).
-5. Pulsar `Lanzar Backtest`.
+4. Revisar parametros globales y usar el boton `Ayuda` de la pestaña Global para consultar ejemplos de stop loss, swing y break-even.
+5. Activar indicadores de prueba (por ejemplo, EMA y MACD).
+6. Pulsar `Lanzar Backtest`.
 
 Nota sobre fechas:
 - `end_date` se inicializa por defecto en `ayer`.

@@ -92,7 +92,9 @@ def index():
             # Filtros globales
             'filtro_fundamental', 'enviar_mail', 'margen_seguridad_active', 
             'margen_seguridad_ascendente', 'volume_active', 'volume_ascendente',
-            'stoch_fast', 'stoch_mid', 'stoch_slow'
+            'stoch_fast', 'stoch_mid', 'stoch_slow',
+            # Protección de entrada
+            'breakeven_enabled'
         ]
 
         for s in lista_switches:
@@ -333,7 +335,8 @@ def launch_strategy():
         switches = [
             'macd', 'rsi', 'ema_cruce_signal', 'bb_active', 'bb_buy_crossover', 
             'bb_sell_crossover', 'filtro_fundamental', 'enviar_mail', 
-            'margen_seguridad_active', 'volume_active', 'stoch_fast', 'stoch_mid', 'stoch_slow'
+            'margen_seguridad_active', 'volume_active', 'stoch_fast', 'stoch_mid', 'stoch_slow',
+            'breakeven_enabled'
         ]
 
         # 3. PROCESAR EL FORMULARIO

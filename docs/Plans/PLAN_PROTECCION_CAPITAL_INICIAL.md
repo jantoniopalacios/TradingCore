@@ -17,6 +17,15 @@ Este plan aplica a ejecuciones desde `scenarios/BacktestWeb/` y se centra en:
 
 ## Capas de control recomendadas
 
+## Limitacion detectada en el motor actual
+Con la logica actual, el stop loss y el trailing se recalculan en todo momento sobre el maximo y no existe una fase explicita de proteccion del precio de entrada (break-even).
+
+Impacto practico observado:
+- si el stop es agresivo, protege capital pero corta ganadores pronto.
+- si el stop es amplio, deja correr beneficio pero tolera mas retrocesos sobre capital.
+
+Esta tension es estructural y no siempre se resuelve solo con ajuste de parametros.
+
 ### 1. Stop loss base (obligatorio)
 Parametro principal:
 - `stoploss_percentage_below_close`
@@ -56,6 +65,37 @@ Activar filtros globales para reducir entradas de baja calidad:
 - volatilidad: `atr_enabled=True`, `atr_period=14`, rango calibrado por activo (`atr_min`, `atr_max`).
 - volumen: `volume_active=True` y umbral de calidad (`volume_avg_multiplier`).
 - tendencia: veto de compra en escenarios de debilidad estructural (por ejemplo `ema_slow_descendente`).
+
+## Evolucion minima propuesta: fase Break-Even
+
+### Objetivo
+Separar la gestion de riesgo en dos fases:
+1. fase de proteccion del capital hasta blindar la entrada.
+2. fase de captura de beneficio con trailing.
+
+### Parametros nuevos propuestos
+- `breakeven_enabled` (bool): activa la logica break-even.
+- `breakeven_trigger_pct` (float): ganancia minima para armar break-even (ejemplo `0.02` = 2%).
+
+### Comportamiento esperado
+1. al abrir posicion, se mantiene el esquema actual de stop inicial.
+2. si el precio alcanza `entry_price * (1 + breakeven_trigger_pct)`, el stop sube al menos a:
+   - `entry_price`
+3. una vez armado break-even, el trailing continua normalmente, pero nunca baja de ese umbral.
+
+### Integracion tecnica sugerida
+- Carga/configuracion:
+   - `scenarios/BacktestWeb/configuracion.py`
+   - `scenarios/BacktestWeb/estrategia_system.py`
+- Tooltips en UI:
+   - `trading_engine/core/constants.py`
+- Lado estrategia (campos en formulario global de riesgo):
+   - `scenarios/BacktestWeb/templates/_tab_global.html`
+- Logica de ejecucion:
+   - `trading_engine/core/Logica_Trading.py`
+
+Nota:
+- Esta evolucion es acotada y no rompe la estrategia actual cuando `breakeven_enabled=False`.
 
 ## Configuraciones semilla
 
@@ -119,6 +159,7 @@ Usar el mismo set de simbolos, rango temporal, comision y capital para todos los
 | M5 ATR ON | Evitar entradas en ruido extremo | M4 + `atr_enabled=True`, rango calibrado | Menor # de trades de baja calidad y drawdown mas estable |
 | M6 Volumen ON | Filtrar liquidez debil | M5 + `volume_active=True` | Caida de trades con deterioro limitado de retorno |
 | M7 Comparativa final | Elegir preset candidato | Comparar Semilla A/B/C | Seleccionar la menor `Max Drawdown` con `Return` aceptable |
+| M8 Break-Even ON | Proteger entrada sin matar tendencia | M4 + `breakeven_enabled=True`, `trigger=0.02` | Menos operaciones perdedoras despues de ganancias iniciales |
 
 ## Reglas de decision (pass/fail)
 1. Rechazar configuraciones con `Max Drawdown` peor que baseline M0.
@@ -154,12 +195,22 @@ Decision (Pass/Fail):
 2. Ejecutar M1-M4 para calibrar bloque de stop/trailing.
 3. Ejecutar M5-M6 para calibrar filtros de entrada.
 4. Ejecutar M7 (A/B/C) y elegir preset candidato por equilibrio retorno-riesgo.
-5. Documentar preset ganador y aplicarlo como configuracion recomendada por perfil.
+5. Ejecutar M8 para validar mejora estructural de proteccion de entrada.
+6. Documentar preset ganador y aplicarlo como configuracion recomendada por perfil.
 
 ## Riesgos conocidos
 - Sobreajuste por activo si solo se valida con un simbolo.
 - Parametros de ATR no transferibles entre perfiles de volatilidad.
 - Exceso de filtros puede reducir demasiado el numero de oportunidades.
+
+## Estado de implementacion
+Cambios aplicados en codigo para version minima Break-Even (sin offset):
+- UI: `breakeven_enabled`, `breakeven_trigger_pct` en `scenarios/BacktestWeb/templates/_tab_global.html`.
+- Carga de configuracion: `scenarios/BacktestWeb/configuracion.py`.
+- Parametros de estrategia: `scenarios/BacktestWeb/estrategia_system.py`.
+- Procesamiento de formulario booleano: `scenarios/BacktestWeb/routes/main_bp.py`.
+- Logica de stop en runtime: `trading_engine/core/Logica_Trading.py`.
+- Tooltips/documentacion de parametros: `trading_engine/core/constants.py`.
 
 ## Referencias
 - [Guia Trailing Stop RSI](../Guia/GUIA_TRAILING_STOP_RSI.md)
