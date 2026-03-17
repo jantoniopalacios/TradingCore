@@ -141,6 +141,69 @@ Nota de seguridad:
 - El visor solo permite lectura dentro de rutas controladas del explorador (`logs` y `docs`).
 - No se permite navegar fuera de esas raices mediante rutas manuales.
 
+## Paso 9: Tabla de parametros y efecto operativo
+
+Esta tabla resume los parametros visibles en UI y su efecto practico.
+Regla clave para interpretar B&H:
+
+- B&H solo entra cuando no hay posicion abierta, no hay senales tecnicas activas y EMA lenta esta favorable.
+- Si activas una senal tecnica (por ejemplo EMA cruce, RSI compra, MACD, Stoch o BB), B&H deja de ser el camino principal de entrada.
+
+| Grupo | Parametro | Efecto operativo | Impacto sobre B&H / Compra |
+|---|---|---|---|
+| Global | `cash` | Capital inicial del backtest | No activa/bloquea senal |
+| Global | `commission` | Comision por operacion | No activa/bloquea senal |
+| Global | `intervalo` | Marco temporal (`1d`, `1wk`, etc.) | Cambia la serie de datos usada por todas las senales |
+| Global | `stoploss_percentage_below_close` | Trailing stop base | Gestion de salida, no de entrada |
+| Global | `enviar_mail` / `destinatario_email` | Notificacion al finalizar | Sin impacto en logica de trading |
+| Stop | `breakeven_enabled` | Activa suelo de proteccion por entrada | Solo salida (riesgo) |
+| Stop | `breakeven_trigger_pct` | Umbral para break-even | Solo salida (riesgo) |
+| Stop | `stoploss_swing_enabled` | Activa stop por swing low | Solo salida (riesgo) |
+| Stop | `stoploss_swing_lookback` | Ventana para swing low | Solo salida (riesgo) |
+| Stop | `stoploss_swing_buffer` | Buffer bajo swing low | Solo salida (riesgo) |
+| Stop | `rsi_trailing_limit` | Umbral RSI para trailing dinamico | Solo aplica si RSI esta ON |
+| Stop | `trailing_pct_below` / `trailing_pct_above` | % trailing segun RSI bajo/alto | Solo aplica si RSI esta ON |
+| EMA | `ema_slow_period` | Periodo de EMA lenta | Base para tendencia/filtro/B&H |
+| EMA | `ema_fast_period` | Periodo de EMA rapida | Relevante en cruce EMA |
+| EMA | `ema_cruce_signal` | Activa senal OR por cruce EMA | Si esta ON, B&H deja de actuar como entrada por defecto |
+| EMA | `ema_slow_minimo` | Senal OR por estado minimo de EMA lenta | Si esta ON, ya hay via tecnica de compra |
+| EMA | `ema_slow_ascendente` | Senal OR por EMA lenta ascendente | Si esta ON, ya hay via tecnica de compra |
+| EMA | `ema_slow_maximo` | Condicion de venta tecnica EMA | Salida tecnica |
+| EMA | `ema_slow_descendente` | Condicion de venta tecnica EMA | Salida tecnica |
+| RSI | `rsi` | Activa calculo/uso de RSI | Permite filtros y senales RSI |
+| RSI | `rsi_period` | Periodo RSI | Ajusta sensibilidad RSI |
+| RSI | `rsi_low_level` | Nivel sobreventa compra | Usado por logica RSI compra |
+| RSI | `rsi_high_level` | Nivel sobrecompra venta | Usado por logica RSI venta |
+| RSI | `rsi_minimo` | Senal OR de compra RSI en minimo | Si ON, B&H queda desplazado por via tecnica |
+| RSI | `rsi_ascendente` | Senal OR de compra RSI ascendente | Si ON, B&H queda desplazado por via tecnica |
+| RSI | `rsi_maximo` | Senal de venta RSI | Salida tecnica |
+| RSI | `rsi_descendente` | Senal de venta RSI descendente | Salida tecnica |
+| RSI | `rsi_strength_threshold` | Filtro global de fuerza RSI | Puede bloquear compras, incluso B&H, cuando RSI esta ON |
+| MACD | `macd` | Activa MACD | Si ON, hay via tecnica de compra/venta |
+| MACD | `macd_fast` / `macd_slow` / `macd_signal` | Parametros de calculo MACD | Ajustan sensibilidad |
+| MACD | `macd_maximo` / `macd_descendente` | Cierre tecnico MACD | Salida tecnica |
+| STOCH | `stoch_fast` / `stoch_mid` / `stoch_slow` | Activa familia estocastica | Si ON, hay via tecnica de compra/venta |
+| STOCH | `*_period` / `*_smooth` | Parametros de calculo Stoch | Ajustan sensibilidad |
+| STOCH | `*_low_level` / `*_high_level` | Umbrales sobreventa/sobrecompra | Definen disparadores |
+| STOCH | `*_minimo` / `*_ascendente` | Compra tecnica Stoch | Si ON, B&H queda desplazado por via tecnica |
+| STOCH | `*_maximo` / `*_descendente` | Venta tecnica Stoch | Salida tecnica |
+| BB | `bb_active` | Activa Bollinger Bands | Si ON, hay via tecnica de compra/venta |
+| BB | `bb_window` / `bb_num_std` | Parametros de bandas | Ajustan ancho/sensibilidad |
+| BB | `bb_buy_crossover` | Compra BB por cruce (o toque segun modo) | Si ON, B&H queda desplazado por via tecnica |
+| BB | `bb_sell_crossover` | Cierre tecnico BB | Salida tecnica |
+| Filtros | `atr_enabled` | Activa filtro de volatilidad ATR | Puede bloquear compras |
+| Filtros | `atr_period` / `atr_min` / `atr_max` | Parametros de filtro ATR | Control de calidad de entrada |
+| Fundamentales | `Margen_Seguridad_Active` | Activa filtro MoS | Puede bloquear compras |
+| Fundamentales | `Margen_Seguridad_Threshold` | Umbral minimo MoS | Puede bloquear compras |
+| Volumen | `volume_active` | Activa filtro/estado de volumen | Puede bloquear compras |
+| Volumen | `volume_period` / `volume_avg_multiplier` | Parametros volumen | Ajustan filtro |
+
+Notas rapidas de interpretacion:
+
+1. `ON` en un indicador no implica compra inmediata; implica que esa familia puede aportar senal OR o filtro.
+2. Si hay posicion abierta, no se abre una compra nueva hasta que se cierre la posicion actual.
+3. El titulo corto del historial (`ESTRATEGIA`) es un resumen automatico, no reemplaza el detalle completo de configuracion.
+
 ## Validacion de exito
 - En logs se completan los pasos del orquestador.
 - En web aparecen resultados y graficos.

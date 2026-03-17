@@ -3,6 +3,7 @@ import threading
 import csv
 import io
 import json
+import html
 from pathlib import Path
 from flask import (
     Blueprint, render_template, request, redirect, url_for, 
@@ -31,6 +32,60 @@ main_bp = Blueprint('main', __name__)
 # Clave: username | Valor: dict de estado de la ultima ejecucion lanzada.
 BACKTEST_STATUS_BY_USER = {}
 BACKTEST_STATUS_LOCK = threading.Lock()
+
+
+def _is_enabled(value):
+    """Normaliza flags bool que pueden venir como bool, numero o texto."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'on', 'yes', 'si', 'sí'}
+    return bool(value)
+
+
+def _build_strategy_short_title(result_row):
+    """Genera un titulo corto y legible para el historial SQL a partir de params_tecnicos."""
+    try:
+        params = json.loads(result_row.params_tecnicos) if result_row.params_tecnicos else {}
+    except Exception:
+        params = {}
+
+    indicators = []
+    if _is_enabled(params.get('ema_cruce_signal')) or any(_is_enabled(params.get(k)) for k in ('ema_slow_minimo', 'ema_slow_maximo', 'ema_slow_ascendente', 'ema_slow_descendente')):
+        indicators.append('EMA')
+    if _is_enabled(params.get('rsi')):
+        indicators.append('RSI')
+    if _is_enabled(params.get('macd')):
+        indicators.append('MACD')
+    if any(_is_enabled(params.get(k)) for k in ('stoch_fast', 'stoch_mid', 'stoch_slow')):
+        indicators.append('STOCH')
+    if _is_enabled(params.get('bb_active')):
+        indicators.append('BB')
+
+    risk_flags = []
+    if _is_enabled(params.get('breakeven_enabled')):
+        risk_flags.append('BE')
+    if _is_enabled(params.get('stoploss_swing_enabled')):
+        risk_flags.append('SWING')
+    if _is_enabled(params.get('rsi')) and params.get('rsi_trailing_limit') is not None and (
+        params.get('trailing_pct_below') is not None or params.get('trailing_pct_above') is not None
+    ):
+        risk_flags.append('TSL-RSI')
+
+    core = '+'.join(indicators) if indicators else 'BASE'
+    risk = f" | {'/'.join(risk_flags)}" if risk_flags else ''
+    interval_value = (
+        params.get('INTERVAL')
+        or params.get('interval')
+        or params.get('intervalo')
+        or getattr(result_row, 'intervalo', None)
+    )
+    interval = f" ({interval_value})" if interval_value else ''
+
+    title = f"{core}{risk}{interval}"
+    return title[:56] + '...' if len(title) > 59 else title
 
 
 def _utc_now_iso():
@@ -257,6 +312,7 @@ def index():
                     'fecha_raw': r.fecha_ejecucion, # Guardamos el objeto datetime para ordenar
                     'fecha': r.fecha_ejecucion.strftime('%Y-%m-%d %H:%M'),
                     'usuario_nombre': r.propietario.username,
+                    'titulo_estrategia': _build_strategy_short_title(r),
                     'activos': []
                 }
             registros_agrupados[tanda_key]['activos'].append(r)
@@ -275,10 +331,20 @@ def index():
 # Inicializamos vacío por seguridad
     arbol_ficheros = []
 
-    # SOLO escaneamos si el usuario es admin
+    # docs visible para todos los usuarios autenticados
+    docs_dir = PROJECT_ROOT / "docs"
+    if docs_dir.exists():
+        arbol_ficheros.append({
+            "name": "docs",
+            "is_dir": True,
+            "children": get_directory_tree(docs_dir, is_admin=(user_mode == 'admin')),
+            "type": "Folder",
+            "path": "docs"
+        })
+
+    # logs solo para admin
     if user_mode == 'admin':
         logs_dir = BACKTESTING_BASE_DIR / "logs"
-        docs_dir = PROJECT_ROOT / "docs"
         if logs_dir.exists():
             arbol_ficheros.append({
                 "name": "logs",
@@ -286,14 +352,6 @@ def index():
                 "children": get_directory_tree(logs_dir, is_admin=True),
                 "type": "Folder",
                 "path": "logs"
-            })
-        if docs_dir.exists():
-            arbol_ficheros.append({
-                "name": "docs",
-                "is_dir": True,
-                "children": get_directory_tree(docs_dir, is_admin=True),
-                "type": "Folder",
-                "path": "docs"
             })
 
     return render_template(
@@ -562,6 +620,7 @@ def backtest_status():
 def view_file(path):
     if not session.get('logged_in'):
         return "No autorizado", 401
+    user_mode = session.get('user_mode')
 
     # Permitir lectura solo desde raíces controladas del explorador.
     # Normalizamos separadores por robustez (URLs usan '/', pero protegemos casos mixtos)
@@ -579,6 +638,10 @@ def view_file(path):
     root_path = allowed_roots.get(root_key)
     if root_path is None:
         return "Ruta no permitida.", 403
+
+    # Permisos por raíz: docs para todos, logs solo admin.
+    if root_key == 'logs' and user_mode != 'admin':
+        return "No autorizado para acceder a logs.", 403
 
     relative_path = Path(*path_obj.parts[1:]) if len(path_obj.parts) > 1 else Path()
     full_path = (root_path / relative_path).resolve()
@@ -832,9 +895,84 @@ def ver_grafico_completo(reg_id):
         if not resultado.grafico_html or not resultado.grafico_html.strip():
             return "<h3>No hay datos gráficos guardados para este backtest.</h3>", 404
         
-        # 3. Devolver como HTML completo para que el navegador lo renderice solo
+        # 3. Inyectar un bloque informativo arriba del gráfico (sin alterar lo persistido en BD)
+        strategy_title = _build_strategy_short_title(resultado)
+        fecha_txt = resultado.fecha_ejecucion.strftime('%Y-%m-%d %H:%M') if resultado.fecha_ejecucion else 'N/A'
+
+        try:
+            params = json.loads(resultado.params_tecnicos) if resultado.params_tecnicos else {}
+        except Exception:
+            params = {}
+
+        def _p(*keys, default='N/A'):
+            for k in keys:
+                if params.get(k) is not None and str(params.get(k)).strip() != '':
+                    return params.get(k)
+            return default
+
+        ema_slow_period_txt = str(_p('ema_slow_period'))
+
+        active_indicators = []
+        if _is_enabled(_p('rsi', default=False)):
+            active_indicators.append(f"RSI({_p('rsi_period')})")
+        if _is_enabled(_p('macd', default=False)):
+            active_indicators.append(f"MACD({_p('macd_fast')}/{_p('macd_slow')}/{_p('macd_signal')})")
+        if _is_enabled(_p('stoch_fast', default=False)):
+            active_indicators.append(f"StochFast({_p('stoch_fast_period')}/{_p('stoch_fast_smooth')})")
+        if _is_enabled(_p('stoch_mid', default=False)):
+            active_indicators.append(f"StochMid({_p('stoch_mid_period')}/{_p('stoch_mid_smooth')})")
+        if _is_enabled(_p('stoch_slow', default=False)):
+            active_indicators.append(f"StochSlow({_p('stoch_slow_period')}/{_p('stoch_slow_smooth')})")
+        if _is_enabled(_p('bb_active', default=False)):
+            active_indicators.append(f"BB({_p('bb_window')},{_p('bb_num_std')})")
+
+        indicators_txt = ' | '.join(active_indicators) if active_indicators else 'Ninguno'
+
+        info_block = f"""
+<style>
+    .chart-info-box {{
+        margin: 12px 16px 8px 16px;
+        padding: 10px 12px;
+        border: 1px solid #dbe4ff;
+        border-left: 4px solid #2f6fed;
+        background: #f7faff;
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        color: #1f2a44;
+        border-radius: 6px;
+    }}
+    .chart-info-box strong {{ color: #0f3ea3; }}
+</style>
+<div class=\"chart-info-box\">
+    <strong>Info estrategia:</strong>
+    {html.escape(strategy_title)}
+    <br>
+    <strong>Símbolo:</strong> {html.escape(str(resultado.symbol or 'N/A'))}
+    | <strong>Intervalo:</strong> {html.escape(str(resultado.intervalo or 'N/A'))}
+    | <strong>Fecha:</strong> {html.escape(fecha_txt)}
+    <br>
+    <strong>EMA Lenta (periodo):</strong> {html.escape(ema_slow_period_txt)}
+    <br>
+    <strong>Indicadores activos (periodos):</strong> {html.escape(indicators_txt)}
+</div>
+"""
+
+        page_html = resultado.grafico_html
+        if '<body>' in page_html:
+            page_html = page_html.replace('<body>', f'<body>{info_block}', 1)
+        elif '<body ' in page_html:
+            body_pos = page_html.lower().find('<body ')
+            body_end = page_html.find('>', body_pos)
+            if body_end != -1:
+                page_html = page_html[:body_end+1] + info_block + page_html[body_end+1:]
+            else:
+                page_html = info_block + page_html
+        else:
+            page_html = info_block + page_html
+
+        # 4. Devolver como HTML completo para que el navegador lo renderice solo
         # Usamos Response para asegurar el mimetype correcto
-        return Response(resultado.grafico_html, mimetype='text/html')
+        return Response(page_html, mimetype='text/html')
     
     except Exception as e:
         return f"<h3>Error al recuperar gráfico: {str(e)}</h3>", 500

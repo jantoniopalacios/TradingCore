@@ -15,6 +15,7 @@
             <tr>
                 <th style="width: 40px;"></th> 
                 <th>FECHA</th>
+                <th>ESTRATEGIA</th>
                 {% if session.get('user_mode') == 'admin' %}<th>USUARIO</th>{% endif %}
                 <th>ACTIVOS</th>
                 <th>RENDIMIENTO PROM.</th>
@@ -29,6 +30,11 @@
             <tr class="bg-light shadow-sm" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#bt-{{ tanda_id }}">
                 <td class="text-center"><i class="bi bi-chevron-right toggle-icon"></i></td>
                 <td class="fw-medium text-dark">{{ datos.fecha }}</td>
+                <td>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle" title="{{ datos.titulo_estrategia }}">
+                        {{ datos.titulo_estrategia }}
+                    </span>
+                </td>
                 
                 {% if session.get('user_mode') == 'admin' %}
                     <td class="text-primary fw-bold">{{ datos.usuario_nombre }}</td>
@@ -67,7 +73,7 @@
             </tr>
 
             <tr class="collapse" id="bt-{{ tanda_id }}">
-                <td colspan="{{ 6 if session.get('user_mode') == 'admin' else 5 }}" class="p-0">
+                <td colspan="{{ 7 if session.get('user_mode') == 'admin' else 6 }}" class="p-0">
                     <div class="bg-white p-4 border-start border-primary border-4">
                         <table class="table table-sm table-bordered mb-0">
                             <thead class="table-light" style="font-size: 11px;">

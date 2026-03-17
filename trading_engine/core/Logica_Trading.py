@@ -38,6 +38,17 @@ if TYPE_CHECKING:
 import logging
 logger = logging.getLogger('Logica_Trading')
 
+
+def _as_bool(value):
+    """Normaliza bool para aceptar valores string/numericos de formularios."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'on', 'yes', 'si', 'sí'}
+    return bool(value)
+
 def _log_trade_action_sl_update(strategy_self: 'StrategySelf', old_sl: float, new_sl: float) -> None:
     """
     Función auxiliar para registrar la actualización del Stop Loss dinámico (Trailing Stop) 
@@ -542,8 +553,10 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     rsi_trailing_limit = getattr(strategy_self, 'rsi_trailing_limit', None)
     trailing_pct_below = getattr(strategy_self, 'trailing_pct_below', None)
     trailing_pct_above = getattr(strategy_self, 'trailing_pct_above', None)
+    rsi_enabled = _as_bool(getattr(strategy_self, 'rsi', False))
 
-    if rsi_val is not None and rsi_trailing_limit is not None:
+    # El trailing por RSI solo aplica si RSI está activado explícitamente.
+    if rsi_enabled and rsi_val is not None and rsi_trailing_limit is not None:
         if trailing_pct_below is not None and rsi_val <= rsi_trailing_limit:
             trailing_pct = trailing_pct_below / 100.0 if trailing_pct_below > 1 else trailing_pct_below
             stop_source = "TrailingRSI<=Limite"

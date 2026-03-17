@@ -59,7 +59,12 @@ def save_backtest_run(user_id, stats, config_dict, trades_df, grafico_html=None)
             # Configuración de la ejecución
             fecha_inicio_datos=str(config_dict.get('START_DATE', config_dict.get('start_date'))),
             fecha_fin_datos=str(config_dict.get('END_DATE', config_dict.get('end_date'))),
-            intervalo=str(config_dict.get('INTERVAL', '1d')),
+            intervalo=str(
+                config_dict.get('INTERVAL')
+                or config_dict.get('interval')
+                or config_dict.get('intervalo')
+                or '1d'
+            ),
             cash_inicial=_clean_value(config_dict.get('CASH', 10000)),
             comision=_clean_value(config_dict.get('COMMISSION', 0.0)),
             

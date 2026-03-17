@@ -54,13 +54,12 @@
   </ul>
 {% endmacro %}
 
-{% if session.get('user_mode') == 'admin' %}
-    <div id="file-viewer-admin" class="card bg-black border-secondary shadow-lg overflow-hidden" style="display: flex; flex-direction: column; height: 600px;">
+  <div id="file-viewer-admin" class="card bg-black border-secondary shadow-lg overflow-hidden" style="display: flex; flex-direction: column; height: 600px;">
         
         <div class="card-header bg-black border-bottom border-secondary p-3" style="flex: 0 auto; z-index: 10;">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0 text-info small fw-bold text-uppercase tracking-wider">
-                    <i class="bi bi-hdd-network me-2"></i>Sistema de Archivos (Admin)
+          <i class="bi bi-hdd-network me-2"></i>Sistema de Archivos{% if session.get('user_mode') == 'admin' %} (Admin){% endif %}
                 </h5>
             </div>
             <div class="input-group input-group-sm">
@@ -79,7 +78,6 @@
             </div>
         </div>
     </div>
-{% endif %}
 
 <style>
     /* COLORES BASE */
