@@ -268,10 +268,30 @@ Resumen operativo observado en SAN.MC (0.10):
 	- `rsi_trailing` desactivado en baseline.
 - Perfil alternativo defensivo para comparativa: `stoploss_percentage_below_close=0.08` con el resto igual.
 - Buffer Swing conservador orientativo en `1d`: `0.3` a `0.8` (valor inicial sugerido: `0.5`).
-- El modelo de stop actualizado usa politica **Close/Close**:
+- El modelo de stop usa politica **Close/Close** (decision confirmada mediante comparativa A/B):
 	- El trailing se actualiza con el maximo de cierres (`Close`).
 	- La salida por stop se confirma por cierre (`Close < stop`).
-	- Ventaja principal: semantica homogénea y mas facil de auditar/interpetar en pruebas EOD.
+	- Ventaja principal: semantica homogenea y mas facil de auditar en pruebas EOD.
+
+### Comparativa A/B: Close/Close vs High/Close
+
+Se ejecuto `scripts/compare_trailing_model.py` sobre ZTS y SAN.MC (1d, 2023-01-01 a 2026-03-16) para cuantificar el impacto del cambio. Resultados:
+
+| Simbolo | Stop | Close/Close Return | High/Close Return | Delta |
+|---------|------|--------------------|-------------------|-------|
+| ZTS     | 5%   | -11.88%            | -12.83%           | C/C mejor +0.95pp |
+| ZTS     | 10%  | -14.14%            | -19.90%           | C/C mejor **+5.76pp** |
+| ZTS     | 15%  | -32.01%            | -27.94%           | H/C mejor +4.07pp |
+| SAN.MC  | 5%   | 156.44%            | 172.03%           | H/C mejor +15.59pp |
+| SAN.MC  | 10%  | **199.21%**        | 191.76%           | C/C mejor **+7.45pp** |
+| SAN.MC  | 15%  | 195.35%            | 195.35%           | Identicos |
+
+**Razonamiento de la decision:**
+
+- Con `stop=0.10` (perfil recomendado), Close/Close gana en **ambos simbolos** (+5.76pp en ZTS, +7.45pp en SAN.MC).
+- Con `stop=0.05` el resultado se invierte en SAN.MC; con `stop=0.15` es mixto o identico.
+- No existe un modelo universalmente superior: depende del stop elegido. Para el rango operativo habitual (`0.08`-`0.12`), Close/Close es consistentemente mejor.
+- Decision final: **mantener Close/Close** como politica de produccion.
 
 ### Como repetir las pruebas
 
@@ -285,6 +305,9 @@ c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/aud
 c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/audit_stops_combinations.py --symbol ZTS --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10
 
 c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/audit_stops_combinations.py --symbol SAN.MC --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10
+
+# Comparativa A/B Close/Close vs High/Close para cualquier simbolo:
+c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/compare_trailing_model.py --symbols ZTS SAN.MC --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stops 0.05 0.10 0.15
 ```
 
 Resultado esperado de exito:

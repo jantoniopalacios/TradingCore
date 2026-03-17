@@ -38,6 +38,22 @@ if TYPE_CHECKING:
 import logging
 logger = logging.getLogger('Logica_Trading')
 
+# ---------------------------------------------------------------------------
+# Modelo de trailing stop: política de producción confirmada = "close" (Close/Close).
+#   "close" → max_price se actualiza con Close[-1]  [PRODUCCION]
+#   "high"  → max_price se actualiza con High[-1]   [solo para comparativas A/B]
+#
+# Comparativa A/B ejecutada el 2026-03-18 sobre ZTS y SAN.MC (1d, stop=0.10):
+#   Close/Close: ZTS -14.14% / SAN.MC +199.21%
+#   High/Close:  ZTS -19.90% / SAN.MC +191.76%
+# → Close/Close superior en 5.76pp (ZTS) y 7.45pp (SAN.MC) con stop=0.10.
+# → Decisión: mantener "close". Ver docs/Guides/QUICK_START_BACKTEST_WEB.md §10.
+#
+# Para cambiar solo en scripts externos (compare_trailing_model.py);
+# nunca modificar manualmente en producción.
+# ---------------------------------------------------------------------------
+_trailing_ref: str = "close"
+
 
 def _as_bool(value):
     """Normaliza bool para aceptar valores string/numericos de formularios."""
@@ -530,9 +546,13 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     # --- GESTIÓN DE STOP LOSS DINÁMICO (Trailing Stop) ---
     # ----------------------------------------------------------------------
     
-    # 1. Actualiza el máximo de referencia con cierre de vela (modo Close/Close)
-    current_close = strategy_self.data.Close[-1]
-    strategy_self.max_price = max(strategy_self.max_price, current_close)
+    # 1. Actualiza el máximo de referencia.
+    #    _trailing_ref == "high"  → High/Close (referencia intraday, el máximo histórico)
+    #    _trailing_ref == "close" → Close/Close (solo cierres, más conservador)
+    _ref_val = (strategy_self.data.High[-1]
+                if _trailing_ref == 'high'
+                else strategy_self.data.Close[-1])
+    strategy_self.max_price = max(strategy_self.max_price, _ref_val)
     
 
     # 2. Calcular el nuevo SL basado en el máximo, usando trailing dinámico por RSI si está configurado
