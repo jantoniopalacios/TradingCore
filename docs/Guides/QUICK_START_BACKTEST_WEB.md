@@ -214,3 +214,80 @@ Si aparece `Sin datos historicos descargados`, revisar:
 - existencia de CSV en `Data_files/`.
 - rango de fechas e intervalo configurados.
 - conectividad con la fuente de datos.
+
+## Paso 10: Auditoria de Stops (pruebas realizadas y repeticion)
+
+En esta fase se audito la logica de stops con scripts independientes, sin modificar codigo de produccion.
+
+Scripts usados:
+
+- `scripts/audit_stops_zts.py`: valida coherencia de TrailingBase por trade.
+- `scripts/audit_stops_combinations.py`: valida combinaciones y ausencia de fugas de fuente (`TrailingBase`, `BreakEven`, `Swing`, `TrailingRSI...`).
+
+### Configuracion comun de las pruebas
+
+- Intervalo: `1d`
+- Rango: `2023-01-01` a `2026-03-16`
+- EMA lenta: `200`
+- En escenarios base: indicadores tecnicos desactivados salvo donde se pruebe explicitamente RSI trailing.
+
+### Pruebas realizadas
+
+1. Auditoria TrailingBase por activo (`audit_stops_zts.py`)
+
+- ZTS con stops `0.05`, `0.10`, `0.15`: sin hallazgos de logica de stop.
+- SAN.MC con stops `0.05`, `0.10`, `0.15`: tras ajustar el modelo del auditor para reflejar exactamente el motor (stop inicial en cierre de compra y actualizacion con `High` desde la vela siguiente), sin hallazgos.
+
+2. Auditoria de combinaciones (`audit_stops_combinations.py`) con stop `0.10`
+
+- ZTS: sin fugas de fuente entre escenarios.
+- SAN.MC: resultado reproducible, sin fugas de fuente entre escenarios.
+
+Resumen operativo observado en SAN.MC (0.10):
+
+- `trailing_base`: solo `TrailingBase`.
+- `breakeven_only`: `BreakEven` y `TrailingBase`.
+- `swing_only`: `TrailingBase` en este rango/parametros (Swing no llego a dominar).
+- `breakeven_and_swing`: `BreakEven` y `TrailingBase`.
+- `rsi_trailing_guard_off`: sin fuentes RSI (correcto).
+- `rsi_trailing_on`: aparece `TrailingRSI<=Limite` (correcto).
+
+### Conclusiones
+
+- Validacion funcional satisfactoria para TrailingBase, BreakEven, Swing y trailing RSI en los escenarios auditados.
+- No se detectaron bugs de logica de stop en los casos ejecutados.
+- Queda pendiente solo una regresion de cobertura amplia (mas activos, otros intervalos y casos extremos de datos) si se requiere cierre al 100%.
+
+### Hallazgos practicos adicionales
+
+- Configuracion comun recomendada (perfil equilibrado):
+	- `intervalo=1d`, `ema_slow_period=200`
+	- `stoploss_percentage_below_close=0.10`
+	- `breakeven_enabled=True`, `breakeven_trigger_pct=0.02`
+	- `stoploss_swing_enabled=False` (activar solo en pruebas especificas)
+	- `rsi_trailing` desactivado en baseline.
+- Perfil alternativo defensivo para comparativa: `stoploss_percentage_below_close=0.08` con el resto igual.
+- Buffer Swing conservador orientativo en `1d`: `0.3` a `0.8` (valor inicial sugerido: `0.5`).
+- El modelo de stop auditado en este punto usa politica **High/Close**:
+	- El trailing se actualiza con el maximo intravela (`High`).
+	- La salida por stop se confirma por cierre (`Close < stop`).
+	- Esto reduce salidas por ruido intradia, pero puede aparentar salidas tardias en velas con mecha.
+
+### Como repetir las pruebas
+
+Desde la raiz del proyecto, con el entorno virtual activo:
+
+```powershell
+c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/audit_stops_zts.py --symbol ZTS --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stops 0.05 0.10 0.15
+
+c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/audit_stops_zts.py --symbol SAN.MC --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stops 0.05 0.10 0.15
+
+c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/audit_stops_combinations.py --symbol ZTS --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10
+
+c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/audit_stops_combinations.py --symbol SAN.MC --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10
+```
+
+Resultado esperado de exito:
+
+- `audit_stops_zts.py`: mensaje `No stop logic issues detected in audited scenario.`
+- `audit_stops_combinations.py`: mensaje `No source-leak issues detected in stop combination scenarios.`
