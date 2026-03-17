@@ -530,9 +530,9 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
     # --- GESTIÓN DE STOP LOSS DINÁMICO (Trailing Stop) ---
     # ----------------------------------------------------------------------
     
-    # 1. Actualiza el precio máximo alcanzado
-    current_high = strategy_self.data.High[-1]
-    strategy_self.max_price = max(strategy_self.max_price, current_high)
+    # 1. Actualiza el máximo de referencia con cierre de vela (modo Close/Close)
+    current_close = strategy_self.data.Close[-1]
+    strategy_self.max_price = max(strategy_self.max_price, current_close)
     
 
     # 2. Calcular el nuevo SL basado en el máximo, usando trailing dinámico por RSI si está configurado

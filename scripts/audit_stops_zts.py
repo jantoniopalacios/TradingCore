@@ -142,9 +142,9 @@ def _audit_trade(
         findings.append(AuditFinding(stop_value, trade_number, "error", "empty OHLCV window for trade"))
         return findings
 
-    # Mirror production logic exactly for TrailingBase:
+    # Mirror production logic exactly for TrailingBase (Close/Close mode):
     # - At BUY: max_price starts at buy close; initial stop uses that close.
-    # - During open position: max_price updates with each bar high.
+    # - During open position: max_price updates with each bar close.
     # - Stop only ratchets up, never down.
     # - Exit condition is close < my_stop_loss.
     buy_close = float(window.iloc[0]["Close"])
@@ -154,9 +154,8 @@ def _audit_trade(
     expected_exit = None
 
     for ts, row in window.iloc[1:].iterrows():
-        high = float(row["High"])
         close = float(row["Close"])
-        max_price = max(max_price, high)
+        max_price = max(max_price, close)
         new_stop_loss = max_price * (1 - trailing_pct)
 
         if new_stop_loss > my_stop_loss:

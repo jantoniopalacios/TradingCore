@@ -268,10 +268,10 @@ Resumen operativo observado en SAN.MC (0.10):
 	- `rsi_trailing` desactivado en baseline.
 - Perfil alternativo defensivo para comparativa: `stoploss_percentage_below_close=0.08` con el resto igual.
 - Buffer Swing conservador orientativo en `1d`: `0.3` a `0.8` (valor inicial sugerido: `0.5`).
-- El modelo de stop auditado en este punto usa politica **High/Close**:
-	- El trailing se actualiza con el maximo intravela (`High`).
+- El modelo de stop actualizado usa politica **Close/Close**:
+	- El trailing se actualiza con el maximo de cierres (`Close`).
 	- La salida por stop se confirma por cierre (`Close < stop`).
-	- Esto reduce salidas por ruido intradia, pero puede aparentar salidas tardias en velas con mecha.
+	- Ventaja principal: semantica homogénea y mas facil de auditar/interpetar en pruebas EOD.
 
 ### Como repetir las pruebas
 
