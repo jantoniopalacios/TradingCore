@@ -128,11 +128,10 @@ def apply_ema_global_filter(strategy_self: 'StrategySelf', condicion_base_tecnic
     # ======================================================================
     # --- FILTRO GLOBAL DE VETO (HARDCODEADO): EMA Descendente BLOQUEA TODO ---
     # ======================================================================
-    # Este es un filtro de PROTECCIÓN PERMANENTE que no depende de parámetros configurables.
-    # Si la EMA Lenta está en descenso → NO se ejecuta NINGUNA compra, independientemente de
-    # cualquier otra señal técnica positiva.
-    if hasattr(strategy_self, 'ema_slow_descendente_STATE') and strategy_self.ema_slow_descendente_STATE:
-        return False  # VETO ABSOLUTO: Bloquea cualquier compra si EMA está descendiendo
+    # Veto configurable con el switch existente `ema_slow_descendente`.
+    # Si está activo y la EMA lenta desciende, se bloquean compras.
+    if getattr(strategy_self, 'ema_slow_descendente', False) and hasattr(strategy_self, 'ema_slow_descendente_STATE') and strategy_self.ema_slow_descendente_STATE:
+        return False  # VETO por EMA descendente habilitado por configuración
     
     # ======================================================================
     # --- FILTROS CONFIGURABLES (si estan habilitados) ---

@@ -50,12 +50,12 @@
                 </div>
                 
                 <div class="alert alert-danger alert-sm mb-3">
-                    <strong>⚠️ PROTECCIÓN HARDCODED (Veto Permanente):</strong><br>
+                    <strong>⚠️ PROTECCIÓN EMA DESCENDENTE (según switch):</strong><br>
                     <small>
-                        <strong>IMPORTANTE:</strong> La EMA Lenta tiene un <strong>veto de seguridad hardcoded</strong> que SIEMPRE está activo:<br>
+                        <strong>IMPORTANTE:</strong> Si activas el switch <strong>"Tendencia Bajista (Venta + Veto)"</strong>:<br>
                         • Si <code>ema_slow_descendente_STATE = True</code> (EMA está bajando) → <strong>BLOQUEA TODAS LAS COMPRAS</strong><br>
-                        • Este bloqueo ocurre <strong>independientemente</strong> de si activaste o no el switch "Descendente"<br>
-                        • Es una protección permanente del código para evitar compras en tendencias bajistas<br>
+                        • El bloqueo se aplica solo cuando el switch "Tendencia Bajista" está activo<br>
+                        • Útil para evitar compras en tramos claramente bajistas<br>
                         • <strong>Diferencia con RSI:</strong> RSI NO tiene vetos hardcoded, solo respeta los switches que actives
                     </small>
                 </div>
@@ -69,7 +69,7 @@
                         • <strong>Modo:</strong> Sistema entra en <strong>Buy & Hold</strong><br>
                         • <strong>COMPRA:</strong> ✅ En mínimos automáticos (<code>ema_slow_minimo_STATE</code> o <code>ema_slow_ascendente_STATE</code>)<br>
                         • <strong>VENTA:</strong> ❌ Solo por Stop Loss (sin ventas técnicas)<br>
-                        • <strong>VETO HARDCODED:</strong> ⚠️ Sigue activo → NO comprará si EMA Lenta está descendiendo<br>
+                        • <strong>VETO EMA DESCENDENTE:</strong> ⚠️ Se aplica solo si activas el switch "Tendencia Bajista"<br>
                         <strong>Resultado:</strong> Estrategia pasiva con protección contra bajadas fuertes.
                     </small>
                 </div>

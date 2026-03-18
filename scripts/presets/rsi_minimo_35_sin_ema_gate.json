@@ -1,0 +1,19 @@
+{
+  "rsi": true,
+  "rsi_period": 10,
+  "rsi_low_level": 35,
+  "rsi_high_level": 70,
+  "rsi_strength_threshold": 0,
+  "rsi_minimo": true,
+  "rsi_ascendente": false,
+  "rsi_maximo": false,
+  "rsi_descendente": false,
+  "ema_cruce_signal": false,
+  "ema_slow_minimo": false,
+  "ema_slow_ascendente": false,
+  "ema_slow_maximo": false,
+  "ema_slow_descendente": false,
+  "stoploss_percentage_below_close": 0.10,
+  "breakeven_enabled": true,
+  "breakeven_trigger_pct": 0.03
+}

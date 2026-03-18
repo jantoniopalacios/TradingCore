@@ -33,8 +33,8 @@ VARIABLE_COMMENTS = {
     "cash": "Monto inicial de capital con el que comienza el backtest.",
     "commission": "Comisión de trading aplicada a cada operación (ej: 0.002 = 0.2%).",
     "stoploss_percentage_below_close": "Porcentaje de pérdida máxima por posición antes de vender automáticamente (Stop Loss).",
-    "breakeven_enabled": "Activa protección Break-Even: cuando la operación alcanza el umbral, el Stop Loss no vuelve por debajo del precio de entrada.",
-    "breakeven_trigger_pct": "Porcentaje de ganancia necesario para activar Break-Even (ej: 0.02 = 2% o 2 = 2%).",
+    "breakeven_enabled": "Activa protección de capital inicial basada en el precio de entrada.",
+    "breakeven_trigger_pct": "Porcentaje máximo de pérdida permitido desde la entrada (ej: 0.03 = 3% o 3 = 3%).",
     "enviar_mail": "Si está activo, se enviará un correo con el resumen de los resultados al finalizar la ejecución.",
     "destinatario_email": "Dirección(es) de correo electrónico a la que se enviarán los resultados.",
     
@@ -54,8 +54,8 @@ VARIABLE_COMMENTS = {
     "rsi_low_level": "Nivel inferior de sobreventa (ej: 30). Si el RSI está por debajo de este nivel, puede generar una señal de compra.",
     "rsi_minimo": "Lógica de Compra: Activa la señal cuando el RSI alcanza un MÍNIMO de sobreventa.",
     "rsi_ascendente": "Lógica de Compra: Activa la señal cuando el RSI cruza al alza el umbral de sobreventa (ej: cruza 30).",
-    "rsi_maximo": "Lógica de Venta: Activa la señal cuando el RSI alcanza un MÁXIMO de sobrecompra.",
-    "rsi_descendente": "Lógica de Venta: Activa la señal cuando el RSI cruza a la baja el umbral de sobrecompra (ej: cruza 70).",
+    "rsi_maximo": "Lógica de Venta: Activa la señal cuando el RSI marca un máximo local en zona de sobrecompra (por encima de rsi_high_level).",
+    "rsi_descendente": "Lógica de Venta: Activa la señal cuando el RSI cruza a la baja el umbral de sobrecompra (rsi_high_level).",
     
     # ------------------------------------------------------------------
     # D. PARÁMETROS STOCHASTICS (web_strategy/_tab_stoch.html)

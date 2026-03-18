@@ -19,6 +19,16 @@ def _last_value(series):
         except Exception:
             return None
 
+
+def _value_at(series, index_offset):
+    try:
+        return float(series.iloc[index_offset])
+    except Exception:
+        try:
+            return float(series[index_offset])
+        except Exception:
+            return None
+
 if TYPE_CHECKING:
     # Usamos StrategySelf para tipado sin crear una dependencia circular de importación
     from estrategia_system import System as StrategySelf 
@@ -163,13 +173,28 @@ def check_rsi_sell_signal(strategy_self: 'StrategySelf') -> Tuple[bool, Optional
         # Inicializar estados si no existen (defensivo)
         maximo_state = getattr(strategy_self, 'rsi_maximo_STATE', False)
         descendente_state = getattr(strategy_self, 'rsi_descendente_STATE', False)
+        rsi_actual = _value_at(getattr(strategy_self, 'rsi_ind', None), -1)
+        rsi_prev = _value_at(getattr(strategy_self, 'rsi_ind', None), -2)
+
+        try:
+            rsi_high_level = float(getattr(strategy_self, 'rsi_high_level', 70))
+        except (TypeError, ValueError):
+            rsi_high_level = 70.0
         
-        # Cierre si RSI alcanza máximo (sobrecompra)
-        if getattr(strategy_self, 'rsi_maximo', False) and maximo_state:
+        # Cierre si RSI alcanza maximo local en zona de sobrecompra.
+        # `maximo_state` detecta que el pico estuvo en la vela previa, por eso usamos `rsi_prev`.
+        if getattr(strategy_self, 'rsi_maximo', False) and maximo_state and rsi_prev is not None and rsi_prev >= rsi_high_level:
             return True, "RSI Máximo (Sobrecompra)"
         
-        # Cierre si RSI desciende
-        if getattr(strategy_self, 'rsi_descendente', False) and descendente_state:
+        # Cierre si RSI cruza a la baja el umbral de sobrecompra.
+        if (
+            getattr(strategy_self, 'rsi_descendente', False)
+            and descendente_state
+            and rsi_prev is not None
+            and rsi_actual is not None
+            and rsi_prev >= rsi_high_level
+            and rsi_actual < rsi_high_level
+        ):
             return True, "RSI Descendente"
     
     return False, None

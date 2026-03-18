@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 TEST SIMPLE: Compara resultadosc on descendente ONLY vs ascendente ONLY vs ambos.
-Este test verifica si la lógica de descendente está funcionando correctamente.
+Este test verifica si la lÃ³gica de descendente estÃ¡ funcionando correctamente.
 """
 
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 def run_comparison_test():
@@ -22,7 +22,7 @@ def run_comparison_test():
     with app.app_context():
         cargar_y_asignar_configuracion('admin')
         
-        # Configuración base (igual para todos)
+        # ConfiguraciÃ³n base (igual para todos)
         base_config = {
             'start_date': '2024-01-01',
             'end_date': '2024-12-31',
@@ -65,23 +65,23 @@ def run_comparison_test():
                 resultados = ejecutar_backtest(config)
                 
                 if resultados is None or len(resultados) == 0:
-                    print("  ❌ No results")
+                    print("  âŒ No results")
                     continue
                 
                 trades_df = resultados[1] if len(resultados) > 1 else None
                 
                 if trades_df is None or trades_df.empty:
-                    print("  ⚠️ No trades")
+                    print("  âš ï¸ No trades")
                     continue
                 
-                # Análisis básico
+                # AnÃ¡lisis bÃ¡sico
                 total = len(trades_df)
                 compras = len(trades_df[trades_df['Tipo'] == 'COMPRA'])
                 ventas = len(trades_df[trades_df['Tipo'] == 'VENTA'])
                 
                 print(f"  Total Trades: {total} (Compras: {compras}, Ventas: {ventas})")
                 
-                # Análisis de triggers
+                # AnÃ¡lisis de triggers
                 ema_asc = len(trades_df[trades_df['Descripcion'].str.contains('Ascendente', case=False, na=False)])
                 ema_desc = len(trades_df[trades_df['Descripcion'].str.contains('Descendente', case=False, na=False)])
                 sl = len(trades_df[trades_df['Descripcion'] == 'StopLoss'])
@@ -93,20 +93,22 @@ def run_comparison_test():
                     print(f"    StopLoss: {sl} ({sl/total*100:.1f}%)")
                     print(f"    Other: {total - ema_asc - ema_desc - sl}")
                 
-                # Verificación
+                # VerificaciÃ³n
                 if test_name == 'ASCENDENTE ONLY' and ema_asc > 0:
-                    print(f"  ✓ Ascendente trigger working")
+                    print(f"  âœ“ Ascendente trigger working")
                 elif test_name == 'DESCENDENTE ONLY' and ema_desc > 0:
-                    print(f"  ✓ Descendente trigger working")
+                    print(f"  âœ“ Descendente trigger working")
                 elif test_name == 'BOTH' and ema_asc > 0 and ema_desc > 0:
-                    print(f"  ✓ Both triggers working")
+                    print(f"  âœ“ Both triggers working")
                 else:
-                    print(f"  ❌ Expected trigger NOT found")
+                    print(f"  âŒ Expected trigger NOT found")
                 
             except Exception as e:
-                print(f"  ❌ Error: {e}")
+                print(f"  âŒ Error: {e}")
         
         print("\n" + "="*80 + "\n")
 
 if __name__ == '__main__':
     run_comparison_test()
+
+

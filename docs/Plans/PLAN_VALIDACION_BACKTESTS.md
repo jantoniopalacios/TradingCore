@@ -34,4 +34,4 @@ Expectativa: Mínimo 20+ trades con SOLO "RSI Ascendente" (sin EMA)
 
 ## 4. Codigo de referencia
 
-Ver: `scripts/test_rsi_isolated.py`
+Ver: `scripts/tests/test_rsi_isolated.py`

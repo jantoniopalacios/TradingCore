@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Buscar backtests recientes donde `ema_slow_descendente` esté activado
+Buscar backtests recientes donde `ema_slow_descendente` estÃ© activado
 y verificar si aparecen ventas etiquetadas como "Descendente".
 """
 
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 import json
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 def main(limit=500):
@@ -17,12 +17,12 @@ def main(limit=500):
         from scenarios.BacktestWeb.app import create_app
         from scenarios.BacktestWeb.database import ResultadoBacktest, Trade, Usuario
     except Exception as e:
-        print(f"[✗] Error importing app or models: {e}")
+        print(f"[âœ—] Error importing app or models: {e}")
         return
 
     app = create_app(user_mode='admin')
     with app.app_context():
-        print(f"[*] Buscando hasta {limit} backtests más recientes con ema_slow_descendente=True...")
+        print(f"[*] Buscando hasta {limit} backtests mÃ¡s recientes con ema_slow_descendente=True...")
         cand = ResultadoBacktest.query.order_by(ResultadoBacktest.id.desc()).limit(limit).all()
         matches = []
 
@@ -59,18 +59,20 @@ def main(limit=500):
                 })
 
         if not matches:
-            print("[✓] No se encontraron backtests con ema_slow_descendente=True en el rango buscado.")
+            print("[âœ“] No se encontraron backtests con ema_slow_descendente=True en el rango buscado.")
             return
 
-        print(f"[✓] Encontrados {len(matches)} backtests con ema_slow_descendente=True:\n")
+        print(f"[âœ“] Encontrados {len(matches)} backtests con ema_slow_descendente=True:\n")
         for m in matches:
-            print(f"- ID: {m['id']} | Usuario: {m['usuario'] or m['usuario_id']} | Símbolo: {m['symbol']} | Fecha: {m['fecha']}")
-            print(f"  Trades: {m['total_trades']} | Sells: {m['total_sells']} | Sells con 'Descendente' en descripción: {m['ema_desc_sells']}")
+            print(f"- ID: {m['id']} | Usuario: {m['usuario'] or m['usuario_id']} | SÃ­mbolo: {m['symbol']} | Fecha: {m['fecha']}")
+            print(f"  Trades: {m['total_trades']} | Sells: {m['total_sells']} | Sells con 'Descendente' en descripciÃ³n: {m['ema_desc_sells']}")
             if m['ema_desc_sells'] > 0:
-                print("  → EMA Descendente: APARECE en las ventas ✅")
+                print("  â†’ EMA Descendente: APARECE en las ventas âœ…")
             else:
-                print("  → EMA Descendente: NO aparece en las ventas ❌")
+                print("  â†’ EMA Descendente: NO aparece en las ventas âŒ")
             print("")
 
 if __name__ == '__main__':
     main()
+
+

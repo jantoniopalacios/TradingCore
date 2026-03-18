@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-TEST 1b: Validar EMA Fix - Que EMA NO salga en trades cuando está desactivado
+TEST 1b: Validar EMA Fix - Que EMA NO salga en trades cuando estÃ¡ desactivado
 
-Objetivo: Confirmar que después del fix en check_ema_buy_signal(), 
+Objetivo: Confirmar que despuÃ©s del fix en check_ema_buy_signal(), 
           los trades con EMA = 0 cuando ema_slow_ascendente=False
 
-Parámetros:  rsi=True, rsi_ascendente=True, ema_slow_ascendente=False
-Activos:     NKE únicamente
-Período:     2024-01-01 to 2024-12-31
+ParÃ¡metros:  rsi=True, rsi_ascendente=True, ema_slow_ascendente=False
+Activos:     NKE Ãºnicamente
+PerÃ­odo:     2024-01-01 to 2024-12-31
 Expectativa: ZERO trades con EMA (antes had 26%)
 """
 import sys
@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from scenarios.BacktestWeb.app import create_app
@@ -38,7 +38,7 @@ def test_ema_fix():
         # 1. Cargar config base
         cargar_y_asignar_configuracion('admin')
         
-        # 2. Configurar parámetros para TEST 1b
+        # 2. Configurar parÃ¡metros para TEST 1b
         config = {
             # Datos
             'start_date': '2024-01-01',
@@ -49,14 +49,14 @@ def test_ema_fix():
             'stoploss_percentage_below_close': 0.0,
             
             # INDICADORES
-            # ❌ EMA COMPLETAMENTE DESACTIVADO (ESTO ES LO QUE ESTAMOS VALIDANDO)
+            # âŒ EMA COMPLETAMENTE DESACTIVADO (ESTO ES LO QUE ESTAMOS VALIDANDO)
             'ema_cruce_signal': False,
             'ema_slow_minimo': False,
             'ema_slow_ascendente': False,    # <-- KEY: Must be False
             'ema_slow_maximo': False,
             'ema_slow_descendente': False,   # <-- Veto on, but disabled signals
             
-            # ✅ RSI ACTIVADO (PARA GENERAR TRADES)
+            # âœ… RSI ACTIVADO (PARA GENERAR TRADES)
             'rsi': True,
             'rsi_period': 14,
             'rsi_low_level': 30,
@@ -80,10 +80,10 @@ def test_ema_fix():
             # Metadata
             'user_id': 1,
             'user_mode': 'admin',
-            'tanda_id': 102,  # ID único para este test
+            'tanda_id': 102,  # ID Ãºnico para este test
         }
         
-        # 🔴 ACTIVOS A PROBAR
+        # ðŸ”´ ACTIVOS A PROBAR
         simbolos_test = ['NKE']
         
         for simbolo in simbolos_test:
@@ -91,11 +91,11 @@ def test_ema_fix():
             print(f"Probando: {simbolo}")
             print(f"{'='*70}")
             
-            # Actualizar configuración con el símbolo actual
+            # Actualizar configuraciÃ³n con el sÃ­mbolo actual
             config['simbolo'] = simbolo
             config['user_id'] = config.get('user_id', 1)
             
-            # Registrar símbolo en BD si no existe
+            # Registrar sÃ­mbolo en BD si no existe
             try:
                 # Buscar por symbol (no nombre)
                 sim_obj = db.session.query(Simbolo).filter_by(symbol=simbolo).filter_by(usuario_id=1).first()
@@ -104,7 +104,7 @@ def test_ema_fix():
                     db.session.add(sim_obj)
                     db.session.commit()
             except Exception as e:
-                print(f"⚠️  No DB symbol registration: {e}")
+                print(f"âš ï¸  No DB symbol registration: {e}")
             
             # Ejecutar backtest
             resultados = ejecutar_backtest(config)
@@ -115,12 +115,12 @@ def test_ema_fix():
                 trades_df_result = resultados[1] if len(resultados) > 1 else pd.DataFrame()
                 
                 if resultados_df is not None and not resultados_df.empty:
-                    print(f"\n✅ Backtest completado para {simbolo}")
+                    print(f"\nâœ… Backtest completado para {simbolo}")
                     
-                    # Estadísticas principales
+                    # EstadÃ­sticas principales
                     print(f"  Return: {resultados_df[resultados_df['Symbol'] == simbolo].get('Return [%]', ['N/A']).iloc[0]}%")
                     
-                    # Verificar si hay trades con EMA (basándonos en descripción de trades)
+                    # Verificar si hay trades con EMA (basÃ¡ndonos en descripciÃ³n de trades)
                     try:
                         if not trades_df_result.empty:
                             trades_symbol = trades_df_result[trades_df_result['Symbol'] == simbolo]
@@ -134,38 +134,38 @@ def test_ema_fix():
                             ]
                             
                             total_trades = len(trades_symbol)
-                            print(f"\n  📊 Trade Distribution:")
+                            print(f"\n  ðŸ“Š Trade Distribution:")
                             print(f"     - Total trades: {total_trades}")
                             print(f"     - Trades with EMA: {len(ema_trades)} ({len(ema_trades)/total_trades*100:.1f}%)")
                             print(f"     - Trades with RSI: {len(rsi_trades)} ({len(rsi_trades)/total_trades*100:.1f}%)")
                             
                             if len(ema_trades) > 0:
-                                print(f"\n  ⚠️  PROBLEMA ENCONTRADO: EMA trades aún presentes")
+                                print(f"\n  âš ï¸  PROBLEMA ENCONTRADO: EMA trades aÃºn presentes")
                                 print(f"     Sample descriptions:")
                                 for desc in ema_trades['Descripcion'].unique()[:3]:
                                     count = len(ema_trades[ema_trades['Descripcion'] == desc])
                                     print(f"       - {desc}: {count} trades")
                                 return False
                             else:
-                                print(f"\n  ✅ ÉXITO: NO hay trades con EMA!")
-                                print(f"     RSI está correctamente generando {len(rsi_trades)} trades ({len(rsi_trades)/total_trades*100:.1f}%)")
+                                print(f"\n  âœ… Ã‰XITO: NO hay trades con EMA!")
+                                print(f"     RSI estÃ¡ correctamente generando {len(rsi_trades)} trades ({len(rsi_trades)/total_trades*100:.1f}%)")
                                 return True
                         else:
-                            print(f"\n  ℹ️  No trades found (could be filtered by other conditions)")
+                            print(f"\n  â„¹ï¸  No trades found (could be filtered by other conditions)")
                             return True
                             
                     except Exception as e:
-                        print(f"⚠️  Could not analyze trades: {e}")
+                        print(f"âš ï¸  Could not analyze trades: {e}")
                         return False
                     
                 else:
-                    print(f"\n❌ Backtest failed for {simbolo} - no results")
+                    print(f"\nâŒ Backtest failed for {simbolo} - no results")
                     return False
             else:
-                print(f"\n❌ Backtest failed for {simbolo}")
+                print(f"\nâŒ Backtest failed for {simbolo}")
                 return False
         
-        print(f"\n✅ TEST 1b COMPLETED SUCCESSFULLY")
+        print(f"\nâœ… TEST 1b COMPLETED SUCCESSFULLY")
         return True
 
 if __name__ == '__main__':
@@ -173,8 +173,10 @@ if __name__ == '__main__':
         success = test_ema_fix()
         sys.exit(0 if success else 1)
     except Exception as e:
-        print(f"\n❌ Error during test: {e}")
+        print(f"\nâŒ Error during test: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+
 

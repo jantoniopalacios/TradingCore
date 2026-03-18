@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-TEST DE DEBUG: Monitorea qué ocurre con ema_slow_descendente_STATE durante la ejecución.
-Añade logging a la función check_ema_sell_signal() para diagnosticar por qué no se cierran posiciones.
+TEST DE DEBUG: Monitorea quÃ© ocurre con ema_slow_descendente_STATE durante la ejecuciÃ³n.
+AÃ±ade logging a la funciÃ³n check_ema_sell_signal() para diagnosticar por quÃ© no se cierran posiciones.
 """
 
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 def test_ema_descendente_debug():
@@ -64,15 +64,15 @@ def test_ema_descendente_debug():
                 trades_df = resultados[1] if len(resultados) > 1 else pd.DataFrame()
                 
                 if resultados_df is None or resultados_df.empty:
-                    print("❌ Backtest failed or returned no data")
+                    print("âŒ Backtest failed or returned no data")
                     return
                     
                 stats = trades_df  # Usar trades_df como variable para compatibilidad
             
-            print(f"\n✓ Backtest completado")
+            print(f"\nâœ“ Backtest completado")
             print(f"  Total de trades: {len(trades)}")
             
-            # Contar por tipo y descripción
+            # Contar por tipo y descripciÃ³n
             compras = [t for t in trades if t.get('Tipo') == 'COMPRA']
             ventas = [t for t in trades if t.get('Tipo') == 'VENTA']
             
@@ -80,43 +80,45 @@ def test_ema_descendente_debug():
             print(f"  Ventas: {len(ventas)}")
             
             if len(ventas) == 0:
-                print("\n⚠️  CRÍTICO: 0 cierres = no se abrieron posiciones (sin compras esperadas)")
+                print("\nâš ï¸  CRÃTICO: 0 cierres = no se abrieron posiciones (sin compras esperadas)")
             
-            # Contar cierres por razón
+            # Contar cierres por razÃ³n
             closes_by_reason = {}
             for t in ventas:
                 desc = t.get('Descripcion', 'DESCONOCIDO')
                 closes_by_reason[desc] = closes_by_reason.get(desc, 0) + 1
             
-            print(f"\n📊 ANÁLISIS DE CIERRES (por descripción):")
+            print(f"\nðŸ“Š ANÃLISIS DE CIERRES (por descripciÃ³n):")
             total_closes = len(ventas)
             for reason, count in sorted(closes_by_reason.items(), key=lambda x: x[1], reverse=True):
                 pct = (count / total_closes * 100) if total_closes > 0 else 0
                 print(f"  {reason}: {count} ({pct:.1f}%)")
             
-            # Diagnóstico
+            # DiagnÃ³stico
             print("\n" + "="*80)
-            print("DIAGNÓSTICO")
+            print("DIAGNÃ“STICO")
             print("="*80)
             
             if len(compras) == 0:
-                print("\n✓ ESPERADO: Sin compras (ema_slow_ascendente=False)")
+                print("\nâœ“ ESPERADO: Sin compras (ema_slow_ascendente=False)")
             
             if "EMA Lenta Descendente" not in closes_by_reason:
-                print("\n❌ PROBLEMA: No hay cierres con 'EMA Lenta Descendente'")
+                print("\nâŒ PROBLEMA: No hay cierres con 'EMA Lenta Descendente'")
                 print("   - ema_slow_descendente_STATE probablemente no es True")
                 print("   - O check_ema_sell_signal() no se llama")
                 print("   - O las posiciones se cierran por StopLoss antes")
             else:
-                print(f"\n✓ 'EMA Lenta Descendente' generó {closes_by_reason['EMA Lenta Descendente']} cierres")
+                print(f"\nâœ“ 'EMA Lenta Descendente' generÃ³ {closes_by_reason['EMA Lenta Descendente']} cierres")
             
             print("\n" + "="*80)
             
         except Exception as e:
-            print(f"\n❌ Error durante backtest: {e}")
+            print(f"\nâŒ Error durante backtest: {e}")
             import traceback
             traceback.print_exc()
 
 if __name__ == '__main__':
     test_ema_descendente_debug()
+
+
 

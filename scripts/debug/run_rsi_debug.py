@@ -1,6 +1,6 @@
-from pathlib import Path
+﻿from pathlib import Path
 import sys
-project_root = Path(__file__).parents[1]
+project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
@@ -58,3 +58,5 @@ print('Running debug backtest for NKE with RSI enabled...')
 res_df, trades_df, bts = run_multi_symbol_backtest(stocks_data, System, config_final, ['NKE'], 20, logger)
 print('Resultados DF:\n', res_df)
 print('Trades DF:\n', trades_df)
+
+

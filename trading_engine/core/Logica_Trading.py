@@ -286,8 +286,10 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     # Verificar si RSI tiene switches de SEÑAL activos (solo estos cuentan como indicador "activo")
     # Los switches de VENTA (máximo, descendente) NO bloquean B&H, solo cierran posiciones
     rsi_tiene_switches_compra = (
-        getattr(strategy_self, 'rsi_minimo', False) or
-        getattr(strategy_self, 'rsi_ascendente', False)
+        getattr(strategy_self, 'rsi', False) and (
+            getattr(strategy_self, 'rsi_minimo', False) or
+            getattr(strategy_self, 'rsi_ascendente', False)
+        )
     )
     
     indicadores_tecnicos_activos = (
@@ -586,10 +588,9 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
 
     new_stop_loss = strategy_self.max_price * (1 - trailing_pct)
 
-    # 2a. Break-Even (opcional): suelo permanente en entry*(1-pct) + trailing libre al superar entry*(1+pct)
-    #   - Siempre: stop no puede bajar de entry*(1-pct)                → limita pérdida en todo momento
-    #   - Fase 1 (max < entry*(1+pct)): stop fijado exactamente en lower_stop (no trailing)
-    #   - Fase 2 (max >= entry*(1+pct)): trailing toma el control, pero lower_stop sigue siendo suelo
+    # 2a. Break-Even (opcional): proteccion de capital inicial.
+    #     El porcentaje define la perdida maxima tolerada desde el precio de entrada.
+    #     Ejemplo: pct=0.03 y entry=100 -> suelo BE=97 en todo momento.
     if getattr(strategy_self, 'breakeven_enabled', False):
         try:
             trade_obj = strategy_self.trades[-1] if strategy_self.trades else None
@@ -600,18 +601,10 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
                 trigger_pct = float(trigger_pct)
                 trigger_pct = trigger_pct / 100.0 if trigger_pct > 1 else trigger_pct
                 if trigger_pct >= 0:
-                    upper_trigger = entry_price * (1 + trigger_pct)
-                    lower_stop    = entry_price * (1 - trigger_pct)
-                    if strategy_self.max_price < upper_trigger:
-                        # Fase 1: stop fijado en el suelo (no trailing aún)
-                        if lower_stop > new_stop_loss:
-                            new_stop_loss = lower_stop
-                            stop_source = "BreakEven"
-                    else:
-                        # Fase 2: trailing corre libre, pero lower_stop es suelo absoluto
-                        if lower_stop > new_stop_loss:
-                            new_stop_loss = lower_stop
-                            stop_source = "BreakEven"
+                    be_floor = entry_price * (1 - trigger_pct)
+                    if be_floor > new_stop_loss:
+                        new_stop_loss = be_floor
+                        stop_source = "BreakEven"
         except Exception:
             pass
 

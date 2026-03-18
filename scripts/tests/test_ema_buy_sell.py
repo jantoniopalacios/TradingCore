@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 TEST: Validar que Ascendente (compra) y Decreciente (venta) funcionan como triggers.
 
@@ -10,7 +10,7 @@ Config:
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 def test_ema_buy_sell():
@@ -44,7 +44,7 @@ def test_ema_buy_sell():
             'ema_slow_maximo': False,
             'ema_slow_descendente': True,     # VENTA: Cuando EMA baja
             
-            # RSI OFF (para que EMA sea el único trigger)
+            # RSI OFF (para que EMA sea el Ãºnico trigger)
             'rsi': False,
             
             # Otros OFF
@@ -152,3 +152,5 @@ if __name__ == '__main__':
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+

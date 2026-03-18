@@ -100,7 +100,7 @@ Regla practica para usuario:
 Orden de intervencion habitual:
 
 1. Stop trailing base (o trailing dinamico segun RSI, si ese ajuste esta activado).
-2. Suelo de break-even (si esta activado): evita que el stop quede por debajo del nivel de proteccion definido por ese porcentaje.
+2. Suelo de break-even (si esta activado): fija una perdida maxima permitida desde la entrada (entry*(1-pct)).
 3. Stop por swing (si esta activado): si propone un nivel mas alto, aprieta aun mas el stop.
 
 Ejemplo conceptual:
@@ -293,6 +293,37 @@ Se ejecuto `scripts/compare_trailing_model.py` sobre ZTS y SAN.MC (1d, 2023-01-0
 - No existe un modelo universalmente superior: depende del stop elegido. Para el rango operativo habitual (`0.08`-`0.12`), Close/Close es consistentemente mejor.
 - Decision final: **mantener Close/Close** como politica de produccion.
 
+### Regla unica recomendada: RSI modo minimo
+
+Dado que actualmente no hay configuracion por activo, la regla unica recomendada para compra por RSI es **modo minimo** (mejora en ZTS y neutro en SAN.MC en los tests realizados).
+
+Implementacion en la app actual (campos de configuracion):
+
+- Activar RSI:
+	- `rsi = True`
+	- `rsi_period = 10`
+	- `rsi_low_level = 20` (25 tambien dio resultado equivalente)
+	- `rsi_high_level = 70`
+- Activar solo la logica minima (giro desde sobreventa):
+	- `rsi_minimo = True`
+	- `rsi_ascendente = False`
+	- `rsi_maximo = False`
+	- `rsi_descendente = False`
+- Desactivar el filtro global de fuerza (modo gate):
+	- `rsi_strength_threshold = 0`
+
+Parametros base a mantener junto con esta regla:
+
+- `ema_slow_ascendente = True`
+- `stoploss_percentage_below_close = 0.10`
+- `breakeven_enabled = True`
+- `breakeven_trigger_pct = 0.03`
+
+Nota importante de implementacion:
+
+- Si `rsi_strength_threshold` queda en `50` (valor por defecto), el sistema aplica filtro global RSI y mezcla comportamiento de modo `gate` con `minimo`.
+- Para usar **minimo puro**, dejar `rsi_strength_threshold = 0`.
+
 ### Como repetir las pruebas
 
 Desde la raiz del proyecto, con el entorno virtual activo:
@@ -308,9 +339,28 @@ c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/aud
 
 # Comparativa A/B Close/Close vs High/Close para cualquier simbolo:
 c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/compare_trailing_model.py --symbols ZTS SAN.MC --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stops 0.05 0.10 0.15
+
+# Barrido manual RSI sobre baseline (EMA ascendente + stop 10% + BE 3%):
+c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/sweep_rsi_filter.py --symbols ZTS SAN.MC --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10 --breakeven 0.03
+
+# Optimizacion RSI con backtesting.Backtest.optimize():
+c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/optimize_rsi.py --symbols ZTS SAN.MC --mode gate --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10 --breakeven 0.03 --topn 10
+
+c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/optimize_rsi.py --symbols ZTS SAN.MC --mode minimo --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10 --breakeven 0.03 --topn 10
 ```
 
 Resultado esperado de exito:
 
 - `audit_stops_zts.py`: mensaje `No stop logic issues detected in audited scenario.`
 - `audit_stops_combinations.py`: mensaje `No source-leak issues detected in stop combination scenarios.`
+
+### Organizacion de scripts
+
+La carpeta `scripts/` se ha organizado para mantener la raiz limpia:
+
+- `scripts/` (raiz): scripts operativos y de uso frecuente.
+- `scripts/analysis/`: analisis ad-hoc.
+- `scripts/debug/`: utilidades de debug puntual.
+- `scripts/tests/`: pruebas exploratorias y de validacion puntual.
+
+Referencia completa: `scripts/README.txt`.

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 TEST 1b SIMPLE: Validar EMA Fix
 
@@ -8,7 +8,7 @@ Objetivo: Confirmar que cuando ema_slow_ascendente=False,
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 def test_ema_fix():
@@ -27,7 +27,7 @@ def test_ema_fix():
     with app.app_context():
         cargar_y_asignar_configuracion('admin')
         
-        # Configurar parámetros para TEST 1b
+        # Configurar parÃ¡metros para TEST 1b
         config = {
             'start_date': '2024-01-01',
             'end_date': '2024-12-31',
@@ -139,3 +139,5 @@ if __name__ == '__main__':
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+
