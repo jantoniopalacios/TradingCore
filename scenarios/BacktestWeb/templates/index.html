@@ -179,6 +179,12 @@
         <button class="nav-link text-info fw-bold" id="tab-historial" data-bs-toggle="tab" data-bs-target="#pane-sql" type="button">
             <i class="bi bi-database me-2"></i> HISTORIAL SQL
         </button>
+
+        {% if session.get('user_mode') == 'admin' %}
+        <button class="nav-link" id="tab-scheduler" data-bs-toggle="tab" data-bs-target="#pane-scheduler" type="button">
+            <i class="bi bi-cpu me-2"></i> SCHEDULER
+        </button>
+        {% endif %}
     </div>
 
     <div class="mt-auto pt-4 border-top border-secondary">
@@ -247,6 +253,14 @@
                     {% include '_tab_historial.html' %}
                 </div>
             </div>
+
+            {% if session.get('user_mode') == 'admin' %}
+            <div class="tab-pane fade" id="pane-scheduler">
+                <div class="card-main p-0 overflow-hidden">
+                    {% include '_tab_scheduler.html' %}
+                </div>
+            </div>
+            {% endif %}
 
         </div>
     </form>
@@ -744,6 +758,126 @@
             displayArea.innerHTML = `<div class="alert alert-danger m-3">Error al cargar datos: ${err}</div>`;
         });
     }
+
+    // --- Scheduler Dashboard (solo admin) ---
+    let schedulerPollTimer = null;
+
+    function _schedulerSetBadge(running) {
+        const badge = document.getElementById('scheduler-running-badge');
+        if (!badge) return;
+        badge.className = running ? 'badge bg-success' : 'badge bg-secondary';
+        badge.textContent = running ? 'En ejecución' : 'Detenido';
+    }
+
+    function _schedulerRender(data) {
+        const statusFile = data.status_file || {};
+        const schedulerState = statusFile.scheduler || {};
+        const jobs = Array.isArray(statusFile.jobs) ? statusFile.jobs : [];
+        const runs = statusFile.runs || {};
+
+        _schedulerSetBadge(Boolean(data.running));
+
+        const stateEl = document.getElementById('scheduler-state');
+        const jobsCountEl = document.getElementById('scheduler-jobs-count');
+        const updatedEl = document.getElementById('scheduler-updated-at');
+        if (stateEl) stateEl.textContent = schedulerState.status || 'unknown';
+        if (jobsCountEl) jobsCountEl.textContent = String(jobs.length);
+        if (updatedEl) updatedEl.textContent = schedulerState.updated_at || '-';
+
+        const jobsTbody = document.getElementById('scheduler-jobs-tbody');
+        if (jobsTbody) {
+            if (!jobs.length) {
+                jobsTbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sin jobs activos</td></tr>';
+            } else {
+                jobsTbody.innerHTML = jobs.map(j => `
+                    <tr>
+                        <td>${j.id || '-'}</td>
+                        <td>${j.name || '-'}</td>
+                        <td>${j.trigger || '-'}</td>
+                        <td>${j.next_run_time || '-'}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        const runsTbody = document.getElementById('scheduler-runs-tbody');
+        if (runsTbody) {
+            const users = Object.keys(runs);
+            if (!users.length) {
+                runsTbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Sin ejecuciones registradas</td></tr>';
+            } else {
+                runsTbody.innerHTML = users.sort().map(username => {
+                    const r = runs[username] || {};
+                    return `
+                        <tr>
+                            <td>${username}</td>
+                            <td>${r.status || '-'}</td>
+                            <td>${r.intervalo || '-'}</td>
+                            <td>${r.started_at || '-'}</td>
+                            <td>${r.finished_at || '-'}</td>
+                            <td>${r.last_result_count ?? '-'}</td>
+                            <td>${r.last_trade_count ?? '-'}</td>
+                            <td class="text-danger">${r.last_error || ''}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+    }
+
+    function schedulerRefresh() {
+        const pane = document.getElementById('pane-scheduler');
+        if (!pane) return;
+        fetch("{{ url_for('main.scheduler_status') }}?t=" + Date.now())
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    _schedulerRender(data);
+                } else {
+                    showToast('warning', data.message || 'No se pudo obtener estado del scheduler.');
+                }
+            })
+            .catch(() => showToast('danger', 'Error de red consultando estado del scheduler.'));
+    }
+
+    function schedulerStart() {
+        fetch("{{ url_for('main.scheduler_start') }}", { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                showToast(data.status === 'error' ? 'danger' : 'success', data.message || 'Operación completada.');
+                setTimeout(schedulerRefresh, 2000);
+            })
+            .catch(() => showToast('danger', 'Error de red al iniciar scheduler.'));
+    }
+
+    function schedulerStop() {
+        fetch("{{ url_for('main.scheduler_stop') }}", { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                showToast(data.status === 'error' ? 'danger' : 'success', data.message || 'Operación completada.');
+                setTimeout(schedulerRefresh, 2000);
+            })
+            .catch(() => showToast('danger', 'Error de red al detener scheduler.'));
+    }
+
+    function startSchedulerPollingIfNeeded() {
+        const pane = document.getElementById('pane-scheduler');
+        if (!pane) return;
+
+        const isActive = pane.classList.contains('show') && pane.classList.contains('active');
+        if (isActive) {
+            schedulerRefresh();
+            if (!schedulerPollTimer) {
+                schedulerPollTimer = setInterval(schedulerRefresh, 5000);
+            }
+        } else if (schedulerPollTimer) {
+            clearInterval(schedulerPollTimer);
+            schedulerPollTimer = null;
+        }
+    }
+
+    document.addEventListener('shown.bs.tab', () => startSchedulerPollingIfNeeded());
+    document.addEventListener('DOMContentLoaded', () => startSchedulerPollingIfNeeded());
 </script>
 </body>
 </html>

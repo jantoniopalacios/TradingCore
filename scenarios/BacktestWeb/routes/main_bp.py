@@ -4,6 +4,9 @@ import csv
 import io
 import json
 import html
+import sys
+import signal
+import subprocess
 from pathlib import Path
 from flask import (
     Blueprint, render_template, request, redirect, url_for, 
@@ -32,6 +35,10 @@ main_bp = Blueprint('main', __name__)
 # Clave: username | Valor: dict de estado de la ultima ejecucion lanzada.
 BACKTEST_STATUS_BY_USER = {}
 BACKTEST_STATUS_LOCK = threading.Lock()
+
+SCHEDULER_SCRIPT_PATH = PROJECT_ROOT / 'Utils' / 'backtest_scheduler.py'
+SCHEDULER_STATUS_PATH = PROJECT_ROOT / 'logs' / 'backtest_scheduler_status.json'
+SCHEDULER_PID_PATH = PROJECT_ROOT / 'logs' / 'backtest_scheduler.pid'
 
 
 def _is_enabled(value):
@@ -90,6 +97,44 @@ def _build_strategy_short_title(result_row):
 
 def _utc_now_iso():
     return datetime.utcnow().isoformat()
+
+
+def _is_scheduler_running_from_pid() -> bool:
+    if not SCHEDULER_PID_PATH.exists():
+        return False
+    try:
+        pid = int(SCHEDULER_PID_PATH.read_text(encoding='utf-8').strip())
+    except Exception:
+        return False
+
+    if os.name == 'nt':
+        # Use tasklist on Windows because OpenProcess/GetExitCodeProcess can fail
+        # with permission/flag combinations for detached processes.
+        try:
+            out = subprocess.check_output(
+                ["tasklist", "/FI", f"PID eq {pid}"],
+                text=True,
+                encoding='utf-8',
+                errors='ignore',
+            )
+            return str(pid) in out and "No tasks are running" not in out
+        except Exception:
+            return False
+    else:
+        try:
+            os.kill(pid, 0)
+            return True
+        except Exception:
+            return False
+
+
+def _read_scheduler_status_file() -> dict:
+    if not SCHEDULER_STATUS_PATH.exists():
+        return {}
+    try:
+        return json.loads(SCHEDULER_STATUS_PATH.read_text(encoding='utf-8'))
+    except Exception:
+        return {}
 
 
 def _init_backtest_status(user_mode, run_id, tanda_id):
@@ -614,6 +659,106 @@ def backtest_status():
         if not state:
             return jsonify({"status": "idle", "message": "Sin ejecuciones recientes."})
         return jsonify(state)
+
+
+@main_bp.route('/scheduler/status', methods=['GET'])
+def scheduler_status():
+    if not session.get('logged_in'):
+        return jsonify({"status": "error", "message": "No autenticado"}), 401
+    if session.get('user_mode') != 'admin':
+        return jsonify({"status": "error", "message": "No autorizado"}), 403
+
+    status_data = _read_scheduler_status_file()
+    is_running = _is_scheduler_running_from_pid()
+
+    # Reconcile: if the process is dead but the JSON still says "running",
+    # report it as "crashed" so the UI stays consistent.
+    if not is_running and isinstance(status_data.get('scheduler'), dict):
+        sched_status = status_data['scheduler'].get('status', '')
+        if sched_status in ('running', 'starting'):
+            status_data['scheduler']['status'] = 'crashed'
+            status_data['scheduler']['message'] = 'El proceso terminó inesperadamente'
+
+    return jsonify({
+        "status": "success",
+        "running": is_running,
+        "status_file": status_data,
+        "pid_file": str(SCHEDULER_PID_PATH),
+        "status_path": str(SCHEDULER_STATUS_PATH),
+    })
+
+
+@main_bp.route('/scheduler/start', methods=['POST'])
+def scheduler_start():
+    if not session.get('logged_in'):
+        return jsonify({"status": "error", "message": "No autenticado"}), 401
+    if session.get('user_mode') != 'admin':
+        return jsonify({"status": "error", "message": "No autorizado"}), 403
+
+    if _is_scheduler_running_from_pid():
+        return jsonify({"status": "ok", "message": "Scheduler ya estaba en ejecución."})
+
+    if not SCHEDULER_SCRIPT_PATH.exists():
+        return jsonify({"status": "error", "message": f"No existe script: {SCHEDULER_SCRIPT_PATH}"}), 500
+
+    try:
+        creationflags = 0
+        if os.name == 'nt':
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+
+        log_path = PROJECT_ROOT / 'logs' / 'backtest_scheduler_web.log'
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_file = open(log_path, 'a', encoding='utf-8')
+        subprocess.Popen(
+            [sys.executable, str(SCHEDULER_SCRIPT_PATH)],
+            cwd=str(PROJECT_ROOT),
+            stdout=log_file,
+            stderr=log_file,
+            stdin=subprocess.DEVNULL,
+            close_fds=False,
+            creationflags=creationflags,
+        )
+
+        return jsonify({"status": "success", "message": "Scheduler arrancado."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"No se pudo arrancar el scheduler: {e}"}), 500
+
+
+@main_bp.route('/scheduler/stop', methods=['POST'])
+def scheduler_stop():
+    if not session.get('logged_in'):
+        return jsonify({"status": "error", "message": "No autenticado"}), 401
+    if session.get('user_mode') != 'admin':
+        return jsonify({"status": "error", "message": "No autorizado"}), 403
+
+    if not SCHEDULER_PID_PATH.exists():
+        return jsonify({"status": "ok", "message": "Scheduler no estaba en ejecución (sin PID)."})
+
+    try:
+        pid = int(SCHEDULER_PID_PATH.read_text(encoding='utf-8').strip())
+    except Exception:
+        return jsonify({"status": "error", "message": "PID inválido en fichero."}), 500
+
+    try:
+        if os.name == 'nt':
+            subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        else:
+            os.kill(pid, signal.SIGTERM)
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"No se pudo detener el scheduler: {e}"}), 500
+
+    try:
+        if SCHEDULER_PID_PATH.exists():
+            SCHEDULER_PID_PATH.unlink()
+    except Exception:
+        pass
+
+    return jsonify({"status": "success", "message": "Scheduler detenido."})
 
 #-- RUTA PARA VER ARCHIVOS DE LOGS --
 @main_bp.route('/view_file/<path:path>')

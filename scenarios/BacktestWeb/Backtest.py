@@ -9,7 +9,7 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # 2. Third Party (Data & Viz)
@@ -80,6 +80,10 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
         # 3. Extraer rutas y parámetros
         start_date = config_final.get('start_date') 
         end_date = config_final.get('end_date')
+        if not end_date:
+            end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+            config_final['end_date'] = end_date
+            logger.info(f"ℹ️ end_date no definido; se usará por defecto: {end_date}")
         intervalo = config_final.get('intervalo', '1d')
         filtro_fundamental = config_final.get('filtro_fundamental', False) 
         data_files_path = Path(config_final.get('data_files_path'))
