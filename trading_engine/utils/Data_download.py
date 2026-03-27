@@ -85,6 +85,10 @@ def descargar_datos_YF(
     
     start_dt = datetime.strptime(start_date, '%Y-%m-%d')
     end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+
+    # Yahoo Finance limita datos intradiarios (1m, 1h) a los últimos 730 días
+    INTERVALOS_INTRADIARIOS = {'1m', '2m', '5m', '15m', '30m', '60m', '1h', '90m'}
+    period_to_use = '730d' if intervalo in INTERVALOS_INTRADIARIOS else 'max'
     
     # 🎯 FECHA CLAVE: Hoy, sin tiempo, para comparación de frescura.
     today_date_str = datetime.now().strftime("%Y-%m-%d")
@@ -113,6 +117,9 @@ def descargar_datos_YF(
                 try:
                     data_to_use = pd.read_csv(csv_file_path_max, index_col='Date', parse_dates=True)
                     data_to_use.index = pd.to_datetime(data_to_use.index)
+                    # Normalizar timezone en carga desde caché (por si fue guardado con tz)
+                    if hasattr(data_to_use.index, 'tz') and data_to_use.index.tz is not None:
+                        data_to_use.index = data_to_use.index.tz_localize(None)
                     if data_to_use.empty:
                         logger.warning(f"La caché MAX de {symbol} está vacía. Forzando descarga.")
                         needs_download = True
@@ -137,11 +144,11 @@ def descargar_datos_YF(
             
             # --- Descarga y Sobrescritura ---
             # 🎯 CAMBIO CLAVE 2: Usar period='max' para obtener el historial completo
-            logger.info(f"2. Descargando historial COMPLETO (period='max') para {symbol}...")
+            logger.info(f"2. Descargando historial (period='{period_to_use}') para {symbol}...")
             try:
                 data = yf.download(
                     symbol,
-                    period='max',  # <--- DESCARGA EL HISTORIAL COMPLETO
+                    period=period_to_use,
                     interval=intervalo,
                     multi_level_index=False,
                     rounding=4,
@@ -152,6 +159,9 @@ def descargar_datos_YF(
                     continue
 
                 data.index.name = 'Date'
+                # Normalizar timezone: yfinance devuelve tz-aware para intradiarios
+                if hasattr(data.index, 'tz') and data.index.tz is not None:
+                    data.index = data.index.tz_localize(None)
                 data["Symbol"] = symbol
                 
                 # Guardar datos en un CSV (Sobrescribe o crea el archivo MAX)
@@ -163,13 +173,18 @@ def descargar_datos_YF(
                 logger.error(f"Error al descargar datos para {symbol}: {e}")
                 continue
         
-        # 4. Recorte Final y Consolidación (Esto es ahora el FILTRADO sobre el Caché MAX)
+        # 4. Recorte Final y Consolidación
+        #    Incluye ventana de warm-up para que los indicadores estén estabilizados
+        #    desde la fecha de análisis real (start_dt).
         if not data_to_use.empty:
-            # Seleccionar solo el rango solicitado (start_dt inclusive, end_dt inclusive)
+            # Seleccionar rango de datos solicitado
             final_data = data_to_use.loc[start_dt:end_dt].copy()
             
             if final_data.empty:
-                logger.warning(f"Advertencia: No hay datos en el rango [{start_date} - {end_date}] después del recorte. Saltando {symbol}.")
+                logger.warning(
+                    f"Advertencia: No hay datos en el rango [{start_date} - {end_date}]. "
+                    f"Saltando {symbol}."
+                )
                 continue
             
             # Asegurar que solo se incluyan las columnas estándar antes de consolidar

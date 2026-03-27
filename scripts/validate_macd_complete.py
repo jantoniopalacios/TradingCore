@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger('validate_macd')
 
 # 🎯 Cargar datos de prueba (NKE 1wk)
-csv_file = PROJECT_ROOT / 'Data_files' / 'NKE_1wk_MAX.csv'
+csv_file = PROJECT_ROOT / 'Data_files' / 'ZTS_1wk_MAX.csv'
 if not csv_file.exists():
     print(f'❌ CSV no encontrado: {csv_file}')
     sys.exit(1)
