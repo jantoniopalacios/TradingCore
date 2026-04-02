@@ -9,13 +9,13 @@
     </div>
 
     <div class="d-flex gap-2 mb-3">
-        <button type="button" class="btn btn-success" onclick="schedulerStart()">
-            <i class="bi bi-play-fill me-1"></i> Iniciar Scheduler
+        <button type="button" class="btn btn-success" onclick="schedulerStart()" title="Inicia el scheduler continuo y ejecuta una vez para todos los usuarios">
+            <i class="bi bi-play-fill me-1"></i> Iniciar Scheduler (ejecutar ahora)
         </button>
         <button type="button" class="btn btn-danger" onclick="schedulerStop()">
             <i class="bi bi-stop-fill me-1"></i> Detener Scheduler
         </button>
-        <button type="button" class="btn btn-outline-light" onclick="schedulerRefresh()">
+        <button type="button" class="btn btn-secondary" onclick="schedulerRefresh()">
             <i class="bi bi-arrow-clockwise me-1"></i> Refrescar
         </button>
     </div>

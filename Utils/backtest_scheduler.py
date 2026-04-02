@@ -109,15 +109,46 @@ def _snapshot_job(job) -> dict:
     }
 
 
+def _read_status_file() -> dict:
+    try:
+        if STATUS_FILE_PATH.exists():
+            raw = json.loads(STATUS_FILE_PATH.read_text(encoding='utf-8'))
+            if isinstance(raw, dict):
+                return raw
+    except Exception:
+        pass
+    return {}
+
+
 def _write_status_file() -> None:
     scheduler = ACTIVE_SCHEDULER
+    existing = _read_status_file()
+
     if scheduler is not None:
         STATUS_STATE['jobs'] = [_snapshot_job(job) for job in scheduler.get_jobs()]
+        scheduler_state = dict(STATUS_STATE.get('scheduler', {}))
+        jobs_state = list(STATUS_STATE.get('jobs', []))
+    else:
+        scheduler_state = dict(existing.get('scheduler', {})) if isinstance(existing.get('scheduler'), dict) else dict(STATUS_STATE.get('scheduler', {}))
+        jobs_state = list(existing.get('jobs', [])) if isinstance(existing.get('jobs'), list) else list(STATUS_STATE.get('jobs', []))
 
-    STATUS_STATE['scheduler']['updated_at'] = _utc_now_iso()
+    existing_runs = existing.get('runs', {}) if isinstance(existing.get('runs'), dict) else {}
+    merged_runs = dict(existing_runs)
+    merged_runs.update(STATUS_STATE.get('runs', {}))
+
+    scheduler_state['updated_at'] = _utc_now_iso()
+    payload = {
+        'scheduler': scheduler_state,
+        'jobs': jobs_state,
+        'runs': merged_runs,
+    }
+
+    STATUS_STATE['scheduler'] = scheduler_state
+    STATUS_STATE['jobs'] = jobs_state
+    STATUS_STATE['runs'] = merged_runs
     STATUS_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     STATUS_FILE_PATH.write_text(
-        json.dumps(STATUS_STATE, indent=2, ensure_ascii=False),
+        json.dumps(payload, indent=2, ensure_ascii=False),
         encoding='utf-8',
     )
 

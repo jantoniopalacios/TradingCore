@@ -760,7 +760,6 @@
     }
 
     // --- Scheduler Dashboard (solo admin) ---
-    let schedulerPollTimer = null;
 
     function _schedulerSetBadge(running) {
         const badge = document.getElementById('scheduler-running-badge');
@@ -841,11 +840,15 @@
     }
 
     function schedulerStart() {
-        fetch("{{ url_for('main.scheduler_start') }}", { method: 'POST' })
+        fetch("{{ url_for('main.scheduler_start') }}", { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ immediate: true })
+        })
             .then(res => res.json())
             .then(data => {
                 showToast(data.status === 'error' ? 'danger' : 'success', data.message || 'Operación completada.');
-                setTimeout(schedulerRefresh, 2000);
+                setTimeout(schedulerRefresh, 4500);
             })
             .catch(() => showToast('danger', 'Error de red al iniciar scheduler.'));
     }
@@ -860,24 +863,41 @@
             .catch(() => showToast('danger', 'Error de red al detener scheduler.'));
     }
 
-    function startSchedulerPollingIfNeeded() {
+    function refreshSchedulerOnTabEntry() {
         const pane = document.getElementById('pane-scheduler');
         if (!pane) return;
 
         const isActive = pane.classList.contains('show') && pane.classList.contains('active');
         if (isActive) {
             schedulerRefresh();
-            if (!schedulerPollTimer) {
-                schedulerPollTimer = setInterval(schedulerRefresh, 5000);
-            }
-        } else if (schedulerPollTimer) {
-            clearInterval(schedulerPollTimer);
-            schedulerPollTimer = null;
         }
     }
 
-    document.addEventListener('shown.bs.tab', () => startSchedulerPollingIfNeeded());
-    document.addEventListener('DOMContentLoaded', () => startSchedulerPollingIfNeeded());
+    function initSchedulerTabRefreshHooks() {
+        const schedulerTabBtn = document.getElementById('tab-scheduler');
+        if (!schedulerTabBtn) return;
+
+        // Refresh when Bootstrap confirms the tab is visible.
+        schedulerTabBtn.addEventListener('shown.bs.tab', () => {
+            schedulerRefresh();
+        });
+
+        // Fallback for edge cases where shown event may not fire as expected.
+        schedulerTabBtn.addEventListener('click', () => {
+            setTimeout(() => refreshSchedulerOnTabEntry(), 120);
+        });
+
+        // If scheduler tab is already active on page load (restored from localStorage),
+        // try immediate + delayed checks because Bootstrap tab activation can be async.
+        refreshSchedulerOnTabEntry();
+        setTimeout(refreshSchedulerOnTabEntry, 120);
+        setTimeout(refreshSchedulerOnTabEntry, 500);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => initSchedulerTabRefreshHooks());
+    window.addEventListener('load', () => {
+        setTimeout(() => refreshSchedulerOnTabEntry(), 120);
+    });
 </script>
 </body>
 </html>

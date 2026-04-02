@@ -13,7 +13,7 @@ from flask import (
     flash, session, jsonify, Response, send_from_directory, abort
 )
 from collections import deque
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 import logging
 import traceback
 
@@ -28,6 +28,7 @@ from ..Backtest import ejecutar_backtest
 
 from ..database import db, ResultadoBacktest, Trade, Usuario, Simbolo # Importa tus modelos
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 main_bp = Blueprint('main', __name__) 
 
@@ -96,7 +97,7 @@ def _build_strategy_short_title(result_row):
 
 
 def _utc_now_iso():
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _is_scheduler_running_from_pid() -> bool:
@@ -135,6 +136,64 @@ def _read_scheduler_status_file() -> dict:
         return json.loads(SCHEDULER_STATUS_PATH.read_text(encoding='utf-8'))
     except Exception:
         return {}
+
+
+def _scheduler_trigger_label(intervalo: str) -> str:
+    """Etiqueta legible de trigger para el dashboard sin depender del proceso scheduler."""
+    v = str(intervalo or '').strip().lower()
+    minute_map = {
+        '1m': 1,
+        '2m': 2,
+        '5m': 5,
+        '15m': 15,
+        '30m': 30,
+        '60m': 60,
+        '1h': 60,
+        '90m': 90,
+    }
+    if v in minute_map:
+        mins = minute_map[v]
+        hours = mins // 60
+        rem = mins % 60
+        if rem == 0:
+            return f"interval[{hours}:00:00]"
+        return f"interval[0:{rem:02d}:00]"
+    if v == '1d':
+        return "cron[mon-fri 22:00 Europe/Madrid]"
+    if v == '1wk':
+        return "cron[mon 09:00 Europe/Madrid]"
+    if v == '1mo':
+        return "cron[day=1 09:00 Europe/Madrid]"
+    return "cron[mon-fri 22:00 Europe/Madrid]"
+
+
+def _build_expected_scheduler_jobs_from_db() -> list:
+    """Reconstruye jobs esperados (solo usuarios) desde config en BD."""
+    jobs = []
+    usuarios = Usuario.query.all()
+    for usuario in usuarios:
+        cfg = {}
+        if usuario.config_actual:
+            try:
+                cfg = json.loads(usuario.config_actual)
+            except Exception:
+                cfg = {}
+
+        enviar_mail = _is_enabled(cfg.get('enviar_mail', False))
+        destinatario = str(cfg.get('destinatario_email', '') or '').strip()
+        if not (enviar_mail and destinatario):
+            continue
+
+        intervalo = str(cfg.get('intervalo', '1d') or '1d')
+        jobs.append({
+            'id': f"backtest_{usuario.username}",
+            'name': f"Backtest {usuario.username} ({intervalo})",
+            'trigger': _scheduler_trigger_label(intervalo),
+            'next_run_time': None,
+        })
+
+    jobs.sort(key=lambda j: j.get('id', ''))
+    return jobs
 
 
 def _init_backtest_status(user_mode, run_id, tanda_id):
@@ -624,7 +683,7 @@ def launch_strategy():
         app_instance = current_app._get_current_object()
 
         logger.info(f"[LAUNCH] ✅ Iniciando hilo de backtest...")
-        run_id = f"{u.id}-{config_web['tanda_id']}-{int(datetime.utcnow().timestamp())}"
+        run_id = f"{u.id}-{config_web['tanda_id']}-{int(datetime.now(timezone.utc).timestamp())}"
         _init_backtest_status(user_mode=user_mode, run_id=run_id, tanda_id=config_web['tanda_id'])
         threading.Thread(
             target=run_backtest_and_save, 
@@ -669,7 +728,80 @@ def scheduler_status():
         return jsonify({"status": "error", "message": "No autorizado"}), 403
 
     status_data = _read_scheduler_status_file()
-    is_running = _is_scheduler_running_from_pid()
+    if not isinstance(status_data, dict):
+        status_data = {}
+    status_data.setdefault('scheduler', {})
+    status_data.setdefault('jobs', [])
+    status_data.setdefault('runs', {})
+
+    # No mostrar jobs internos de mantenimiento en dashboard (_refresh_jobs, etc.)
+    runtime_jobs = [
+        j for j in status_data.get('jobs', [])
+        if not str((j or {}).get('id', '')).startswith('_')
+    ]
+
+    pid_is_running = _is_scheduler_running_from_pid()
+
+    # El JSON sigue siendo la referencia principal, pero si el PID está vivo
+    # y el JSON quedó stale por una ejecución inmediata, reconciliamos a running.
+    json_status = status_data.get('scheduler', {}).get('status', 'unknown')
+
+    if json_status == 'stopped':
+        if pid_is_running:
+            is_running = True
+            status_data['scheduler']['status'] = 'running'
+            status_data['scheduler']['message'] = 'Proceso activo detectado'
+        else:
+            is_running = False
+    elif json_status in ('running', 'starting'):
+        is_running = pid_is_running
+        if not is_running:
+            status_data['scheduler']['status'] = 'crashed'
+            status_data['scheduler']['message'] = 'El proceso terminó inesperadamente'
+    else:
+        is_running = pid_is_running
+        if is_running:
+            status_data['scheduler']['status'] = 'running'
+            status_data['scheduler']['message'] = 'Proceso activo detectado'
+
+    # Siempre mostrar los jobs esperados (usuarios en BD con enviar_mail=true)
+    # Si está running: mostrar con next_run_time real
+    # Si está stopped: mostrar jobs que se crearían (sin next_run_time)
+    try:
+        expected_jobs = _build_expected_scheduler_jobs_from_db()
+    except Exception:
+        expected_jobs = []
+
+    if is_running:
+        runtime_by_id = {
+            str((j or {}).get('id', '')): j
+            for j in runtime_jobs
+            if str((j or {}).get('id', ''))
+        }
+
+        merged_jobs = []
+        for ej in expected_jobs:
+            job_id = str(ej.get('id', ''))
+            rj = runtime_by_id.get(job_id, {})
+            merged_jobs.append({
+                'id': ej.get('id'),
+                'name': ej.get('name'),
+                'trigger': ej.get('trigger') or rj.get('trigger'),
+                'next_run_time': rj.get('next_run_time'),
+            })
+
+        status_data['jobs'] = merged_jobs if merged_jobs else runtime_jobs
+    else:
+        # Scheduler stopped: mostrar los jobs que se crearían (sin next_run_time)
+        status_data['jobs'] = [
+            {
+                'id': j.get('id'),
+                'name': j.get('name'),
+                'trigger': j.get('trigger'),
+                'next_run_time': None,
+            }
+            for j in expected_jobs
+        ]
 
     # Reconcile: if the process is dead but the JSON still says "running",
     # report it as "crashed" so the UI stays consistent.
@@ -695,31 +827,81 @@ def scheduler_start():
     if session.get('user_mode') != 'admin':
         return jsonify({"status": "error", "message": "No autorizado"}), 403
 
-    if _is_scheduler_running_from_pid():
-        return jsonify({"status": "ok", "message": "Scheduler ya estaba en ejecución."})
+    immediate = request.json.get('immediate', False) if request.is_json else request.args.get('immediate', False)
+
+    # Chequear por PID para saber si estaba corriendo
+    was_running = _is_scheduler_running_from_pid()
+    
+    if was_running:
+        # Ya hay un proceso: si se solicita inmediato, simplemente ejecutar --ahora
+        if immediate:
+            try:
+                log_path = PROJECT_ROOT / 'logs' / 'backtest_scheduler_web.log'
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(log_path, 'a', encoding='utf-8') as log_file:
+                    subprocess.Popen(
+                        [sys.executable, str(SCHEDULER_SCRIPT_PATH), '--ahora'],
+                        cwd=str(PROJECT_ROOT),
+                        stdout=log_file,
+                        stderr=log_file,
+                        stdin=subprocess.DEVNULL,
+                        close_fds=False,
+                    )
+                return jsonify({"status": "success", "message": "Scheduler ya estaba en ejecución. Ejecución inmediata lanzada."})
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Scheduler estaba corriendo pero no se pudo ejecutar --ahora: {e}"}), 500
+        else:
+            return jsonify({"status": "ok", "message": "Scheduler ya estaba en ejecución."})
 
     if not SCHEDULER_SCRIPT_PATH.exists():
         return jsonify({"status": "error", "message": f"No existe script: {SCHEDULER_SCRIPT_PATH}"}), 500
 
     try:
+        status_data = _read_scheduler_status_file()
+        if not isinstance(status_data, dict):
+            status_data = {}
+        status_data.setdefault('scheduler', {})
+        status_data.setdefault('jobs', [])
+        status_data.setdefault('runs', {})
+        status_data['scheduler']['status'] = 'starting'
+        status_data['scheduler']['message'] = 'Arrancando scheduler desde web'
+        status_data['scheduler']['updated_at'] = datetime.now(timezone.utc).isoformat()
+        SCHEDULER_STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        SCHEDULER_STATUS_PATH.write_text(
+            json.dumps(status_data, indent=2, ensure_ascii=False),
+            encoding='utf-8'
+        )
+
         creationflags = 0
         if os.name == 'nt':
             creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
 
         log_path = PROJECT_ROOT / 'logs' / 'backtest_scheduler_web.log'
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_file = open(log_path, 'a', encoding='utf-8')
-        subprocess.Popen(
-            [sys.executable, str(SCHEDULER_SCRIPT_PATH)],
-            cwd=str(PROJECT_ROOT),
-            stdout=log_file,
-            stderr=log_file,
-            stdin=subprocess.DEVNULL,
-            close_fds=False,
-            creationflags=creationflags,
-        )
+        with open(log_path, 'a', encoding='utf-8') as log_file:
+            subprocess.Popen(
+                [sys.executable, str(SCHEDULER_SCRIPT_PATH)],
+                cwd=str(PROJECT_ROOT),
+                stdout=log_file,
+                stderr=log_file,
+                stdin=subprocess.DEVNULL,
+                close_fds=False,
+                creationflags=creationflags,
+            )
 
-        return jsonify({"status": "success", "message": "Scheduler arrancado."})
+            # Si se solicita ejecución inmediata, lanzar --ahora en paralelo.
+            if immediate:
+                subprocess.Popen(
+                    [sys.executable, str(SCHEDULER_SCRIPT_PATH), '--ahora'],
+                    cwd=str(PROJECT_ROOT),
+                    stdout=log_file,
+                    stderr=log_file,
+                    stdin=subprocess.DEVNULL,
+                    close_fds=False,
+                    creationflags=creationflags,
+                )
+
+        return jsonify({"status": "success", "message": "Scheduler arrancado." + (" Ejecución inmediata lanzada." if immediate else "")})
     except Exception as e:
         return jsonify({"status": "error", "message": f"No se pudo arrancar el scheduler: {e}"}), 500
 
@@ -732,7 +914,22 @@ def scheduler_stop():
         return jsonify({"status": "error", "message": "No autorizado"}), 403
 
     if not SCHEDULER_PID_PATH.exists():
-        return jsonify({"status": "ok", "message": "Scheduler no estaba en ejecución (sin PID)."})
+        # No hay PID file: marcar JSON como stopped por si acaso estaba corriendo
+        try:
+            status_data = _read_scheduler_status_file()
+            if isinstance(status_data, dict):
+                status_data.setdefault('scheduler', {})
+                status_data['scheduler']['status'] = 'stopped'
+                status_data['scheduler']['message'] = 'Detenido manualmente desde web'
+                status_data['scheduler']['updated_at'] = datetime.now(timezone.utc).isoformat()
+                SCHEDULER_STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+                SCHEDULER_STATUS_PATH.write_text(
+                    json.dumps(status_data, indent=2, ensure_ascii=False),
+                    encoding='utf-8'
+                )
+        except Exception:
+            pass
+        return jsonify({"status": "ok", "message": "Scheduler no estaba en ejecución."})
 
     try:
         pid = int(SCHEDULER_PID_PATH.read_text(encoding='utf-8').strip())
@@ -742,19 +939,46 @@ def scheduler_stop():
     try:
         if os.name == 'nt':
             subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
                 ["taskkill", "/PID", str(pid), "/T", "/F"],
                 check=False,
                 capture_output=True,
                 text=True,
             )
+            # Esperar brevemente a que el proceso muera
+            import time
+            time.sleep(0.5)
         else:
             os.kill(pid, signal.SIGTERM)
+            import time
+            time.sleep(0.5)
     except Exception as e:
         return jsonify({"status": "error", "message": f"No se pudo detener el scheduler: {e}"}), 500
 
     try:
         if SCHEDULER_PID_PATH.exists():
             SCHEDULER_PID_PATH.unlink()
+    except Exception:
+        pass
+
+    # Marcar el JSON como stopped
+    try:
+        status_data = _read_scheduler_status_file()
+        if isinstance(status_data, dict):
+            status_data.setdefault('scheduler', {})
+            status_data['scheduler']['status'] = 'stopped'
+            status_data['scheduler']['message'] = 'Detenido manualmente desde web'
+            status_data['scheduler']['updated_at'] = datetime.now(timezone.utc).isoformat()
+            SCHEDULER_STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+            SCHEDULER_STATUS_PATH.write_text(
+                json.dumps(status_data, indent=2, ensure_ascii=False),
+                encoding='utf-8'
+            )
     except Exception:
         pass
 
@@ -968,24 +1192,75 @@ def export_tanda(tanda_id):
 # -- EXPORTAR TODOS LOS TRADES (ADMIN) --
 @main_bp.route('/export_todo_admin')
 def export_todo_admin():
+    if not session.get('logged_in'):
+        return "No autorizado", 401
     if session.get('user_mode') != 'admin':
         return "Acceso denegado", 403
     
     try:
-        # El admin descarga TODOS los trades de la base de datos
-        trades = Trade.query.all()
+        # El admin descarga TODOS los trades + relaciones en una sola carga
+        trades = Trade.query.options(
+            joinedload(Trade.backtest).joinedload(ResultadoBacktest.propietario)
+        ).all()
+
+        def _to_scalar_csv(v):
+            if v is None:
+                return ''
+            if isinstance(v, (str, int, float, bool)):
+                return v
+            return json.dumps(v, ensure_ascii=False)
+
+        params_by_backtest = {}
+        param_keys = set()
+
+        for t in trades:
+            bt = t.backtest
+            if bt is None:
+                continue
+            bt_id = bt.id
+            if bt_id in params_by_backtest:
+                continue
+
+            params = {}
+            if bt.params_tecnicos:
+                try:
+                    raw_params = json.loads(bt.params_tecnicos)
+                    if isinstance(raw_params, dict):
+                        params = raw_params
+                except Exception:
+                    params = {}
+
+            scalar_params = {str(k): _to_scalar_csv(v) for k, v in params.items()}
+            params_by_backtest[bt_id] = scalar_params
+            param_keys.update(scalar_params.keys())
+
+        ordered_param_keys = sorted(param_keys)
 
         output = io.StringIO()
         writer = csv.writer(output, delimiter=';')
-        writer.writerow(['Usuario Propietario', 'ID Tanda', 'Activo', 'Tipo', 'Fecha', 'Entrada', 'Salida', 'PnL_Abs', 'Retorno_Pct'])
+        writer.writerow([
+            'Usuario Propietario',
+            'ID Tanda',
+            'Activo',
+            'Tipo',
+            'Fecha',
+            'Entrada',
+            'Salida',
+            'PnL_Abs',
+            'Retorno_Pct',
+            *ordered_param_keys,
+        ])
 
         for t in trades:
+            bt = t.backtest
+            params_row = params_by_backtest.get(bt.id, {}) if bt is not None else {}
             writer.writerow([
-                t.backtest.propietario.username,
-                t.backtest.id_estrategia,
-                t.backtest.symbol,
+                bt.propietario.username if bt and bt.propietario else '',
+                bt.id_estrategia if bt else '',
+                bt.symbol if bt else '',
                 t.tipo, t.fecha, t.precio_entrada, 
-                t.precio_salida, t.pnl_absoluto, t.retorno_pct
+                t.precio_salida, t.pnl_absoluto, t.retorno_pct,
+                *[params_row.get(k, '') for k in ordered_param_keys],
             ])
 
         output.seek(0)
