@@ -7,6 +7,7 @@ a los módulos de la carpeta 'indicators' para mejorar la modularidad y el mante
 """
 
 from backtesting.lib import crossover
+import json
 import pandas as pd
 import numpy as np
 
@@ -64,6 +65,106 @@ def _as_bool(value):
     if isinstance(value, str):
         return value.strip().lower() in {'1', 'true', 'on', 'yes', 'si', 'sí'}
     return bool(value)
+
+def _build_signal_context(strategy_self: 'StrategySelf', trigger_indicators: dict, precio_close: float, stop_loss=None) -> str:
+    """
+    Construye un snapshot JSON con los valores actuales de todos los indicadores activos
+    en el momento en que se dispara una señal de compra o venta.
+
+    El JSON resultante permite análisis posterior: qué indicador disparó la señal,
+    con qué valor y cuál era el límite/umbral configurado en ese instante.
+
+    Returns
+    -------
+    str
+        JSON serializado listo para almacenar en la columna `signal_context` de Trade.
+    """
+
+    def _safe_float(val, decimals=4):
+        """Convierte un valor a float redondeado de forma segura."""
+        try:
+            if val is None:
+                return None
+            f = float(val)
+            return round(f, decimals) if not (f != f) else None  # NaN guard
+        except (TypeError, ValueError):
+            return None
+
+    def _last(series):
+        """Obtiene el último valor de una serie (Indicator o pd.Series)."""
+        if series is None:
+            return None
+        try:
+            return _safe_float(series.iloc[-1])
+        except Exception:
+            try:
+                return _safe_float(series[-1])
+            except Exception:
+                return None
+
+    indicadores = {}
+
+    # --- EMA ---
+    ema_fast = _last(getattr(strategy_self, 'ema_fast_series', None))
+    ema_slow = _last(getattr(strategy_self, 'ema_slow_series', None))
+    if ema_fast is not None or ema_slow is not None:
+        indicadores['EMA'] = {
+            'fast': ema_fast,
+            'slow': ema_slow,
+            'periodo_fast': getattr(strategy_self, 'ema_fast_period', None),
+            'periodo_slow': getattr(strategy_self, 'ema_slow_period', None),
+        }
+
+    # --- RSI ---
+    if getattr(strategy_self, 'rsi', False):
+        rsi_val = _last(getattr(strategy_self, 'rsi_ind', None))
+        indicadores['RSI'] = {
+            'valor': rsi_val,
+            'limite_min': _safe_float(getattr(strategy_self, 'rsi_low_level', None)),
+            'limite_max': _safe_float(getattr(strategy_self, 'rsi_high_level', None)),
+            'umbral_fuerza': _safe_float(getattr(strategy_self, 'rsi_strength_threshold', None)),
+        }
+
+    # --- MACD ---
+    if getattr(strategy_self, 'macd', False):
+        indicadores['MACD'] = {
+            'linea': _last(getattr(strategy_self, 'macd_line', None)),
+            'signal': _last(getattr(strategy_self, 'macd_signal_line', None)),
+            'hist': _last(getattr(strategy_self, 'macd_hist', None)),
+        }
+
+    # --- Stochastic (Fast / Mid / Slow) ---
+    for prefix, k_attr, d_attr, level_attr in [
+        ('stoch_fast', 'stoch_k_fast', 'stoch_d_fast', 'stoch_fast_low_level'),
+        ('stoch_mid',  'stoch_k_mid',  'stoch_d_mid',  'stoch_mid_low_level'),
+        ('stoch_slow', 'stoch_k_slow', 'stoch_d_slow', 'stoch_slow_low_level'),
+    ]:
+        if getattr(strategy_self, prefix, False):
+            indicadores[prefix] = {
+                'k': _last(getattr(strategy_self, k_attr, None)),
+                'd': _last(getattr(strategy_self, d_attr, None)),
+                'nivel_sobreventa': _safe_float(getattr(strategy_self, level_attr, None)),
+            }
+
+    # --- Bollinger Bands ---
+    if getattr(strategy_self, 'bb_active', False):
+        indicadores['BB'] = {
+            'upper': _last(getattr(strategy_self, 'bb_upper_band_series', None)),
+            'lower': _last(getattr(strategy_self, 'bb_lower_band_series', None)),
+            'mid':   _last(getattr(strategy_self, 'bb_mid_band_series', None)),
+            'window': getattr(strategy_self, 'bb_window', None),
+            'num_std': _safe_float(getattr(strategy_self, 'bb_num_std', None)),
+        }
+
+    # --- Precio de cierre y Stop Loss ---
+    context = {
+        'trigger': list(trigger_indicators.keys())[0] if trigger_indicators else None,
+        'precio_close': _safe_float(precio_close),
+        'stop_loss': _safe_float(stop_loss),
+        'indicadores': indicadores,
+    }
+    return json.dumps(context, ensure_ascii=False)
+
 
 def _log_trade_action_sl_update(strategy_self: 'StrategySelf', old_sl: float, new_sl: float) -> None:
     """
@@ -408,6 +509,12 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
             "PnL_Absoluto": "N/A", 
             "Retorno_Pct": "N/A", 
             "Comision_Total": "N/A",
+            "Signal_Context": _build_signal_context(
+                strategy_self,
+                trigger_indicators=technical_reasons,
+                precio_close=strategy_self.data.Close[-1],
+                stop_loss=strategy_self.my_stop_loss,
+            ),
         })
 
 # ----------------------------------------------------------------------
@@ -540,6 +647,12 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
                 "PnL_Absoluto": round(trade_obj.pl, 2) if trade_obj and trade_obj.pl is not None else "N/A", 
                 "Retorno_Pct": round(trade_obj.pl_pct * 100, 2) if trade_obj and trade_obj.pl_pct is not None else "N/A", 
                 "Comision_Total": round(trade_obj._commissions, 2) if trade_obj and trade_obj._commissions is not None else "N/A",
+                "Signal_Context": _build_signal_context(
+                    strategy_self,
+                    trigger_indicators={'cierre_tecnico': descripcion_cierre},
+                    precio_close=strategy_self.data.Close[-1],
+                    stop_loss=None,
+                ),
             })
             
             return 
@@ -658,6 +771,12 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
             "PnL_Absoluto": round(trade_obj.pl, 2) if trade_obj and trade_obj.pl is not None else "N/A", 
             "Retorno_Pct": round(trade_obj.pl_pct * 100, 2) if trade_obj and trade_obj.pl_pct is not None else "N/A", 
             "Comision_Total": round(trade_obj._commissions, 2) if trade_obj and trade_obj._commissions is not None else "N/A",
+            "Signal_Context": _build_signal_context(
+                strategy_self,
+                trigger_indicators={'stop_loss': stop_source},
+                precio_close=strategy_self.data.Close[-1],
+                stop_loss=final_stop_loss,
+            ),
         })
     else:
         # Registro por qué no se compró (debug) — protegido contra variables no definidas

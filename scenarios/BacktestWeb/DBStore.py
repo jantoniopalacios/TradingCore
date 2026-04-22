@@ -98,7 +98,10 @@ def save_backtest_run(user_id, stats, config_dict, trades_df, grafico_html=None)
                     pnl_absoluto=_clean_value(row.get('PnL', row.get('PnL_Absoluto'))),
                     
                     # 5. Retorno: Aseguramos que no se multiplique doblemente
-                    retorno_pct=_clean_value(row.get('ReturnPct', row.get('Retorno_Pct')))
+                    retorno_pct=_clean_value(row.get('ReturnPct', row.get('Retorno_Pct'))),
+
+                    # 6. Snapshot de indicadores en el momento del disparo
+                    signal_context=row.get('Signal_Context'),
                 )
                 db.session.add(t)
 

@@ -51,6 +51,20 @@
                         {{ avg_return|round(2) }}%
                     </span>
                 </td>
+                
+                <td class="text-center small text-muted">
+                    {{ datos.ultima_operacion_fecha if datos.ultima_operacion_fecha else '-' }}
+                </td>
+                
+                <td class="text-center">
+                    {% if datos.ultima_operacion_tipo and datos.ultima_operacion_tipo != '-' %}
+                        <span class="badge {{ 'bg-success' if datos.ultima_operacion_tipo == 'COMPRA' else 'bg-danger' }}">
+                            {{ datos.ultima_operacion_tipo }}
+                        </span>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
 
                 <td class="text-end">
                     <div class="btn-group">
@@ -59,7 +73,7 @@
                             <i class="bi bi-gear-fill"></i>
                         </button>
                         
-                        <a href="{{ url_for('main.export_tanda', tanda_id=tanda_id) }}" 
+                        <a href="{{ url_for('main.export_tanda', tanda_id=datos.id_tanda, usuario_id=datos.usuario_id) }}" 
                            class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation();">
                             <i class="bi bi-download"></i>
                         </a>
@@ -83,6 +97,8 @@
                                     <th>SHARPE</th>
                                     <th>MAX DD</th>
                                     <th>WIN RATE</th>
+                                    <th>ÚLTIMA OP.</th>
+                                    <th>TIPO</th>
                                     <th>OPERACIONES / GRÁFICO</th>
                                 </tr>
                             </thead>
@@ -106,6 +122,18 @@
                                             </div>
                                             <span class="fw-bold">{{ wr }}%</span>
                                         </div>
+                                    </td>
+                                    <td class="text-center small text-muted">
+                                        {{ r.ultima_operacion_fecha if r.ultima_operacion_fecha else '-' }}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if r.ultima_operacion_tipo and r.ultima_operacion_tipo != '-' %}
+                                            <span class="badge {{ 'bg-success' if r.ultima_operacion_tipo == 'COMPRA' else 'bg-danger' }}">
+                                                {{ r.ultima_operacion_tipo }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         <div class="d-flex align-items-center">

@@ -420,11 +420,22 @@ def index():
                     'activos': []
                 }
             registros_agrupados[tanda_key]['activos'].append(r)
+        
+        # 3. Enriquecer cada backtest (activo) con el último trade de ese backtest específico
+        for tanda_key, tanda_data in registros_agrupados.items():
+            for backtest in tanda_data['activos']:
+                last_trade = Trade.query.filter_by(backtest_id=backtest.id).order_by(Trade.id.desc()).first()
+                if last_trade:
+                    backtest.ultima_operacion_fecha = last_trade.fecha
+                    backtest.ultima_operacion_tipo = last_trade.tipo
+                else:
+                    backtest.ultima_operacion_fecha = '-'
+                    backtest.ultima_operacion_tipo = '-'
             
     except Exception as e:
         print(f"Error historial: {e}")
 
-    # 3. EL CAMBIO FINAL: Ordenar el diccionario de tandas por la fecha del primer elemento de cada tanda
+    # 4. EL CAMBIO FINAL: Ordenar el diccionario de tandas por la fecha del primer elemento de cada tanda
     # Esto garantiza que la Tanda #10 aparezca antes que la #9 si se hizo después.
     tandas_ordenadas = dict(sorted(
         registros_agrupados.items(), 
@@ -1141,14 +1152,33 @@ def get_trades(backtest_id):
         # Buscamos los trades asociados al ID único del ResultadoBacktest
         trades = Trade.query.filter_by(backtest_id=backtest_id).all()
 
+        def _to_number(value):
+            try:
+                if value is None:
+                    return None
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        def _parse_signal_context(raw_value):
+            if not raw_value:
+                return None
+            try:
+                parsed = json.loads(raw_value)
+                return parsed if isinstance(parsed, dict) else None
+            except Exception:
+                return None
+
         return jsonify([{
             'tipo': t.tipo,
             'descripcion': t.descripcion,
             'fecha': t.fecha,
-            'entrada': float(t.precio_entrada),
-            'salida': float(t.precio_salida),
-            'pnl': float(t.pnl_absoluto),
-            'retorno': float(t.retorno_pct)
+            'entrada': _to_number(t.precio_entrada),
+            'salida': _to_number(t.precio_salida),
+            'pnl': _to_number(t.pnl_absoluto),
+            'retorno': _to_number(t.retorno_pct),
+            'trigger': (_parse_signal_context(t.signal_context) or {}).get('trigger'),
+            'signal_context': _parse_signal_context(t.signal_context),
         } for t in trades])
     except Exception as e:
         print(f"Error al obtener trades: {e}")
@@ -1161,10 +1191,19 @@ def export_tanda(tanda_id):
     user_mode = session.get('user_mode')
     
     try:
-        # 1. Buscamos al usuario de la sesión
-        u = Usuario.query.filter_by(username=user_mode).first()
-        
-        # 2. Filtramos la tanda SOLO para este usuario
+        # 1. Determinamos el usuario propietario de la tanda.
+        # Si se pasa usuario_id como query param (admin descargando tanda ajena), lo usamos.
+        # En caso contrario usamos el usuario de la sesión.
+        usuario_id_param = request.args.get('usuario_id', type=int)
+        if usuario_id_param is not None:
+            u = Usuario.query.get(usuario_id_param)
+        else:
+            u = Usuario.query.filter_by(username=user_mode).first()
+
+        if u is None:
+            return "Usuario no encontrado", 404
+
+        # 2. Filtramos la tanda para el usuario correcto
         resultados = ResultadoBacktest.query.filter_by(id_estrategia=tanda_id, usuario_id=u.id).all()
         ids_resultados = [r.id for r in resultados]
         
@@ -1172,12 +1211,42 @@ def export_tanda(tanda_id):
 
         output = io.StringIO()
         writer = csv.writer(output, delimiter=';')
-        writer.writerow(['Usuario', 'Tanda', 'Activo', 'Tipo', 'Fecha', 'Entrada', 'Salida', 'PnL_Abs', 'Retorno_Pct'])
+        writer.writerow([
+            'Usuario',
+            'Tanda',
+            'Activo',
+            'Tipo',
+            'Fecha',
+            'Entrada',
+            'Salida',
+            'PnL_Abs',
+            'Retorno_Pct',
+            'Trigger',
+            'Signal_Context',
+        ])
 
         for t in trades:
+            signal_context = {}
+            if t.signal_context:
+                try:
+                    parsed_signal_context = json.loads(t.signal_context)
+                    if isinstance(parsed_signal_context, dict):
+                        signal_context = parsed_signal_context
+                except Exception:
+                    signal_context = {}
+
             writer.writerow([
-                user_mode, tanda_id, t.backtest.symbol, t.tipo, t.fecha, 
-                t.precio_entrada, t.precio_salida, t.pnl_absoluto, t.retorno_pct
+                user_mode,
+                tanda_id,
+                t.backtest.symbol,
+                t.tipo,
+                t.fecha,
+                t.precio_entrada,
+                t.precio_salida,
+                t.pnl_absoluto,
+                t.retorno_pct,
+                signal_context.get('trigger', ''),
+                t.signal_context or '',
             ])
 
         output.seek(0)
@@ -1248,18 +1317,30 @@ def export_todo_admin():
             'Salida',
             'PnL_Abs',
             'Retorno_Pct',
+            'Trigger',
+            'Signal_Context',
             *ordered_param_keys,
         ])
 
         for t in trades:
             bt = t.backtest
             params_row = params_by_backtest.get(bt.id, {}) if bt is not None else {}
+            signal_context = {}
+            if t.signal_context:
+                try:
+                    parsed_signal_context = json.loads(t.signal_context)
+                    if isinstance(parsed_signal_context, dict):
+                        signal_context = parsed_signal_context
+                except Exception:
+                    signal_context = {}
             writer.writerow([
                 bt.propietario.username if bt and bt.propietario else '',
                 bt.id_estrategia if bt else '',
                 bt.symbol if bt else '',
                 t.tipo, t.fecha, t.precio_entrada, 
                 t.precio_salida, t.pnl_absoluto, t.retorno_pct,
+                signal_context.get('trigger', ''),
+                t.signal_context or '',
                 *[params_row.get(k, '') for k in ordered_param_keys],
             ])
 

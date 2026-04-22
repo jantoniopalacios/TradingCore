@@ -722,6 +722,68 @@
                 return;
             }
 
+            const fmtNumber = (value, decimals = 2, suffix = '') => {
+                if (value === null || value === undefined || Number.isNaN(Number(value))) {
+                    return '-';
+                }
+                return `${Number(value).toFixed(decimals)}${suffix}`;
+            };
+
+            const escapeHtml = (value) => {
+                if (value === null || value === undefined) {
+                    return '-';
+                }
+                return String(value)
+                    .replaceAll('&', '&amp;')
+                    .replaceAll('<', '&lt;')
+                    .replaceAll('>', '&gt;')
+                    .replaceAll('"', '&quot;')
+                    .replaceAll("'", '&#39;');
+            };
+
+            const renderSignalContext = (trade) => {
+                if (!trade.signal_context) {
+                    return '-';
+                }
+
+                const trigger = trade.trigger || trade.signal_context.trigger || 'sin trigger';
+                const indicators = trade.signal_context.indicadores || {};
+                const triggerData = indicators[trigger] || null;
+                const summaryParts = [];
+
+                if (trade.signal_context.precio_close !== null && trade.signal_context.precio_close !== undefined) {
+                    summaryParts.push(`Close ${fmtNumber(trade.signal_context.precio_close)}`);
+                }
+                if (trade.signal_context.stop_loss !== null && trade.signal_context.stop_loss !== undefined) {
+                    summaryParts.push(`SL ${fmtNumber(trade.signal_context.stop_loss)}`);
+                }
+
+                if (triggerData && typeof triggerData === 'object') {
+                    Object.entries(triggerData).forEach(([key, value]) => {
+                        if (value === null || value === undefined || typeof value === 'object') {
+                            return;
+                        }
+                        const label = key.replaceAll('_', ' ');
+                        if (typeof value === 'number') {
+                            summaryParts.push(`${label} ${fmtNumber(value, 4)}`);
+                        } else {
+                            summaryParts.push(`${label} ${value}`);
+                        }
+                    });
+                }
+
+                const summaryHtml = summaryParts.length
+                    ? `<div class="small mb-1"><strong>${escapeHtml(trigger)}:</strong> ${escapeHtml(summaryParts.join(' | '))}</div>`
+                    : `<div class="small mb-1"><strong>${escapeHtml(trigger)}</strong></div>`;
+                const prettyJson = escapeHtml(JSON.stringify(trade.signal_context, null, 2));
+                return `
+                    ${summaryHtml}
+                    <details>
+                        <summary>JSON completo</summary>
+                        <pre class="small mb-0">${prettyJson}</pre>
+                    </details>`;
+            };
+
             let html = `
                 <table class="csv-table">
                     <thead>
@@ -733,21 +795,24 @@
                             <th>SALIDA</th>
                             <th>PnL ABS</th>
                             <th>RETORNO %</th>
+                            <th>CONTEXTO</th>
                         </tr>
                     </thead>
                     <tbody>`;
             
             trades.forEach(t => {
-                const pnlClass = t.retorno >= 0 ? 'text-success' : 'text-danger';
+                const pnlClass = (t.retorno ?? 0) >= 0 ? 'text-success' : 'text-danger';
+                const badgeClass = t.tipo === 'COMPRA' ? 'bg-success' : 'bg-danger';
                 html += `
                     <tr>
-                        <td><span class="badge ${t.tipo == 'Long' ? 'bg-success' : 'bg-danger'}">${t.tipo}</span></td>
-                        <td class="small text">${t.descripcion || '-'}</td> 
-                        <td>${t.fecha}</td>
-                        <td>${t.entrada.toFixed(2)}</td>
-                        <td>${t.salida.toFixed(2)}</td>
-                        <td class="${pnlClass}">${t.pnl.toFixed(2)}</td>
-                        <td class="${pnlClass}">${t.retorno.toFixed(2)}%</td>
+                        <td><span class="badge ${badgeClass}">${escapeHtml(t.tipo)}</span></td>
+                        <td class="small text">${escapeHtml(t.descripcion || '-')}</td> 
+                        <td>${escapeHtml(t.fecha)}</td>
+                        <td>${fmtNumber(t.entrada)}</td>
+                        <td>${fmtNumber(t.salida)}</td>
+                        <td class="${pnlClass}">${fmtNumber(t.pnl)}</td>
+                        <td class="${pnlClass}">${fmtNumber(t.retorno, 2, '%')}</td>
+                        <td>${renderSignalContext(t)}</td>
                     </tr>`;
             });
 

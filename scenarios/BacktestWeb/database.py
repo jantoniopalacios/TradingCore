@@ -120,6 +120,11 @@ class Trade(db.Model):
     precio_salida = db.Column(db.Float)
     pnl_absoluto = db.Column(db.Float)
     retorno_pct = db.Column(db.Float)
+    # Snapshot estructurado de valores de indicadores en el momento del disparo.
+    # Almacena: trigger principal, valores actuales y límites configurados de cada indicador.
+    # Formato JSON: {"trigger": "RSI", "precio_close": 155.2, "stop_loss": 148.0,
+    #                "indicadores": {"RSI": {"valor": 32.5, "limite_min": 30, "limite_max": 70}, ...}}
+    signal_context = db.Column(db.Text, nullable=True)
 
 #  --- NUEVA TABLA DE SIMBOLOS ---
 # Esta tabla almacena los símbolos que cada usuario quiere analizar
