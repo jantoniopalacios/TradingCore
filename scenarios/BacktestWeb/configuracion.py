@@ -190,6 +190,9 @@ def asignar_parametros_a_system(config_data: dict, rutas: dict):
     System.ema_slow_maximo = get_param('ema_slow_maximo', False, bool)
     System.ema_buy_logic = get_param('ema_buy_logic', 'None')
     System.ema_sell_logic = get_param('ema_sell_logic', 'None')
+    System.ema_price_above_slow_pct = get_param('ema_price_above_slow_pct', 0, float)
+    System.ema_price_above_fast_pct = get_param('ema_price_above_fast_pct', 0, float)
+    System.ema_fast_above_slow_pct = get_param('ema_fast_above_slow_pct', 0, float)
 
     # --- 3. RSI ---
     System.rsi = get_param('rsi', False, bool)

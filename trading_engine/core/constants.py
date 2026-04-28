@@ -100,6 +100,9 @@ VARIABLE_COMMENTS = {
     "ema_buy_logic_crossover": "Activa la señal de COMPRA cuando la EMA Rápida cruza por encima de la EMA Lenta.",
     "ema_sell_logic_crossover": "Activa la señal de VENTA cuando la EMA Rápida cruza por debajo de la EMA Lenta.",
     "ema_slow_activo": "Activa la EMA Lenta como filtro de tendencia. Solo permite compras si el precio está por encima de la EMA Lenta.",
+    "ema_price_above_slow_pct": "Porcentaje máximo que el precio puede estar por encima de la EMA Lenta antes de bloquear compras (ej: 2.5 = 2.5%). Si es 0, no aplica este filtro.",
+    "ema_price_above_fast_pct": "Porcentaje máximo que el precio puede estar por encima de la EMA Rápida antes de bloquear compras (ej: 2.5 = 2.5%). Si es 0, no aplica este filtro.",
+    "ema_fast_above_slow_pct": "Porcentaje máximo que la EMA Rápida puede estar por encima de la EMA Lenta antes de bloquear compras (ej: 2.5 = 2.5%). Si es 0, no aplica este filtro.",
 
     # ------------------------------------------------------------------
     # F. PARÁMETROS MACD (web_strategy/_tab_macd.html)
@@ -233,6 +236,9 @@ COLUMNAS_HISTORICO = [
     'ema_buy_logic_crossover',
     'ema_sell_logic_crossover',
     'ema_slow_activo',         # Antes: 'ema_filter_active'
+    'ema_price_above_slow_pct',
+    'ema_price_above_fast_pct',
+    'ema_fast_above_slow_pct',
 
     # ------------------------------------------------------------------
     # G. PARÁMETROS MACD (web_strategy/_tab_macd.html)

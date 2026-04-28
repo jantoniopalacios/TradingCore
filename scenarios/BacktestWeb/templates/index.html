@@ -181,6 +181,9 @@
         </button>
 
         {% if session.get('user_mode') == 'admin' %}
+        <button class="nav-link" id="tab-users" data-bs-toggle="tab" data-bs-target="#pane-users" type="button">
+            <i class="bi bi-people me-2"></i> USUARIOS
+        </button>
         <button class="nav-link" id="tab-scheduler" data-bs-toggle="tab" data-bs-target="#pane-scheduler" type="button">
             <i class="bi bi-cpu me-2"></i> SCHEDULER
         </button>
@@ -191,8 +194,11 @@
         <button type="button" onclick="lanzarEstrategia()" class="btn btn-primary w-100 fw-bold mb-3 shadow-sm">
             <i class="bi bi-play-fill me-1"></i> LANZAR BACKTEST
         </button>
-        <button type="button" onclick="guardarConfig()" class="btn btn-outline-light btn-sm w-100 opacity-75 mb-4">
+        <button type="button" onclick="guardarConfig()" class="btn btn-outline-light btn-sm w-100 opacity-75 mb-2">
             <i class="bi bi-save me-1"></i> GUARDAR CONFIG
+        </button>
+        <button type="button" onclick="descargarConfig()" class="btn btn-outline-info btn-sm w-100 opacity-75 mb-4">
+            <i class="bi bi-download me-1"></i> DESCARGAR CONFIG
         </button>
         
         <a href="{{ url_for('main.logout') }}" class="btn btn-outline-danger btn-sm w-100 border-0">
@@ -255,6 +261,11 @@
             </div>
 
             {% if session.get('user_mode') == 'admin' %}
+            <div class="tab-pane fade" id="pane-users">
+                <div class="card-main p-0 overflow-hidden">
+                    {% include '_tab_user_management.html' %}
+                </div>
+            </div>
             <div class="tab-pane fade" id="pane-scheduler">
                 <div class="card-main p-0 overflow-hidden">
                     {% include '_tab_scheduler.html' %}
@@ -341,6 +352,16 @@
             const btn = document.querySelector(`#${savedId}`);
             if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
         });
+
+        // 2.1 Restaurar pestaña principal a partir del hash de URL (ej: #pane-users)
+        // Tiene prioridad sobre localStorage para soportar redirects del backend.
+        if (window.location.hash) {
+            const hash = window.location.hash;
+            const hashBtn = document.querySelector(`button[data-bs-toggle="tab"][data-bs-target="${hash}"]`);
+            if (hashBtn) {
+                bootstrap.Tab.getOrCreateInstance(hashBtn).show();
+            }
+        }
 
         // 3. GUARDAR PESTAÑA ACTIVA AL HACER CLIC
         // Distinción por atributo: data-bs-toggle="tab" = pestaña lateral, "pill" = sub-pestaña.
@@ -612,6 +633,46 @@
         .then(data => showToast(data.status === 'success' ? 'success' : 'danger', data.message || 'Operación completada.'))
         .catch(() => showToast('danger', 'Error de red al guardar la configuración.'))
         .finally(() => { btn.disabled = false; btn.innerHTML = origHtml; });
+    }
+
+    // DESCARGAR CONFIG como JSON
+    function descargarConfig() {
+        const btn = document.querySelector('button[onclick="descargarConfig()"]');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
+
+        fetch("{{ url_for('main.export_config') }}")
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                
+                // Extraer nombre del fichero desde Content-Disposition
+                const disposition = res.headers.get('Content-Disposition') || '';
+                let filename = `config_{{ session.get('user_mode') }}_${new Date().toISOString().slice(0,10)}.json`;
+                if (disposition.includes('filename=')) {
+                    const matches = disposition.match(/filename=([^;]+)/);
+                    if (matches && matches[1]) {
+                        filename = matches[1].replace(/"/g, '').trim();
+                    }
+                }
+                
+                return res.blob().then(blob => ({ blob, filename }));
+            })
+            .then(({ blob, filename }) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('success', 'Configuración descargada correctamente.');
+            })
+            .catch(err => {
+                showToast('danger', `Error al descargar: ${err.message}`);
+            })
+            .finally(() => { btn.disabled = false; btn.innerHTML = origHtml; });
     }
 
     function showToast(type, message) {

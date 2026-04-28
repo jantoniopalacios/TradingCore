@@ -3,10 +3,106 @@
     <div class="text-secondary small">
         <i class="bi bi-info-circle me-1"></i> <strong>Modo Administrador:</strong> Acceso al historial global del sistema.
     </div>
-    <a href="{{ url_for('main.export_todo_admin') }}" class="btn btn-danger btn-sm shadow-sm">
-        <i class="bi bi-database-fill-down me-2"></i>Descargar Base de Datos Completa
-    </a>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-warning btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#limpiezaDatosModal">
+            <i class="bi bi-trash-fill me-2"></i>Limpieza de Datos
+        </button>
+        <a href="{{ url_for('main.export_todo_admin') }}" class="btn btn-danger btn-sm shadow-sm">
+            <i class="bi bi-database-fill-down me-2"></i>Descargar Base de Datos Completa
+        </a>
+    </div>
 </div>
+
+<!-- Modal Limpieza de Datos -->
+<div class="modal fade" id="limpiezaDatosModal" tabindex="-1" aria-labelledby="limpiezaDatosModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="limpiezaDatosModalLabel">
+                    <i class="bi bi-trash-fill me-2"></i>Limpieza de Datos
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger" role="alert">
+                    <strong>⚠️ Advertencia:</strong> Esta acción eliminará todas las tandas (backtests) anteriores a la fecha especificada para el usuario seleccionado. Esta acción es irreversible.
+                </div>
+                <form id="formLimpiezaDatos">
+                    <div class="mb-3">
+                        <label for="limpiezaUsuario" class="form-label">Usuario:</label>
+                        <select class="form-select" id="limpiezaUsuario" name="usuario_id" required>
+                            <option value="">-- Selecciona un usuario --</option>
+                            {% for usuario in usuarios %}
+                            <option value="{{ usuario.id }}">{{ usuario.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="limpiezaFecha" class="form-label">Fecha límite (borrar anteriores a esta fecha):</label>
+                        <input type="date" class="form-control" id="limpiezaFecha" name="fecha_limite" required>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="limpiezaConfirmacion" name="confirmacion" required>
+                            <label class="form-check-label" for="limpiezaConfirmacion">
+                                Confirmo que deseo eliminar todas las tandas anteriores a la fecha especificada
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="ejecutarLimpiezaDatos()">
+                    <i class="bi bi-trash-fill me-2"></i>Eliminar Datos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function ejecutarLimpiezaDatos() {
+    const usuario_id = document.getElementById('limpiezaUsuario').value;
+    const fecha_limite = document.getElementById('limpiezaFecha').value;
+    const confirmacion = document.getElementById('limpiezaConfirmacion').checked;
+
+    if (!usuario_id || !fecha_limite || !confirmacion) {
+        alert('Por favor completa todos los campos y confirma la acción.');
+        return;
+    }
+
+    if (confirm('¿Estás seguro de que deseas eliminar todas las tandas anteriores a ' + fecha_limite + ' para este usuario? Esta acción no se puede deshacer.')) {
+        fetch('{{ url_for("main.limpiar_datos_admin") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                usuario_id: parseInt(usuario_id),
+                fecha_limite: fecha_limite
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                document.getElementById('limpiezaConfirmacion').checked = false;
+                document.getElementById('limpiezaUsuario').value = '';
+                document.getElementById('limpiezaFecha').value = '';
+                bootstrap.Modal.getInstance(document.getElementById('limpiezaDatosModal')).hide();
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al procesar la limpieza de datos.');
+        });
+    }
+}
+</script>
 {% endif %}
 
 <div class="table-responsive">

@@ -163,6 +163,40 @@ def apply_ema_global_filter(strategy_self: 'StrategySelf', condicion_base_tecnic
     if getattr(strategy_self, 'ema_slow_ascendente', False) and not strategy_self.ema_slow_ascendente_STATE:
         return False # DENIEGO: Requerimiento de ascendente no cumplido
 
+    # ======================================================================
+    # --- FILTROS DE PRECIO ADICIONALES (Porcentajes) ---
+    # ======================================================================
+    
+    # Obtener el precio actual (último close)
+    if hasattr(strategy_self, 'data') and len(strategy_self.data) > 0:
+        current_price = strategy_self.data.Close[-1]
+        
+        # 1. FILTRO: Precio por encima de EMA Lenta (en porcentaje)
+        ema_price_above_slow_pct = getattr(strategy_self, 'ema_price_above_slow_pct', 0)
+        if ema_price_above_slow_pct > 0 and strategy_self.ema_slow_series is not None and len(strategy_self.ema_slow_series) > 0:
+            ema_slow_value = strategy_self.ema_slow_series[-1]
+            threshold_slow = ema_slow_value * (1 + ema_price_above_slow_pct / 100)
+            if current_price > threshold_slow:
+                return False  # DENIEGO: Precio demasiado por encima de EMA Lenta
+        
+        # 2. FILTRO: Precio por encima de EMA Rápida (en porcentaje)
+        ema_price_above_fast_pct = getattr(strategy_self, 'ema_price_above_fast_pct', 0)
+        if ema_price_above_fast_pct > 0 and strategy_self.ema_fast_series is not None and len(strategy_self.ema_fast_series) > 0:
+            ema_fast_value = strategy_self.ema_fast_series[-1]
+            threshold_fast = ema_fast_value * (1 + ema_price_above_fast_pct / 100)
+            if current_price > threshold_fast:
+                return False  # DENIEGO: Precio demasiado por encima de EMA Rápida
+        
+        # 3. FILTRO: EMA Rápida por encima de EMA Lenta (en porcentaje)
+        ema_fast_above_slow_pct = getattr(strategy_self, 'ema_fast_above_slow_pct', 0)
+        if ema_fast_above_slow_pct > 0 and strategy_self.ema_fast_series is not None and strategy_self.ema_slow_series is not None:
+            if len(strategy_self.ema_fast_series) > 0 and len(strategy_self.ema_slow_series) > 0:
+                ema_fast_value = strategy_self.ema_fast_series[-1]
+                ema_slow_value = strategy_self.ema_slow_series[-1]
+                threshold_spread = ema_slow_value * (1 + ema_fast_above_slow_pct / 100)
+                if ema_fast_value > threshold_spread:
+                    return False  # DENIEGO: EMA Rápida demasiado por encima de EMA Lenta
+
     return condicion_base_tecnica
 
 # ----------------------------------------------------------------------

@@ -75,6 +75,26 @@
                 </div>
                 
                 <p class="small text-muted mb-0"><strong>Diferencia clave con RSI:</strong> EMA sin switches = B&H con veto | RSI sin switches = Fuerza Pura agresiva (>55)</p>
+                
+                <hr class="my-3">
+                
+                <div class="alert alert-success alert-sm mb-3">
+                    <strong>✅ Filtros de Precio Adicionales (Nuevo):</strong><br>
+                    <small>
+                        Tres nuevos filtros de porcentaje que actúan como <strong>bloqueos (AND)</strong> adicionales para evitar compras en condiciones de sobrecalentamiento:<br>
+                        <br>
+                        <strong>1. Precio por encima de EMA Lenta (%):</strong> Bloquea si el precio está más de X% por encima de la EMA lenta<br>
+                        <strong>2. Precio por encima de EMA Rápida (%):</strong> Bloquea si el precio está más de X% por encima de la EMA rápida<br>
+                        <strong>3. EMA Rápida por encima de Lenta (%):</strong> Bloquea si la EMA rápida está más de X% por encima de la EMA lenta<br>
+                        <br>
+                        💡 <strong>Ejemplo de uso:</strong><br>
+                        • Si estableces "Precio por encima de EMA Lenta (%)" = 2.5 → La compra se bloqueará cuando el precio esté más del 2.5% por encima de la EMA lenta<br>
+                        • Si estableces "EMA Rápida por encima de Lenta (%)" = 1.5 → La compra se bloqueará cuando la EMA rápida esté más del 1.5% por encima de la EMA lenta<br>
+                        • Si dejas todos en 0 → Los filtros no se aplican (comportamiento estándar)<br>
+                        <br>
+                        ⚠️ <strong>Importante - Retrocompatibilidad:</strong> Los valores por defecto son 0 (desactivados), por lo que si no estableces valores específicos, el sistema funciona exactamente como antes. Los nuevos filtros son completamente opcionales.
+                    </small>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -149,6 +169,42 @@
                            {% if config.ema_slow_descendente == 'True' %}checked{% endif %}>
                     <label class="form-check-label fw-bold" for="ema_slow_descendente">Tendencia Bajista (Venta + Veto)</label>
                 </div>
+            </div>
+        </div>
+
+        <h5 class="mt-4 text-info">⚙️ Filtros de Precio Adicionales (Bloqueos AND)</h5>
+        <p class="text-muted small">Establece porcentajes máximos de distancia para bloquear compras. Ingresa 0 para desactivar cada filtro.</p>
+
+        <div class="row row-control align-items-center mb-3">
+            <div class="col-7"><label for="ema_price_above_slow_pct" class="form-label">Precio por encima de EMA Lenta (%):</label></div>
+            <div class="col-3">
+                <input type="number" class="form-control" id="ema_price_above_slow_pct" name="ema_price_above_slow_pct" 
+                       min="0" step="0.1" value="{{ config.ema_price_above_slow_pct | default(0) }}">
+            </div>
+            <div class="col-2 text-muted small">
+                <i class="bi bi-question-circle" data-bs-toggle="tooltip" title="Si el precio está más % por encima de la EMA Lenta, no compra"></i>
+            </div>
+        </div>
+
+        <div class="row row-control align-items-center mb-3">
+            <div class="col-7"><label for="ema_price_above_fast_pct" class="form-label">Precio por encima de EMA Rápida (%):</label></div>
+            <div class="col-3">
+                <input type="number" class="form-control" id="ema_price_above_fast_pct" name="ema_price_above_fast_pct" 
+                       min="0" step="0.1" value="{{ config.ema_price_above_fast_pct | default(0) }}">
+            </div>
+            <div class="col-2 text-muted small">
+                <i class="bi bi-question-circle" data-bs-toggle="tooltip" title="Si el precio está más % por encima de la EMA Rápida, no compra"></i>
+            </div>
+        </div>
+
+        <div class="row row-control align-items-center mb-3">
+            <div class="col-7"><label for="ema_fast_above_slow_pct" class="form-label">EMA Rápida por encima de Lenta (%):</label></div>
+            <div class="col-3">
+                <input type="number" class="form-control" id="ema_fast_above_slow_pct" name="ema_fast_above_slow_pct" 
+                       min="0" step="0.1" value="{{ config.ema_fast_above_slow_pct | default(0) }}">
+            </div>
+            <div class="col-2 text-muted small">
+                <i class="bi bi-question-circle" data-bs-toggle="tooltip" title="Si la EMA Rápida está más % por encima de la EMA Lenta, no compra"></i>
             </div>
         </div>
     </div>

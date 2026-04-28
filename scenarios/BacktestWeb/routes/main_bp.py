@@ -469,6 +469,10 @@ def index():
                 "path": "logs"
             })
 
+    usuarios_gestion = []
+    if user_mode == 'admin':
+        usuarios_gestion = Usuario.query.order_by(Usuario.username.asc()).all()
+
     return render_template(
         'index.html',
         system=System,
@@ -477,7 +481,9 @@ def index():
         symbols_content=symbols_text,
         file_tree=arbol_ficheros, 
         registros=tandas_ordenadas, # Enviamos las tandas ya ordenadas
-        comments=VARIABLE_COMMENTS
+        comments=VARIABLE_COMMENTS,
+        usuarios_gestion=usuarios_gestion,
+        usuarios=usuarios_gestion
     )
 
 # --- ACCIONES Y VISOR (Todas las funciones restauradas) ---
@@ -1352,7 +1358,110 @@ def export_todo_admin():
         )
     except Exception as e:
         return f"Error en exportación global: {e}", 500
+
+# -- LIMPIAR DATOS ADMIN --
+@main_bp.route('/limpiar_datos_admin', methods=['POST'])
+def limpiar_datos_admin():
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "No autorizado"}), 401
+    if session.get('user_mode') != 'admin':
+        return jsonify({"success": False, "message": "Acceso denegado"}), 403
     
+    try:
+        data = request.get_json()
+        usuario_id = data.get('usuario_id')
+        fecha_limite_str = data.get('fecha_limite')
+        
+        if not usuario_id or not fecha_limite_str:
+            return jsonify({"success": False, "message": "Parámetros incompletos"}), 400
+        
+        # Convertir string de fecha a objeto datetime
+        fecha_limite = datetime.strptime(fecha_limite_str, '%Y-%m-%d').date()
+        
+        # Verificar que el usuario existe
+        usuario = Usuario.query.get(usuario_id)
+        if not usuario:
+            return jsonify({"success": False, "message": "Usuario no encontrado"}), 404
+        
+        # Obtener todos los backtests del usuario que sean anteriores a la fecha límite
+        backtests_a_eliminar = ResultadoBacktest.query.filter(
+            ResultadoBacktest.usuario_id == usuario_id,
+            ResultadoBacktest.fecha_ejecucion < datetime.combine(fecha_limite, datetime.min.time())
+        ).all()
+        
+        # Contar los trades que serán eliminados
+        trades_count = 0
+        for backtest in backtests_a_eliminar:
+            trades_count += Trade.query.filter(Trade.backtest_id == backtest.id).count()
+        
+        # Eliminar todos los trades asociados a esos backtests
+        for backtest in backtests_a_eliminar:
+            Trade.query.filter(Trade.backtest_id == backtest.id).delete()
+        
+        # Eliminar los backtests
+        backtests_eliminados = len(backtests_a_eliminar)
+        for backtest in backtests_a_eliminar:
+            db.session.delete(backtest)
+        
+        # Confirmar cambios
+        db.session.commit()
+        
+        mensaje = f"Limpieza completada: Se eliminaron {backtests_eliminados} tandas y {trades_count} operaciones del usuario '{usuario.username}' anteriores a {fecha_limite_str}."
+        
+        return jsonify({
+            "success": True, 
+            "message": mensaje
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({"success": False, "message": f"Formato de fecha inválido: {str(e)}"}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Error al limpiar datos: {str(e)}"}), 500
+
+# -- EXPORTAR CONFIGURACIÓN DEL USUARIO --
+@main_bp.route('/export_config')
+def export_config():
+    if not session.get('logged_in'):
+        return "No autorizado", 401
+    
+    try:
+        user_mode = session.get('user_mode')
+        u = Usuario.query.filter_by(username=user_mode).first()
+        
+        if not u:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+        
+        # Obtener configuración guardada del usuario
+        config_data = {}
+        if u.config_actual:
+            try:
+                config_data = json.loads(u.config_actual) if isinstance(u.config_actual, str) else u.config_actual
+            except:
+                config_data = {}
+        
+        # Obtener símbolos del usuario
+        simbolos = Simbolo.query.filter_by(usuario_id=u.id).all()
+        simbolos_list = [s.symbol for s in simbolos]
+        
+        # Estructura final para exportar
+        export_data = {
+            "usuario": user_mode,
+            "fecha_exportacion": datetime.utcnow().isoformat(),
+            "configuracion": config_data,
+            "activos": simbolos_list
+        }
+        
+        # Devolver como descarga JSON
+        json_str = json.dumps(export_data, indent=2, ensure_ascii=False)
+        return Response(
+            json_str,
+            mimetype="application/json",
+            headers={"Content-disposition": f"attachment; filename=config_{user_mode}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"}
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # -- RUTA PARA ELIMINAR BACKTESTS DE UNA TANDA --
 @main_bp.route('/eliminar_backtest/<int:id_estrategia>/<int:usuario_id>', methods=['POST'])
 def eliminar_backtest(id_estrategia, usuario_id):
@@ -1479,6 +1588,111 @@ def ver_grafico_completo(reg_id):
         return f"<h3>Error al recuperar gráfico: {str(e)}</h3>", 500
     
 # --- AUTENTICACIÓN ---
+
+def _require_admin_session():
+    if not session.get('logged_in'):
+        return False, redirect(url_for('main.login'))
+    if session.get('user_mode') != 'admin':
+        flash("❌ Acceso restringido a administradores", "danger")
+        return False, redirect(url_for('main.index'))
+    return True, None
+
+
+@main_bp.route('/admin/users/create', methods=['POST'])
+def admin_users_create():
+    ok, resp = _require_admin_session()
+    if not ok:
+        return resp
+
+    username = request.form.get('username', '').strip().lower()
+    password = request.form.get('password', '').strip()
+
+    if not username or not password:
+        flash("❌ Usuario y contraseña son obligatorios", "danger")
+        return redirect(url_for('main.index', _anchor='pane-users'))
+
+    exists = Usuario.query.filter(func.lower(Usuario.username) == username).first()
+    if exists:
+        flash(f"❌ El usuario '{username}' ya existe", "danger")
+        return redirect(url_for('main.index', _anchor='pane-users'))
+
+    try:
+        nuevo = Usuario(username=username, password=password)
+        db.session.add(nuevo)
+        db.session.commit()
+        flash(f"✅ Usuario '{username}' creado correctamente", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"❌ Error al crear usuario: {e}", "danger")
+
+    return redirect(url_for('main.index', _anchor='pane-users'))
+
+
+@main_bp.route('/admin/users/update/<int:user_id>', methods=['POST'])
+def admin_users_update(user_id):
+    ok, resp = _require_admin_session()
+    if not ok:
+        return resp
+
+    target = Usuario.query.get_or_404(user_id)
+    new_username = request.form.get('username', '').strip().lower()
+    new_password = request.form.get('password', '').strip()
+
+    if not new_username:
+        flash("❌ El nombre de usuario no puede estar vacío", "danger")
+        return redirect(url_for('main.index', _anchor='pane-users'))
+
+    if target.username.lower() == 'admin' and new_username != 'admin':
+        flash("❌ El usuario admin no puede cambiar de nombre", "danger")
+        return redirect(url_for('main.index', _anchor='pane-users'))
+
+    exists = Usuario.query.filter(
+        func.lower(Usuario.username) == new_username,
+        Usuario.id != target.id
+    ).first()
+    if exists:
+        flash(f"❌ Ya existe otro usuario con nombre '{new_username}'", "danger")
+        return redirect(url_for('main.index', _anchor='pane-users'))
+
+    try:
+        target.username = new_username
+        if new_password:
+            target.password = new_password
+        db.session.commit()
+        flash(f"✅ Usuario '{new_username}' actualizado", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"❌ Error al actualizar usuario: {e}", "danger")
+
+    return redirect(url_for('main.index', _anchor='pane-users'))
+
+
+@main_bp.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+def admin_users_delete(user_id):
+    ok, resp = _require_admin_session()
+    if not ok:
+        return resp
+
+    target = Usuario.query.get_or_404(user_id)
+    current_user = session.get('user_mode', '').lower().strip()
+
+    if target.username.lower() == 'admin':
+        flash("❌ El usuario admin no se puede eliminar", "danger")
+        return redirect(url_for('main.index', _anchor='pane-users'))
+
+    if target.username.lower() == current_user:
+        flash("❌ No puedes eliminar tu propio usuario en sesión", "danger")
+        return redirect(url_for('main.index', _anchor='pane-users'))
+
+    try:
+        db.session.delete(target)
+        db.session.commit()
+        flash("✅ Usuario eliminado correctamente", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"❌ Error al eliminar usuario: {e}", "danger")
+
+    return redirect(url_for('main.index', _anchor='pane-users'))
 
 #-- RUTA DE LOGIN --
 @main_bp.route('/login', methods=['GET', 'POST'])
