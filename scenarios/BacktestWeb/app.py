@@ -12,7 +12,7 @@ import sys
 import logging
 from flask import Flask, send_from_directory
 from logging.handlers import RotatingFileHandler
-from trading_engine.core.database_pg import db
+from trading_engine.core.database_pg import db, ENGINE_OPTIONS
 
 # IMPORTACIONES DE RUTAS (Sin lógica de DB)
 from .configuracion import BACKTESTING_BASE_DIR, DB_URI
@@ -40,6 +40,7 @@ def create_app(user_mode="admin"):
     # Configuración básica
     app.config['SQLALCHEMY_DATABASE_URI'] = DB_URI 
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = ENGINE_OPTIONS.copy()
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev_key_TradingCore")
     app.config['USER_MODE'] = user_mode
 
@@ -74,6 +75,21 @@ def create_app(user_mode="admin"):
 
     return app
 
+
+def _env_flag(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def run_app():
+    app = create_app(user_mode=os.environ.get('TRADINGCORE_USER_MODE', 'admin'))
+    host = os.environ.get('TRADINGCORE_WEB_HOST', '127.0.0.1')
+    port = int(os.environ.get('TRADINGCORE_WEB_PORT', '5000'))
+    debug = _env_flag('TRADINGCORE_WEB_DEBUG', host not in {'0.0.0.0', '::'})
+    use_reloader = _env_flag('TRADINGCORE_WEB_RELOADER', debug)
+    app.run(host=host, port=port, debug=debug, use_reloader=use_reloader)
+
 if __name__ == '__main__':
-    app = create_app(user_mode="admin")
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=True)
+    run_app()

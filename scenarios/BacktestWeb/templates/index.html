@@ -194,11 +194,11 @@
         <button type="button" onclick="lanzarEstrategia()" class="btn btn-primary w-100 fw-bold mb-3 shadow-sm">
             <i class="bi bi-play-fill me-1"></i> LANZAR BACKTEST
         </button>
-        <button type="button" onclick="guardarConfig()" class="btn btn-outline-light btn-sm w-100 opacity-75 mb-2">
+        <button type="button" onclick="abrirGuardarConfigModal()" class="btn btn-outline-light btn-sm w-100 opacity-75 mb-2">
             <i class="bi bi-save me-1"></i> GUARDAR CONFIG
         </button>
-        <button type="button" onclick="descargarConfig()" class="btn btn-outline-info btn-sm w-100 opacity-75 mb-4">
-            <i class="bi bi-download me-1"></i> DESCARGAR CONFIG
+        <button type="button" onclick="abrirCargarConfigModal()" class="btn btn-outline-info btn-sm w-100 opacity-75 mb-4">
+            <i class="bi bi-upload me-1"></i> CARGAR CONFIG
         </button>
         
         <a href="{{ url_for('main.logout') }}" class="btn btn-outline-danger btn-sm w-100 border-0">
@@ -314,6 +314,43 @@
             </div>
             <div class="modal-footer">
                 <button type="button" id="launchStatusOkBtn" class="btn btn-primary" data-bs-dismiss="modal" disabled>OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="saveConfigModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h6 class="modal-title"><i class="bi bi-save me-2"></i>Guardar Configuración</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label for="configFileName" class="form-label">Nombre del fichero</label>
+                <input type="text" id="configFileName" class="form-control" placeholder="AAAAMMDD-ESTRATEGIA-USUARIO.json">
+                <div class="form-text">Se guardará en Data_files/Backtest_config/{{ session.get('user_mode') }}.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="saveConfigConfirmBtn" class="btn btn-primary" onclick="guardarConfigEnFichero()">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="loadConfigModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h6 class="modal-title"><i class="bi bi-upload me-2"></i>Cargar Configuración</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="loadConfigFilesContainer" class="list-group small"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>
     </div>
@@ -614,65 +651,140 @@
         launchStatusPollTimer = setInterval(poll, 1500);
     }
 
-    // GUARDAR CONFIG vía AJAX (sin recarga de página)
-    function guardarConfig() {
+    function buildSuggestedConfigFilename() {
+        const today = new Date();
+        const stamp = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+        const activeIndicators = [];
+        const riskFlags = [];
+        const hasChecked = (name) => {
+            const input = document.querySelector(`[name="${name}"]`);
+            return !!(input && input.checked);
+        };
+        const getValue = (name) => {
+            const input = document.querySelector(`[name="${name}"]`);
+            return input ? String(input.value || '').trim() : '';
+        };
+
+        if (hasChecked('ema_cruce_signal') || hasChecked('ema_slow_minimo') || hasChecked('ema_slow_maximo') || hasChecked('ema_slow_ascendente') || hasChecked('ema_slow_descendente')) activeIndicators.push('EMA');
+        if (hasChecked('rsi')) activeIndicators.push('RSI');
+        if (hasChecked('macd')) activeIndicators.push('MACD');
+        if (hasChecked('stoch_fast') || hasChecked('stoch_mid') || hasChecked('stoch_slow')) activeIndicators.push('STOCH');
+        if (hasChecked('bb_active')) activeIndicators.push('BB');
+
+        if (hasChecked('breakeven_enabled')) riskFlags.push('BE');
+        if (hasChecked('stoploss_swing_enabled')) riskFlags.push('SWING');
+        if (hasChecked('rsi') && getValue('rsi_trailing_limit') && (getValue('trailing_pct_below') || getValue('trailing_pct_above'))) riskFlags.push('TSL-RSI');
+
+        const core = activeIndicators.length ? activeIndicators.join('+') : 'BASE';
+        const risk = riskFlags.length ? `-${riskFlags.join('_')}` : '';
+        const intervalValue = getValue('intervalo');
+        const interval = intervalValue ? `-${intervalValue}` : '';
+        const strategyPart = `${core}${risk}${interval}`.replace(/[^A-Za-z0-9+_-]/g, '-');
+        const userPart = `{{ session.get('user_mode') }}`.replace(/[^A-Za-z0-9+_-]/g, '-');
+        return `${stamp}-${strategyPart}-${userPart}.json`;
+    }
+
+    function abrirGuardarConfigModal() {
+        document.getElementById('configFileName').value = buildSuggestedConfigFilename();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('saveConfigModal')).show();
+    }
+
+    function guardarConfigEnFichero() {
         const formEl = document.getElementById('config-form');
         const formData = new FormData(formEl);
-        formData.set('action', 'save_config');
-        const btn = document.querySelector('button[onclick="guardarConfig()"]');
+        formData.set('config_file_name', document.getElementById('configFileName').value.trim());
+        const btn = document.getElementById('saveConfigConfirmBtn');
         const origHtml = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
 
-        fetch("{{ url_for('main.index') }}", {
+        fetch("{{ url_for('main.save_config_file') }}", {
             method: 'POST',
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             body: formData
         })
         .then(res => res.json())
-        .then(data => showToast(data.status === 'success' ? 'success' : 'danger', data.message || 'Operación completada.'))
-        .catch(() => showToast('danger', 'Error de red al guardar la configuración.'))
+        .then(data => {
+            showToast(data.status === 'success' ? 'success' : 'danger', data.message || 'Operación completada.');
+            if (data.status === 'success') {
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('saveConfigModal')).hide();
+            }
+        })
+        .catch(() => showToast('danger', 'Error de red al guardar la configuración en fichero.'))
         .finally(() => { btn.disabled = false; btn.innerHTML = origHtml; });
     }
 
-    // DESCARGAR CONFIG como JSON
-    function descargarConfig() {
-        const btn = document.querySelector('button[onclick="descargarConfig()"]');
-        const origHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
+    function abrirCargarConfigModal() {
+        const container = document.getElementById('loadConfigFilesContainer');
+        container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('loadConfigModal')).show();
 
-        fetch("{{ url_for('main.export_config') }}")
-            .then(res => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                
-                // Extraer nombre del fichero desde Content-Disposition
-                const disposition = res.headers.get('Content-Disposition') || '';
-                let filename = `config_{{ session.get('user_mode') }}_${new Date().toISOString().slice(0,10)}.json`;
-                if (disposition.includes('filename=')) {
-                    const matches = disposition.match(/filename=([^;]+)/);
-                    if (matches && matches[1]) {
-                        filename = matches[1].replace(/"/g, '').trim();
-                    }
+        fetch("{{ url_for('main.list_config_files') }}")
+            .then(res => res.json())
+            .then(data => {
+                if (data.status !== 'success') {
+                    throw new Error(data.message || 'No se pudo listar la carpeta');
                 }
-                
-                return res.blob().then(blob => ({ blob, filename }));
-            })
-            .then(({ blob, filename }) => {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                showToast('success', 'Configuración descargada correctamente.');
+                if (!data.files.length) {
+                    container.innerHTML = '<div class="text-muted text-center py-4">No hay configuraciones guardadas para este usuario.</div>';
+                    return;
+                }
+                container.innerHTML = data.files.map(file => `
+                    <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" onclick="cargarConfigDesdeFichero('${file.name.replace(/'/g, "&#39;")}')">
+                        <span>
+                            <strong>${file.name}</strong><br>
+                            <span class="text-muted">${file.modified_at} · ${file.size} bytes</span>
+                        </span>
+                        <i class="bi bi-arrow-right-circle"></i>
+                    </button>
+                `).join('');
             })
             .catch(err => {
-                showToast('danger', `Error al descargar: ${err.message}`);
+                container.innerHTML = `<div class="alert alert-danger mb-0">${err.message}</div>`;
+            });
+    }
+
+    function applyLoadedConfigToForm(configuracion, activos) {
+        const form = document.getElementById('config-form');
+        form.querySelectorAll('input[type="checkbox"][name]').forEach(input => {
+            input.checked = false;
+        });
+        form.querySelectorAll('input[name]:not([type="checkbox"]):not([type="button"]):not([type="submit"]), select[name], textarea[name]').forEach(field => {
+            field.value = '';
+        });
+
+        Object.entries(configuracion || {}).forEach(([key, value]) => {
+            const field = form.querySelector(`[name="${key}"]`);
+            if (!field) return;
+            if (field.type === 'checkbox') {
+                field.checked = value === true || value === 'True' || value === '1' || value === 1;
+                return;
+            }
+            field.value = value == null ? '' : value;
+        });
+
+        const symbolsField = form.querySelector('[name="symbols_content"]');
+        if (symbolsField && Array.isArray(activos)) {
+            symbolsField.value = activos.join(', ');
+        }
+    }
+
+    function cargarConfigDesdeFichero(filename) {
+        fetch("{{ url_for('main.load_config_file') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status !== 'success') {
+                    throw new Error(data.message || 'No se pudo cargar el fichero');
+                }
+                applyLoadedConfigToForm(data.configuracion, data.activos);
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('loadConfigModal')).hide();
+                showToast('success', data.message || 'Configuración cargada.');
             })
-            .finally(() => { btn.disabled = false; btn.innerHTML = origHtml; });
+            .catch(err => showToast('danger', err.message || 'Error al cargar la configuración.'));
     }
 
     function showToast(type, message) {

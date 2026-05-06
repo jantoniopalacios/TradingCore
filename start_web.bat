@@ -38,7 +38,7 @@ if %errorlevel% equ 0 (
 :: 3. LANZAR SERVIDOR FLASK (Modo Oculto)
 echo [*] Lanzando servidor Flask en segundo plano...
 :: IMPORTANTE: Cambiamos a la ruta absoluta de tu proyecto para schtasks
-schtasks /create /tn "%TASK_NAME%" /tr "powershell.exe -windowstyle hidden -command $env:PYTHONUTF8=1; cd C:\Users\juant\Proyectos\Python\TradingCore; .\.venv\Scripts\python.exe -m %APP_PATH% --host=0.0.0.0" /sc once /st 00:00 /f >nul 2>&1
+schtasks /create /tn "%TASK_NAME%" /tr "powershell.exe -windowstyle hidden -command $env:PYTHONUTF8=1; $env:TRADINGCORE_WEB_HOST='0.0.0.0'; $env:TRADINGCORE_WEB_PORT='5000'; $env:TRADINGCORE_WEB_DEBUG='0'; $env:TRADINGCORE_WEB_RELOADER='0'; cd C:\Users\juant\Proyectos\Python\TradingCore; .\.venv\Scripts\python.exe -m %APP_PATH%" /sc once /st 00:00 /f >nul 2>&1
 
 schtasks /run /tn "%TASK_NAME%" >nul 2>&1
 schtasks /delete /tn "%TASK_NAME%" /f >nul 2>&1

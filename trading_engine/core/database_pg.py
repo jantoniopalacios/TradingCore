@@ -10,6 +10,12 @@ DB_NAME = "trading_db"
 
 DATABASE_URL = f"postgresql+pg8000://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+ENGINE_OPTIONS = {
+    "pool_pre_ping": True,
+    "pool_recycle": 1800,
+    "pool_use_lifo": True,
+}
+
 # 1. Creamos el objeto 'db' que Flask-SQLAlchemy necesita
 db = SQLAlchemy()
 
@@ -17,6 +23,7 @@ db = SQLAlchemy()
 engine_pg = create_engine(
     DATABASE_URL,
     client_encoding='utf8',
+    **ENGINE_OPTIONS,
     connect_args={
         'user': DB_USER,
         'password': DB_PASS

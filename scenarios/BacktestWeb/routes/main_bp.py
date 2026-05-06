@@ -40,6 +40,16 @@ BACKTEST_STATUS_LOCK = threading.Lock()
 SCHEDULER_SCRIPT_PATH = PROJECT_ROOT / 'Utils' / 'backtest_scheduler.py'
 SCHEDULER_STATUS_PATH = PROJECT_ROOT / 'logs' / 'backtest_scheduler_status.json'
 SCHEDULER_PID_PATH = PROJECT_ROOT / 'logs' / 'backtest_scheduler.pid'
+CONFIG_SNAPSHOT_BASE_DIR = PROJECT_ROOT / 'Data_files' / 'Backtest_config'
+
+SAVEABLE_BOOLEAN_FIELDS = [
+    'macd', 'rsi', 'ema_cruce_signal', 'bb_active', 'bb_buy_crossover', 'bb_sell_crossover',
+    'rsi_minimo', 'rsi_ascendente', 'rsi_maximo', 'rsi_descendente',
+    'ema_slow_minimo', 'ema_slow_ascendente', 'ema_slow_maximo', 'ema_slow_descendente',
+    'filtro_fundamental', 'enviar_mail', 'margen_seguridad_active', 'margen_seguridad_ascendente',
+    'volume_active', 'volume_ascendente', 'stoch_fast', 'stoch_mid', 'stoch_slow',
+    'breakeven_enabled', 'stoploss_swing_enabled'
+]
 
 
 def _is_enabled(value):
@@ -94,6 +104,83 @@ def _build_strategy_short_title(result_row):
 
     title = f"{core}{risk}{interval}"
     return title[:56] + '...' if len(title) > 59 else title
+
+
+def _build_strategy_short_title_from_params(params):
+    class _ResultProxy:
+        params_tecnicos = json.dumps(params, ensure_ascii=False)
+        intervalo = params.get('intervalo')
+
+    return _build_strategy_short_title(_ResultProxy())
+
+
+def _sanitize_filename_component(value):
+    cleaned = ''.join(ch if ch.isalnum() or ch in ('-', '_', '+', '(', ')') else '-' for ch in str(value or '').strip())
+    while '--' in cleaned:
+        cleaned = cleaned.replace('--', '-')
+    return cleaned.strip('-_') or 'config'
+
+
+def _user_config_snapshot_dir(username):
+    return CONFIG_SNAPSHOT_BASE_DIR / str(username)
+
+
+def _extract_symbols_from_form_data(form_data):
+    contenido = form_data.get('symbols_content', '') or ''
+    raw_activos = contenido.replace(';', ',').replace('\n', ',').replace('\r', ',')
+    return list(dict.fromkeys([s.strip().upper() for s in raw_activos.split(',') if s.strip()]))
+
+
+def _build_config_params_from_form_data(form_data, include_dates=False):
+    excluded = {'symbols_content', 'action', 'config_file_name'}
+    if not include_dates:
+        excluded.update({'end_date', 'fecha_fin'})
+    config_params = {k: v for k, v in form_data.items() if k not in excluded}
+
+    for field in SAVEABLE_BOOLEAN_FIELDS:
+        config_params[field] = 'True' if field in form_data else 'False'
+
+    if include_dates:
+        end_date_value = form_data.get('end_date') or form_data.get('fecha_fin')
+        if end_date_value:
+            config_params['end_date'] = end_date_value
+
+    return config_params
+
+
+def _persist_user_runtime_config(user, form_data):
+    symbol_names = _extract_symbols_from_form_data(form_data)
+    config_params = _build_config_params_from_form_data(form_data, include_dates=False)
+
+    Simbolo.query.filter_by(usuario_id=user.id).delete()
+    for sym_name in symbol_names:
+        db.session.add(Simbolo(symbol=sym_name, name=sym_name, usuario_id=user.id))
+
+    user.config_actual = json.dumps(config_params, ensure_ascii=False)
+    return config_params, symbol_names
+
+
+def _build_default_snapshot_filename(username, config_params):
+    stamp = datetime.now().strftime('%Y%m%d')
+    strategy_title = _sanitize_filename_component(_build_strategy_short_title_from_params(config_params))
+    username_part = _sanitize_filename_component(username)
+    return f"{stamp}-{strategy_title}-{username_part}.json"
+
+
+def _write_config_snapshot(username, file_name, config_payload):
+    user_dir = _user_config_snapshot_dir(username)
+    user_dir.mkdir(parents=True, exist_ok=True)
+
+    safe_name = str(file_name or '').strip()
+    if not safe_name:
+        raise ValueError('Debes indicar un nombre de fichero')
+    if not safe_name.lower().endswith('.json'):
+        safe_name = f"{safe_name}.json"
+    safe_name = _sanitize_filename_component(Path(safe_name).stem) + '.json'
+
+    file_path = user_dir / safe_name
+    file_path.write_text(json.dumps(config_payload, indent=2, ensure_ascii=False), encoding='utf-8')
+    return file_path
 
 
 def _utc_now_iso():
@@ -270,7 +357,9 @@ def obtener_usuarios_registrados():
     try:
         usuarios = {u.username.lower(): u.password for u in Usuario.query.all()}
         return usuarios
-    except:
+    except Exception as exc:
+        db.session.rollback()
+        logging.getLogger(__name__).warning("Fallo recuperando usuarios registrados: %s", exc)
         return {"admin": "admin"} # Fallback de emergencia
 
 def get_user_paths(username):
@@ -298,52 +387,9 @@ def index():
         form_data = request.form.to_dict()
         if 'fecha_fin' in form_data and 'end_date' not in form_data:
             form_data['end_date'] = form_data['fecha_fin']
-        
-        # 1. Guardar Símbolos (Tu lógica actual en DB que ya funciona)
-        if 'symbols_content' in form_data:
-            contenido = form_data['symbols_content']
-            raw_activos = contenido.replace(';', ',').replace('\n', ',').replace('\r', ',')
-            lista_nombres_simbolos = [s.strip().upper() for s in raw_activos.split(',') if s.strip()]
-            lista_nombres_simbolos = list(dict.fromkeys(lista_nombres_simbolos))
-            
-            try:
-                Simbolo.query.filter_by(usuario_id=u.id).delete()
-                for sym_name in lista_nombres_simbolos:
-                    nuevo_simbolo = Simbolo(symbol=sym_name, name=sym_name, usuario_id=u.id)
-                    db.session.add(nuevo_simbolo)
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                flash(f"Error símbolos: {e}", "danger")
-
-        # 2. Guardar Parámetros Técnicos en Usuario.config_actual
-        config_params = {k: v for k, v in form_data.items() if k not in ['symbols_content', 'action', 'end_date', 'fecha_fin']}
-
-        # --- LISTA MAESTRA DE SWITCHES (Basada en tus .html) ---
-        lista_switches = [
-            # Indicadores principales
-            'macd', 'rsi', 'ema_cruce_signal', 'bb_active', 'bb_buy_crossover', 'bb_sell_crossover',
-            # Parámetros RSI (nuevos)
-            'rsi_minimo', 'rsi_ascendente', 'rsi_maximo', 'rsi_descendente',
-            # Parámetros EMA (existentes)
-            'ema_slow_minimo', 'ema_slow_ascendente', 'ema_slow_maximo', 'ema_slow_descendente',
-            # Filtros globales
-            'filtro_fundamental', 'enviar_mail', 'margen_seguridad_active', 
-            'margen_seguridad_ascendente', 'volume_active', 'volume_ascendente',
-            'stoch_fast', 'stoch_mid', 'stoch_slow',
-            # Protección de entrada
-            'breakeven_enabled'
-        ]
-
-        for s in lista_switches:
-            # FORZAMOS EL TEXTO 'True' o 'False' para que el HTML lo reconozca
-            if s in form_data:
-                config_params[s] = 'True'
-            else:
-                config_params[s] = 'False'
 
         try:
-            u.config_actual = json.dumps(config_params) # Guardamos como JSON
+            _persist_user_runtime_config(u, form_data)
             db.session.commit()
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({"status": "success", "message": "✅ Configuración guardada correctamente."})
@@ -635,6 +681,15 @@ def launch_strategy():
         if 'fecha_fin' in form_data and 'end_date' not in form_data:
             logger.warning("[LAUNCH] Se recibió 'fecha_fin' en POST legado; se normaliza a 'end_date'")
             form_data['end_date'] = form_data['fecha_fin']
+
+        try:
+            _persist_user_runtime_config(u, form_data)
+            db.session.commit()
+        except Exception as persist_error:
+            db.session.rollback()
+            logger.error(f"[LAUNCH] No se pudo guardar configuración previa al lanzamiento: {persist_error}")
+            return jsonify({"status": "error", "message": f"No se pudo guardar la configuración antes del lanzamiento: {persist_error}"}), 500
+
         config_web = {}
 
         # 1. Cargar valores por defecto de la clase System
@@ -646,12 +701,7 @@ def launch_strategy():
 
         # 2. LISTA MAESTRA DE BOOLEANOS (Switches de tu UI)
         # Asegúrate de que los nombres coincidan exactamente con el 'name' en tu HTML
-        switches = [
-            'macd', 'rsi', 'ema_cruce_signal', 'bb_active', 'bb_buy_crossover', 
-            'bb_sell_crossover', 'filtro_fundamental', 'enviar_mail', 
-            'margen_seguridad_active', 'volume_active', 'stoch_fast', 'stoch_mid', 'stoch_slow',
-            'breakeven_enabled'
-        ]
+        switches = SAVEABLE_BOOLEAN_FIELDS
 
         # 3. PROCESAR EL FORMULARIO
         for key, value in form_data.items():
@@ -1419,48 +1469,112 @@ def limpiar_datos_admin():
         db.session.rollback()
         return jsonify({"success": False, "message": f"Error al limpiar datos: {str(e)}"}), 500
 
-# -- EXPORTAR CONFIGURACIÓN DEL USUARIO --
-@main_bp.route('/export_config')
-def export_config():
+# -- GUARDAR CONFIGURACIÓN EN FICHERO DEL USUARIO --
+@main_bp.route('/save_config_file', methods=['POST'])
+def save_config_file():
     if not session.get('logged_in'):
-        return "No autorizado", 401
-    
+        return jsonify({"status": "error", "message": "No autorizado"}), 401
+
     try:
         user_mode = session.get('user_mode')
         u = Usuario.query.filter_by(username=user_mode).first()
-        
         if not u:
-            return jsonify({"error": "Usuario no encontrado"}), 404
-        
-        # Obtener configuración guardada del usuario
-        config_data = {}
-        if u.config_actual:
-            try:
-                config_data = json.loads(u.config_actual) if isinstance(u.config_actual, str) else u.config_actual
-            except:
-                config_data = {}
-        
-        # Obtener símbolos del usuario
-        simbolos = Simbolo.query.filter_by(usuario_id=u.id).all()
-        simbolos_list = [s.symbol for s in simbolos]
-        
-        # Estructura final para exportar
-        export_data = {
+            return jsonify({"status": "error", "message": "Usuario no encontrado"}), 404
+
+        form_data = request.form.to_dict()
+        if 'fecha_fin' in form_data and 'end_date' not in form_data:
+            form_data['end_date'] = form_data['fecha_fin']
+
+        config_params = _build_config_params_from_form_data(form_data, include_dates=True)
+        symbols_list = _extract_symbols_from_form_data(form_data)
+        requested_name = form_data.get('config_file_name') or _build_default_snapshot_filename(user_mode, config_params)
+
+        payload = {
             "usuario": user_mode,
-            "fecha_exportacion": datetime.utcnow().isoformat(),
-            "configuracion": config_data,
-            "activos": simbolos_list
+            "fecha_guardado": datetime.utcnow().isoformat(),
+            "configuracion": config_params,
+            "activos": symbols_list,
         }
-        
-        # Devolver como descarga JSON
-        json_str = json.dumps(export_data, indent=2, ensure_ascii=False)
-        return Response(
-            json_str,
-            mimetype="application/json",
-            headers={"Content-disposition": f"attachment; filename=config_{user_mode}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"}
-        )
+        file_path = _write_config_snapshot(user_mode, requested_name, payload)
+
+        return jsonify({
+            "status": "success",
+            "message": f"Configuración guardada en {file_path.name}",
+            "filename": file_path.name,
+            "suggested_filename": _build_default_snapshot_filename(user_mode, config_params),
+        })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@main_bp.route('/list_config_files')
+def list_config_files():
+    if not session.get('logged_in'):
+        return jsonify({"status": "error", "message": "No autorizado"}), 401
+
+    try:
+        user_mode = session.get('user_mode')
+        user_dir = _user_config_snapshot_dir(user_mode)
+        if not user_dir.exists():
+            return jsonify({"status": "success", "files": []})
+
+        files = []
+        for file_path in sorted(user_dir.glob('*.json'), key=lambda p: p.stat().st_mtime, reverse=True):
+            stats = file_path.stat()
+            files.append({
+                "name": file_path.name,
+                "modified_at": datetime.fromtimestamp(stats.st_mtime).strftime('%Y-%m-%d %H:%M'),
+                "size": stats.st_size,
+            })
+        return jsonify({"status": "success", "files": files})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@main_bp.route('/load_config_file', methods=['POST'])
+def load_config_file():
+    if not session.get('logged_in'):
+        return jsonify({"status": "error", "message": "No autorizado"}), 401
+
+    try:
+        payload = request.get_json(silent=True) or {}
+        filename = payload.get('filename', '')
+        if not filename:
+            return jsonify({"status": "error", "message": "Debes seleccionar un fichero"}), 400
+
+        user_mode = session.get('user_mode')
+        u = Usuario.query.filter_by(username=user_mode).first()
+        if not u:
+            return jsonify({"status": "error", "message": "Usuario no encontrado"}), 404
+
+        safe_name = _sanitize_filename_component(Path(filename).stem) + '.json'
+        file_path = _user_config_snapshot_dir(user_mode) / safe_name
+        if not file_path.exists():
+            return jsonify({"status": "error", "message": "El fichero no existe"}), 404
+
+        data = json.loads(file_path.read_text(encoding='utf-8'))
+        config_data = data.get('configuracion') or {}
+        activos = data.get('activos') or []
+
+        runtime_config = dict(config_data)
+        runtime_config.pop('end_date', None)
+        u.config_actual = json.dumps(runtime_config, ensure_ascii=False)
+        Simbolo.query.filter_by(usuario_id=u.id).delete()
+        for sym_name in activos:
+            normalized = str(sym_name).upper()
+            db.session.add(Simbolo(symbol=normalized, name=normalized, usuario_id=u.id))
+        db.session.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": f"Configuración cargada desde {safe_name}",
+            "configuracion": config_data,
+            "activos": activos,
+            "filename": safe_name,
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # -- RUTA PARA ELIMINAR BACKTESTS DE UNA TANDA --
 @main_bp.route('/eliminar_backtest/<int:id_estrategia>/<int:usuario_id>', methods=['POST'])

@@ -24,6 +24,7 @@ def test_config_resurrected(client):
     print(f"\n[INFO] DB_URI detectada: {DB_URI}")
     assert "postgresql" in DB_URI
     assert "localhost" in DB_URI
+    assert client.application.config['SQLALCHEMY_ENGINE_OPTIONS']['pool_pre_ping'] is True
 
 def test_index_without_csv(client):
     """Verifica que el index carga sin archivos fÃ­sicos de sÃ­mbolos"""
