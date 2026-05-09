@@ -1,9 +1,16 @@
 $ruta_pg = "C:\Program Files\PostgreSQL\16\bin\psql.exe" 
 $db_name = "trading_db"
+$ruta_backup = "G:\Mi unidad\Backup"
 $env:PGPASSWORD = "admin" # Evita que el script se bloquee pidiendo pass
 
+# Verificar que el directorio de backup existe
+if (-not (Test-Path $ruta_backup)) {
+    Write-Host "❌ El directorio de backup no existe: $ruta_backup" -ForegroundColor Red
+    exit
+}
+
 # Listar los archivos .sql
-$backups = Get-ChildItem "G:\Mi unidad\Backup\backup_trading_*.sql" | Sort-Object LastWriteTime -Descending
+$backups = Get-ChildItem "$ruta_backup\backup_trading_*.sql" | Sort-Object LastWriteTime -Descending
 
 if ($backups.Count -eq 0) {
     Write-Host "❌ No se encontraron archivos de backup." -ForegroundColor Red

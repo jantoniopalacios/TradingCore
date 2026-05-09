@@ -3,7 +3,9 @@ import threading
 import csv
 import io
 import json
+import gzip
 import html
+import time
 import sys
 import signal
 import subprocess
@@ -16,6 +18,11 @@ from collections import deque
 from datetime import date, timedelta, datetime, timezone
 import logging
 import traceback
+from bokeh.embed import file_html
+from bokeh.layouts import column
+from bokeh.models import ColumnDataSource, HoverTool
+from bokeh.plotting import figure
+from bokeh.resources import CDN
 
 # --- IMPORTACIONES ORIGINALES ---
 from ..file_handler import read_symbols_raw, write_symbols_raw, get_directory_tree
@@ -41,6 +48,11 @@ SCHEDULER_SCRIPT_PATH = PROJECT_ROOT / 'Utils' / 'backtest_scheduler.py'
 SCHEDULER_STATUS_PATH = PROJECT_ROOT / 'logs' / 'backtest_scheduler_status.json'
 SCHEDULER_PID_PATH = PROJECT_ROOT / 'logs' / 'backtest_scheduler.pid'
 CONFIG_SNAPSHOT_BASE_DIR = PROJECT_ROOT / 'Data_files' / 'Backtest_config'
+GRAPH_CACHE_BASE_DIR = BACKTESTING_BASE_DIR / 'Graphics' / 'cache'
+GRAPH_CACHE_TTL_SECONDS = int(os.getenv('BACKTEST_GRAPH_CACHE_TTL_SECONDS', '86400'))
+GRAPH_CACHE_CLEANUP_INTERVAL_SECONDS = int(os.getenv('BACKTEST_GRAPH_CACHE_CLEANUP_INTERVAL_SECONDS', '3600'))
+_LAST_GRAPH_CACHE_CLEANUP_TS = 0.0
+_GRAPH_CACHE_CLEANUP_LOCK = threading.Lock()
 
 SAVEABLE_BOOLEAN_FIELDS = [
     'macd', 'rsi', 'ema_cruce_signal', 'bb_active', 'bb_buy_crossover', 'bb_sell_crossover',
@@ -185,6 +197,272 @@ def _write_config_snapshot(username, file_name, config_payload):
 
 def _utc_now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+def _graph_cache_file_for_result(resultado):
+    symbol_safe = _sanitize_filename_component(resultado.symbol or 'N/A')
+    user_dir = GRAPH_CACHE_BASE_DIR / f"user_{resultado.usuario_id}"
+    return user_dir / f"bt_{resultado.id}_{symbol_safe}.html"
+
+
+def _graph_snapshot_file_for_result(resultado):
+    symbol_safe = _sanitize_filename_component(resultado.symbol or 'N/A')
+    user_dir = GRAPH_CACHE_BASE_DIR / f"user_{resultado.usuario_id}"
+    return user_dir / f"bt_{resultado.id}_{symbol_safe}_snapshot.json.gz"
+
+
+def _parse_iso_datetimes(values):
+    out = []
+    for v in values or []:
+        if not v:
+            out.append(None)
+            continue
+        try:
+            out.append(datetime.fromisoformat(str(v).replace('Z', '+00:00')))
+        except Exception:
+            out.append(None)
+    return out
+
+
+def _read_graph_snapshot_payload(resultado):
+    snapshot_file = _graph_snapshot_file_for_result(resultado)
+    if not snapshot_file.exists():
+        return None
+    try:
+        with gzip.open(snapshot_file, 'rt', encoding='utf-8') as gz:
+            return json.load(gz)
+    except Exception as snapshot_err:
+        logging.getLogger(__name__).warning("No se pudo leer snapshot de grafico %s: %s", snapshot_file, snapshot_err)
+        return None
+
+
+def _render_bokeh_html_from_snapshot(snapshot_payload, resultado):
+    ohlcv = snapshot_payload.get('ohlcv') or {}
+    x = _parse_iso_datetimes(ohlcv.get('index'))
+    o = ohlcv.get('open') or []
+    h = ohlcv.get('high') or []
+    l = ohlcv.get('low') or []
+    c = ohlcv.get('close') or []
+
+    n = min(len(x), len(o), len(h), len(l), len(c))
+    if n <= 0:
+        return None
+
+    x = x[:n]
+    o = o[:n]
+    h = h[:n]
+    l = l[:n]
+    c = c[:n]
+
+    valid_diffs = []
+    prev = None
+    for ts in x:
+        if ts is not None and prev is not None:
+            valid_diffs.append(max((ts - prev).total_seconds() * 1000.0, 1.0))
+        if ts is not None:
+            prev = ts
+    candle_width = (valid_diffs[0] if valid_diffs else 24 * 60 * 60 * 1000) * 0.7
+
+    up_idx, down_idx = [], []
+    top, bottom = [], []
+    for i in range(n):
+        oi = o[i]
+        ci = c[i]
+        if oi is None or ci is None:
+            top.append(oi if oi is not None else ci)
+            bottom.append(ci if oi is not None else oi)
+            down_idx.append(i)
+            continue
+        top.append(max(oi, ci))
+        bottom.append(min(oi, ci))
+        if ci >= oi:
+            up_idx.append(i)
+        else:
+            down_idx.append(i)
+
+    p_price = figure(
+        x_axis_type='datetime',
+        title=f"{resultado.symbol} | Precio",
+        height=360,
+        tools='pan,wheel_zoom,box_zoom,reset,save',
+        sizing_mode='stretch_width',
+    )
+    p_price.segment(x, h, x, l, color='#6b7280')
+
+    if up_idx:
+        p_price.vbar(
+            x=[x[i] for i in up_idx],
+            width=candle_width,
+            top=[top[i] for i in up_idx],
+            bottom=[bottom[i] for i in up_idx],
+            fill_color='#16a34a',
+            line_color='#15803d',
+        )
+    if down_idx:
+        p_price.vbar(
+            x=[x[i] for i in down_idx],
+            width=candle_width,
+            top=[top[i] for i in down_idx],
+            bottom=[bottom[i] for i in down_idx],
+            fill_color='#dc2626',
+            line_color='#b91c1c',
+        )
+
+    source = ColumnDataSource(data={'x': x, 'open': o, 'high': h, 'low': l, 'close': c})
+    p_price.add_tools(HoverTool(
+        tooltips=[('Fecha', '@x{%F %T}'), ('Open', '@open{0.00}'), ('High', '@high{0.00}'), ('Low', '@low{0.00}'), ('Close', '@close{0.00}')],
+        formatters={'@x': 'datetime'},
+        mode='vline',
+    ))
+
+    trades = snapshot_payload.get('trades') or {}
+    entry_x = _parse_iso_datetimes(trades.get('entry_time'))
+    entry_y = trades.get('entry_price') or []
+    m = min(len(entry_x), len(entry_y))
+    entries = [(entry_x[i], entry_y[i]) for i in range(m) if entry_x[i] is not None and entry_y[i] is not None]
+    if entries:
+        p_price.scatter(x=[p[0] for p in entries], y=[p[1] for p in entries], marker='triangle', size=8, color='#2563eb')
+
+    eq = snapshot_payload.get('equity') or {}
+    eq_x = _parse_iso_datetimes(eq.get('index'))
+    eq_y = eq.get('equity') or []
+    k = min(len(eq_x), len(eq_y))
+    eq_points = [(eq_x[i], eq_y[i]) for i in range(k) if eq_x[i] is not None and eq_y[i] is not None]
+
+    p_equity = figure(
+        x_axis_type='datetime',
+        title='Equity Curve',
+        height=220,
+        tools='pan,wheel_zoom,box_zoom,reset,save',
+        sizing_mode='stretch_width',
+        x_range=p_price.x_range,
+    )
+    if eq_points:
+        p_equity.line([p[0] for p in eq_points], [p[1] for p in eq_points], line_width=2, color='#0ea5e9')
+
+    dd_y = eq.get('drawdown_pct') or []
+    d = min(len(eq_x), len(dd_y))
+    dd_points = [(eq_x[i], dd_y[i]) for i in range(d) if eq_x[i] is not None and dd_y[i] is not None]
+    p_dd = figure(
+        x_axis_type='datetime',
+        title='Drawdown %',
+        height=180,
+        tools='pan,wheel_zoom,box_zoom,reset,save',
+        sizing_mode='stretch_width',
+        x_range=p_price.x_range,
+    )
+    if dd_points:
+        p_dd.line([p[0] for p in dd_points], [p[1] for p in dd_points], line_width=2, color='#f97316')
+
+    return file_html(column(p_price, p_equity, p_dd, sizing_mode='stretch_width'), CDN, f"Backtest {resultado.symbol}")
+
+
+def _remove_graph_artifacts_for_result(resultado):
+    try:
+        _graph_cache_file_for_result(resultado).unlink(missing_ok=True)
+    except Exception:
+        pass
+    try:
+        _graph_snapshot_file_for_result(resultado).unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _is_graph_cache_valid(cache_file: Path, ttl_seconds: int = GRAPH_CACHE_TTL_SECONDS) -> bool:
+    if not cache_file.exists():
+        return False
+    if ttl_seconds <= 0:
+        return True
+    try:
+        age_seconds = time.time() - cache_file.stat().st_mtime
+        return age_seconds <= ttl_seconds
+    except Exception:
+        return False
+
+
+def _read_graph_html_with_cache(resultado):
+    """
+    Retorna HTML desde cache temporal si es valido.
+    Fallback compatible: si no hay cache valido, usa grafico_html de BD y regenera cache.
+    """
+    cache_file = _graph_cache_file_for_result(resultado)
+    try:
+        if _is_graph_cache_valid(cache_file):
+            return cache_file.read_text(encoding='utf-8')
+    except Exception as cache_err:
+        logging.getLogger(__name__).warning("No se pudo leer cache de grafico %s: %s", cache_file, cache_err)
+
+    db_html = (resultado.grafico_html or '').strip()
+    if db_html:
+        try:
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            cache_file.write_text(db_html, encoding='utf-8')
+        except Exception as cache_write_err:
+            logging.getLogger(__name__).warning("No se pudo refrescar cache de grafico %s: %s", cache_file, cache_write_err)
+        return db_html
+
+    # Tercera via: regeneracion desde snapshot compacto persistido por resultado.
+    snapshot_payload = _read_graph_snapshot_payload(resultado)
+    if snapshot_payload:
+        regenerated_html = _render_bokeh_html_from_snapshot(snapshot_payload, resultado)
+        if regenerated_html:
+            try:
+                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                cache_file.write_text(regenerated_html, encoding='utf-8')
+            except Exception as cache_write_err:
+                logging.getLogger(__name__).warning("No se pudo guardar cache regenerado %s: %s", cache_file, cache_write_err)
+            return regenerated_html
+
+    return None
+
+
+def _prune_expired_graph_cache(force: bool = False):
+    """
+    Limpia archivos de cache vencidos y carpetas vacias.
+    Se ejecuta de forma periodica para evitar crecimiento indefinido de disco.
+    """
+    global _LAST_GRAPH_CACHE_CLEANUP_TS
+
+    now_ts = time.time()
+    if not force and GRAPH_CACHE_CLEANUP_INTERVAL_SECONDS > 0:
+        if (now_ts - _LAST_GRAPH_CACHE_CLEANUP_TS) < GRAPH_CACHE_CLEANUP_INTERVAL_SECONDS:
+            return 0
+
+    deleted = 0
+    with _GRAPH_CACHE_CLEANUP_LOCK:
+        # Revalidar dentro del lock para evitar limpieza duplicada en concurrencia.
+        now_ts = time.time()
+        if not force and GRAPH_CACHE_CLEANUP_INTERVAL_SECONDS > 0:
+            if (now_ts - _LAST_GRAPH_CACHE_CLEANUP_TS) < GRAPH_CACHE_CLEANUP_INTERVAL_SECONDS:
+                return 0
+
+        try:
+            if GRAPH_CACHE_BASE_DIR.exists():
+                for cache_file in GRAPH_CACHE_BASE_DIR.rglob('*.html'):
+                    if not _is_graph_cache_valid(cache_file):
+                        try:
+                            cache_file.unlink(missing_ok=True)
+                            deleted += 1
+                        except Exception as file_err:
+                            logging.getLogger(__name__).warning(
+                                "No se pudo eliminar cache vencido %s: %s", cache_file, file_err
+                            )
+
+                # Borrar directorios vacios (de abajo hacia arriba).
+                for dir_path in sorted(
+                    [d for d in GRAPH_CACHE_BASE_DIR.rglob('*') if d.is_dir()],
+                    key=lambda p: len(p.parts),
+                    reverse=True,
+                ):
+                    try:
+                        if not any(dir_path.iterdir()):
+                            dir_path.rmdir()
+                    except Exception:
+                        pass
+        finally:
+            _LAST_GRAPH_CACHE_CLEANUP_TS = time.time()
+
+    return deleted
 
 
 def _is_scheduler_running_from_pid() -> bool:
@@ -378,7 +656,19 @@ def index():
         return redirect(url_for('main.login'))
 
     user_mode = session.get('user_mode')
-    u = Usuario.query.filter_by(username=user_mode).first()
+
+    # Mantenimiento liviano de cache HTML con frecuencia limitada.
+    try:
+        _prune_expired_graph_cache()
+    except Exception as cleanup_err:
+        logging.getLogger(__name__).warning("Fallo en limpieza de cache de graficos: %s", cleanup_err)
+
+    try:
+        u = Usuario.query.filter_by(username=user_mode).first()
+    except Exception as exc:
+        db.session.rollback()
+        logging.getLogger(__name__).warning("Fallo recuperando usuario de sesion '%s': %s", user_mode, exc)
+        u = None
 
     # ================================================================
     # --- LÓGICA POST (Guardado de Configuración en DB) ---
@@ -442,13 +732,29 @@ def index():
     # Historial de resultados (Ordenado por fecha descendente)
     registros_agrupados = {}
     try:
-        # 1. Traemos los registros ordenados por fecha desde la base de datos
-        query_base = ResultadoBacktest.query.order_by(ResultadoBacktest.fecha_ejecucion.desc())
+        # 1. OPTIMIZACION: Eager loading de resultados con usuario relacionado
+        query_base = ResultadoBacktest.query.options(joinedload(ResultadoBacktest.propietario)).order_by(ResultadoBacktest.fecha_ejecucion.desc())
         
         if user_mode == 'admin':
             todos = query_base.all()
+            # Para admin: cargar TODOS los trades en una sola consulta (no por backtest)
+            todos_ids = [r.id for r in todos]
+            all_trades_dict = {}
+            if todos_ids:
+                trades_batch = Trade.query.filter(Trade.backtest_id.in_(todos_ids)).all()
+                for trade in trades_batch:
+                    if trade.backtest_id not in all_trades_dict or trade.id > all_trades_dict[trade.backtest_id].id:
+                        all_trades_dict[trade.backtest_id] = trade
         else:
             todos = query_base.filter_by(usuario_id=u.id).all()
+            # Para usuario normal: cargar trades de sus propios backtests
+            todos_ids = [r.id for r in todos]
+            all_trades_dict = {}
+            if todos_ids:
+                trades_batch = Trade.query.filter(Trade.backtest_id.in_(todos_ids)).all()
+                for trade in trades_batch:
+                    if trade.backtest_id not in all_trades_dict or trade.id > all_trades_dict[trade.backtest_id].id:
+                        all_trades_dict[trade.backtest_id] = trade
         
         # 2. Agrupamos manteniendo el orden de aparición (que ya viene ordenado por fecha)
         for r in todos:
@@ -467,16 +773,25 @@ def index():
                 }
             registros_agrupados[tanda_key]['activos'].append(r)
         
-        # 3. Enriquecer cada backtest (activo) con el último trade de ese backtest específico
+        # 3. Enriquecer cada backtest (activo) con el último trade desde el diccionario precargado
         for tanda_key, tanda_data in registros_agrupados.items():
             for backtest in tanda_data['activos']:
-                last_trade = Trade.query.filter_by(backtest_id=backtest.id).order_by(Trade.id.desc()).first()
+                # Obtener último trade desde el diccionario precargado (O(1) en vez de SELECT por cada backtest)
+                last_trade = all_trades_dict.get(backtest.id)
                 if last_trade:
                     backtest.ultima_operacion_fecha = last_trade.fecha
                     backtest.ultima_operacion_tipo = last_trade.tipo
                 else:
                     backtest.ultima_operacion_fecha = '-'
                     backtest.ultima_operacion_tipo = '-'
+
+                has_db_graph = bool((backtest.grafico_html or '').strip())
+                cache_file = _graph_cache_file_for_result(backtest)
+                snapshot_file = _graph_snapshot_file_for_result(backtest)
+                backtest.graph_available = has_db_graph or _is_graph_cache_valid(cache_file) or snapshot_file.exists()
+                # Mantener visible la accion de grafico en historial SQL incluso si
+                # no hay artefacto local (p. ej. tras limpieza de grafico_html).
+                backtest.has_graph = True
             
     except Exception as e:
         print(f"Error historial: {e}")
@@ -517,7 +832,12 @@ def index():
 
     usuarios_gestion = []
     if user_mode == 'admin':
-        usuarios_gestion = Usuario.query.order_by(Usuario.username.asc()).all()
+        try:
+            usuarios_gestion = Usuario.query.order_by(Usuario.username.asc()).all()
+        except Exception as exc:
+            db.session.rollback()
+            logging.getLogger(__name__).warning("Fallo recuperando lista de usuarios para gestion: %s", exc)
+            usuarios_gestion = []
 
     return render_template(
         'index.html',
@@ -1598,6 +1918,7 @@ def eliminar_backtest(id_estrategia, usuario_id):
 
         if activos:
             for activo in activos:
+                _remove_graph_artifacts_for_result(activo)
                 Trade.query.filter_by(backtest_id=activo.id).delete()
                 db.session.delete(activo)
             db.session.commit()
@@ -1612,12 +1933,33 @@ def eliminar_backtest(id_estrategia, usuario_id):
 @main_bp.route('/backtest/ver_grafico/<int:reg_id>')
 def ver_grafico_completo(reg_id):
     try:
+        if not session.get('logged_in'):
+            return redirect(url_for('main.login'))
+
+        user_mode = session.get('user_mode')
+
         # 1. Buscamos en la DB (Asegúrate de que reg_id coincida con el nombre del argumento)
         resultado = ResultadoBacktest.query.get_or_404(reg_id)
+
+        # 1.1 Control de acceso: admin ve todo; usuario normal solo sus registros
+        if user_mode != 'admin':
+            usuario = Usuario.query.filter_by(username=user_mode).first()
+            if not usuario:
+                return redirect(url_for('main.login'))
+            if resultado.usuario_id != usuario.id:
+                return "<h3>No tienes permiso para visualizar este gráfico.</h3>", 403
         
-        # 2. Validar contenido
-        if not resultado.grafico_html or not resultado.grafico_html.strip():
-            return "<h3>No hay datos gráficos guardados para este backtest.</h3>", 404
+        # 2. Cargar contenido desde cache temporal (si esta vigente) o fallback DB
+        graph_html = _read_graph_html_with_cache(resultado)
+        if not graph_html:
+            return (
+                "<html><body style='font-family:Segoe UI,Arial,sans-serif;padding:24px;'>"
+                "<h3>Grafico no disponible para este backtest</h3>"
+                "<p>Se limpiaron los HTML legacy y este resultado no tiene snapshot/cache local.</p>"
+                "<p>Para recuperar visualizacion, ejecuta nuevamente el backtest de este activo.</p>"
+                "</body></html>",
+                200,
+            )
         
         # 3. Inyectar un bloque informativo arriba del gráfico (sin alterar lo persistido en BD)
         strategy_title = _build_strategy_short_title(resultado)
@@ -1681,7 +2023,7 @@ def ver_grafico_completo(reg_id):
 </div>
 """
 
-        page_html = resultado.grafico_html
+        page_html = graph_html
         if '<body>' in page_html:
             page_html = page_html.replace('<body>', f'<body>{info_block}', 1)
         elif '<body ' in page_html:

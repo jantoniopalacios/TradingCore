@@ -238,12 +238,12 @@ function ejecutarLimpiezaDatos() {
                                                 Ver ({{ r.total_trades }})
                                             </button>
                                             
-                                            {% if r.grafico_html %}
-                                            <a href="{{ url_for('main.ver_grafico_completo', reg_id=r.id) }}" 
-                                               target="_blank" class="btn btn-sm btn-outline-info border-0 ms-auto">
+                                            <a href="{{ url_for('main.ver_grafico_completo', reg_id=r.id) }}"
+                                               target="_blank"
+                                               class="btn btn-sm {{ 'btn-outline-info' if r.graph_available else 'btn-outline-secondary' }} border-0 ms-auto"
+                                               title="{{ 'Ver grafico' if r.graph_available else 'No hay grafico persistido; intenta regenerar con una nueva ejecucion' }}">
                                                 <i class="bi bi-graph-up"></i>
                                             </a>
-                                            {% endif %}
                                         </div>
                                     </td>
                                 </tr>

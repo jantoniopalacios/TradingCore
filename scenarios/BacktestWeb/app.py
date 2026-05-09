@@ -10,6 +10,7 @@
 import os
 import sys
 import logging
+import argparse
 from flask import Flask, send_from_directory
 from logging.handlers import RotatingFileHandler
 from trading_engine.core.database_pg import db, ENGINE_OPTIONS
@@ -57,16 +58,19 @@ def create_app(user_mode="admin"):
             
             db.create_all()
             
-            # Cargamos la config del usuario
-            app.logger.info(f"Cargando parámetros para {user_mode}...")
-            config_data = cargar_y_asignar_configuracion(user_mode)
-            app.config.update(config_data)
-            
             # Registramos rutas
             app.register_blueprint(main_bp)
+
+            # Cargamos la config del usuario (no crítico si BD no disponible aún)
+            app.logger.info(f"Cargando parámetros para {user_mode}...")
+            try:
+                config_data = cargar_y_asignar_configuracion(user_mode)
+                app.config.update(config_data)
+            except Exception as e_cfg:
+                app.logger.warning(f"No se pudo cargar configuración de BD al iniciar: {e_cfg}")
             
         except Exception as e:
-            print(f"❌ ERROR CRÍTICO AL INICIAR: {e}")
+            app.logger.error(f"ERROR CRÍTICO AL INICIAR: {e}")
             sys.exit(1)
 
     @app.route('/favicon.ico')
@@ -83,13 +87,43 @@ def _env_flag(name, default=False):
     return value.strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
-def run_app():
-    app = create_app(user_mode=os.environ.get('TRADINGCORE_USER_MODE', 'admin'))
-    host = os.environ.get('TRADINGCORE_WEB_HOST', '127.0.0.1')
-    port = int(os.environ.get('TRADINGCORE_WEB_PORT', '5000'))
-    debug = _env_flag('TRADINGCORE_WEB_DEBUG', host not in {'0.0.0.0', '::'})
+def run_app(argv=None):
+    parser = argparse.ArgumentParser(add_help=True)
+    parser.add_argument('--host', dest='host')
+    parser.add_argument('--port', dest='port', type=int)
+    parser.add_argument('--user-mode', dest='user_mode')
+    parser.add_argument('--debug', dest='debug', action='store_true')
+    parser.add_argument('--no-debug', dest='no_debug', action='store_true')
+    parser.add_argument('--reloader', dest='reloader', action='store_true')
+    parser.add_argument('--no-reloader', dest='no_reloader', action='store_true')
+
+    args, _ = parser.parse_known_args(argv)
+
+    user_mode = args.user_mode or os.environ.get('TRADINGCORE_USER_MODE', 'admin')
+    host = args.host or os.environ.get('TRADINGCORE_WEB_HOST', '127.0.0.1')
+    port = args.port if args.port is not None else int(os.environ.get('TRADINGCORE_WEB_PORT', '5000'))
+
+    env_debug_default = host not in {'0.0.0.0', '::'}
+    debug = _env_flag('TRADINGCORE_WEB_DEBUG', env_debug_default)
+    if args.debug:
+        debug = True
+    if args.no_debug:
+        debug = False
+
     use_reloader = _env_flag('TRADINGCORE_WEB_RELOADER', debug)
-    app.run(host=host, port=port, debug=debug, use_reloader=use_reloader)
+    if args.reloader:
+        use_reloader = True
+    if args.no_reloader:
+        use_reloader = False
+
+    app = create_app(user_mode=user_mode)
+    if debug:
+        app.run(host=host, port=port, debug=True, use_reloader=use_reloader)
+    else:
+        from waitress import serve
+        threads = int(os.environ.get('TRADINGCORE_WEB_THREADS', '8'))
+        logging.getLogger(__name__).info("Starting waitress server on %s:%s with %d threads", host, port, threads)
+        serve(app, host=host, port=port, threads=threads)
 
 if __name__ == '__main__':
     run_app()

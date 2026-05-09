@@ -9,6 +9,8 @@ import os
 import sys
 import threading
 import time
+import json
+import gzip
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -40,11 +42,137 @@ except ImportError as e:
 # 5. Imports Locales y Persistencia
 from .database import db, Simbolo, Usuario
 from .DBStore import save_backtest_run
-from .configuracion import cargar_y_asignar_configuracion, asignar_parametros_a_system
+from .configuracion import BACKTESTING_BASE_DIR, cargar_y_asignar_configuracion, asignar_parametros_a_system
 from .estrategia_system import System
 
 # Configuración de Logger
 logger = logging.getLogger("Ejecucion")
+
+GRAPH_CACHE_BASE_DIR = BACKTESTING_BASE_DIR / 'Graphics' / 'cache'
+STORE_GRAPH_HTML_IN_DB = str(os.getenv('BACKTEST_STORE_GRAPH_HTML_IN_DB', '1')).strip().lower() in {'1', 'true', 'yes', 'on'}
+PREWARM_GRAPH_CACHE = str(os.getenv('BACKTEST_PREWARM_GRAPH_CACHE', '0')).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _graph_cache_file_for_result(user_id: int, result_id: int, symbol: str) -> Path:
+    symbol_safe = ''.join(ch if ch.isalnum() or ch in ('-', '_', '+', '(', ')') else '-' for ch in str(symbol or 'N/A'))
+    while '--' in symbol_safe:
+        symbol_safe = symbol_safe.replace('--', '-')
+    symbol_safe = symbol_safe.strip('-_') or 'N-A'
+    return GRAPH_CACHE_BASE_DIR / f"user_{user_id}" / f"bt_{result_id}_{symbol_safe}.html"
+
+
+def _graph_snapshot_file_for_result(user_id: int, result_id: int, symbol: str) -> Path:
+    symbol_safe = ''.join(ch if ch.isalnum() or ch in ('-', '_', '+', '(', ')') else '-' for ch in str(symbol or 'N/A'))
+    while '--' in symbol_safe:
+        symbol_safe = symbol_safe.replace('--', '-')
+    symbol_safe = symbol_safe.strip('-_') or 'N-A'
+    return GRAPH_CACHE_BASE_DIR / f"user_{user_id}" / f"bt_{result_id}_{symbol_safe}_snapshot.json.gz"
+
+
+def _col_values(df: pd.DataFrame, candidates, default=None):
+    for c in candidates:
+        if c in df.columns:
+            return df[c].tolist()
+    if default is None:
+        return [None] * len(df)
+    return [default] * len(df)
+
+
+def _to_iso_list(values):
+    out = []
+    for v in values:
+        try:
+            ts = pd.to_datetime(v, errors='coerce')
+            if pd.isna(ts):
+                out.append(None)
+            else:
+                out.append(pd.Timestamp(ts).isoformat())
+        except Exception:
+            out.append(None)
+    return out
+
+
+def _to_num_list(values):
+    out = []
+    for v in values:
+        try:
+            if v is None or (isinstance(v, float) and not np.isfinite(v)):
+                out.append(None)
+            elif pd.isna(v):
+                out.append(None)
+            else:
+                out.append(float(v))
+        except Exception:
+            out.append(None)
+    return out
+
+
+def _build_graph_snapshot_payload(symbol: str, intervalo: str, market_df: pd.DataFrame, bt_results) -> dict:
+    market_df = market_df.copy() if isinstance(market_df, pd.DataFrame) else pd.DataFrame()
+    if 'Symbol' in market_df.columns:
+        market_df = market_df.drop(columns=['Symbol'])
+
+    if isinstance(market_df.index, pd.RangeIndex):
+        idx_values = _col_values(market_df, ['Date', 'Datetime', 'date', 'datetime'])
+    else:
+        idx_values = list(market_df.index)
+
+    ohlcv = {
+        'index': _to_iso_list(idx_values),
+        'open': _to_num_list(_col_values(market_df, ['Open', 'open'])),
+        'high': _to_num_list(_col_values(market_df, ['High', 'high'])),
+        'low': _to_num_list(_col_values(market_df, ['Low', 'low'])),
+        'close': _to_num_list(_col_values(market_df, ['Close', 'close'])),
+        'volume': _to_num_list(_col_values(market_df, ['Volume', 'volume'], default=0.0)),
+    }
+
+    equity_df = bt_results.get('_equity_curve') if bt_results is not None else None
+    if isinstance(equity_df, pd.DataFrame) and not equity_df.empty:
+        eq_index = list(equity_df.index)
+        equity = {
+            'index': _to_iso_list(eq_index),
+            'equity': _to_num_list(_col_values(equity_df, ['Equity', 'equity'])),
+            'drawdown_pct': _to_num_list(_col_values(equity_df, ['DrawdownPct', 'Drawdown [%]', 'Drawdown'])),
+        }
+    else:
+        equity = {'index': [], 'equity': [], 'drawdown_pct': []}
+
+    trades_df = bt_results.get('_trades') if bt_results is not None else None
+    if isinstance(trades_df, pd.DataFrame) and not trades_df.empty:
+        trades = {
+            'entry_time': _to_iso_list(_col_values(trades_df, ['EntryTime', 'Entry Time'])),
+            'exit_time': _to_iso_list(_col_values(trades_df, ['ExitTime', 'Exit Time'])),
+            'entry_price': _to_num_list(_col_values(trades_df, ['EntryPrice', 'Entry Price'])),
+            'exit_price': _to_num_list(_col_values(trades_df, ['ExitPrice', 'Exit Price'])),
+            'size': _to_num_list(_col_values(trades_df, ['Size', 'size'], default=0.0)),
+            'pnl': _to_num_list(_col_values(trades_df, ['PnL', 'pnl'], default=0.0)),
+        }
+    else:
+        trades = {
+            'entry_time': [],
+            'exit_time': [],
+            'entry_price': [],
+            'exit_price': [],
+            'size': [],
+            'pnl': [],
+        }
+
+    return {
+        'version': 1,
+        'symbol': str(symbol),
+        'intervalo': str(intervalo or '1d'),
+        'created_at': datetime.utcnow().isoformat() + 'Z',
+        'ohlcv': ohlcv,
+        'equity': equity,
+        'trades': trades,
+    }
+
+
+def _write_graph_snapshot(user_id: int, result_id: int, symbol: str, payload: dict):
+    snapshot_file = _graph_snapshot_file_for_result(user_id, result_id, symbol)
+    snapshot_file.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(snapshot_file, 'wt', encoding='utf-8') as gz:
+        json.dump(payload, gz, ensure_ascii=False, separators=(',', ':'))
 
 # ----------------------------------------------------------------------
 
@@ -181,30 +309,28 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
         
         logger.info(f"✅ Backtest completado: {len(resultados_df)} resultados")
 
-        # 8. Renderizado de Gráficos (Bokeh)
-        _progress(8, 11, 'Graficos', 'Generando visualizaciones por activo')
-        logger.info("[9/9] Generando gráficos")
+        # 8. Graficos diferidos (lazy)
+        _progress(8, 11, 'Graficos', 'Generacion diferida activada; se omite prewarm')
+        logger.info("[9/9] Generacion de graficos diferida (lazy)")
         diccionario_graficos_html = {}
-        graph_dir = Path(config_final.get('graph_dir'))
-        
-        # Crear directorio si no existe
-        graph_dir.mkdir(parents=True, exist_ok=True)
+        if PREWARM_GRAPH_CACHE:
+            graph_dir = Path(config_final.get('graph_dir'))
+            graph_dir.mkdir(parents=True, exist_ok=True)
+            for symbol, bt_results in backtest_objects.items():
+                try:
+                    if bt_results:
+                        graph_file = graph_dir / f"{symbol}_backtest.html"
+                        logger.info(f"  Generando gráfico en prewarm: {symbol}")
+                        bt_results.plot(filename=str(graph_file), open_browser=False)
 
-        for symbol, bt_results in backtest_objects.items():
-            try:
-                if bt_results:
-                    graph_file = graph_dir / f"{symbol}_backtest.html"
-                    logger.info(f"  Generando gráfico: {symbol}")
-                    bt_results.plot(filename=str(graph_file), open_browser=False)
-                    
-                    if graph_file.exists():
-                        with open(graph_file, 'r', encoding='utf-8') as f:
-                            diccionario_graficos_html[symbol] = f.read()
-                        logger.info(f"  ✅ Gráfico guardado: {graph_file}")
-                    else:
-                        logger.warning(f"  ⚠️  Gráfico no se guardó en {graph_file}")
-            except Exception as e:
-                logger.error(f"  ❌ Error generando gráfico para {symbol}: {e}")
+                        if graph_file.exists():
+                            with open(graph_file, 'r', encoding='utf-8') as f:
+                                diccionario_graficos_html[symbol] = f.read()
+                            logger.info(f"  ✅ Prewarm gráfico guardado: {graph_file}")
+                        else:
+                            logger.warning(f"  ⚠️  Prewarm no guardó gráfico en {graph_file}")
+                except Exception as e:
+                    logger.error(f"  ❌ Error en prewarm para {symbol}: {e}")
 
         # 9. Persistencia Delegada
         _progress(9, 11, 'Persistencia', 'Guardando resultados y operaciones en SQL')
@@ -216,13 +342,39 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
                 for _, row in resultados_df.iterrows():
                     ticker = row.get('Symbol', 'UNKNOWN')
                     try:
-                        save_backtest_run(
+                        graph_html = diccionario_graficos_html.get(ticker) if PREWARM_GRAPH_CACHE else None
+                        bt_result_for_symbol = backtest_objects.get(ticker)
+                        market_df_for_symbol = stocks_data_dict.get(ticker, pd.DataFrame())
+                        result_id = save_backtest_run(
                             user_id=current_user_id,
                             stats=row.to_dict(),
                             config_dict=config_final,
                             trades_df=trades_df[trades_df['Symbol'] == ticker] if not trades_df.empty else None,
-                            grafico_html=diccionario_graficos_html.get(ticker)
+                            grafico_html=graph_html if STORE_GRAPH_HTML_IN_DB else None
                         )
+
+                        # Snapshot compacto para reconstruir graficos sin depender de HTML en BD.
+                        if result_id and bt_result_for_symbol is not None:
+                            try:
+                                payload = _build_graph_snapshot_payload(
+                                    symbol=ticker,
+                                    intervalo=intervalo,
+                                    market_df=market_df_for_symbol,
+                                    bt_results=bt_result_for_symbol,
+                                )
+                                _write_graph_snapshot(current_user_id, result_id, ticker, payload)
+                            except Exception as snapshot_err:
+                                logger.warning(f"⚠️  No se pudo guardar snapshot de gráfico para {ticker}: {snapshot_err}")
+
+                        # Cache temporal en disco para visualizacion si hubo prewarm.
+                        if graph_html and result_id:
+                            try:
+                                cache_file = _graph_cache_file_for_result(current_user_id, result_id, ticker)
+                                cache_file.parent.mkdir(parents=True, exist_ok=True)
+                                cache_file.write_text(graph_html, encoding='utf-8')
+                            except Exception as cache_err:
+                                logger.warning(f"⚠️  No se pudo escribir cache de gráfico para {ticker}: {cache_err}")
+
                         saved_count += 1
                     except Exception as e:
                         logger.error(f"  ❌ Error guardando resultado para {ticker}: {e}")
