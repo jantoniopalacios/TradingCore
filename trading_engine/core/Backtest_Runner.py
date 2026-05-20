@@ -14,6 +14,23 @@ from trading_engine.core.constants import REQUIRED_COLS # Si tienes esta constan
 logger = logging.getLogger("Backtest_Runner")
 StrategySelf = Type[Strategy] 
 
+
+def _safe_float(value, default: float = 0.0) -> float:
+    if value is None:
+        return float(default)
+    if isinstance(value, (int, float)):
+        try:
+            return float(value)
+        except Exception:
+            return float(default)
+    text = str(value).strip().replace(',', '.')
+    if text == '':
+        return float(default)
+    try:
+        return float(text)
+    except Exception:
+        return float(default)
+
 # ----------------------------------------------------------------------
 # --- FUNCIONES CENTRALES DEL MOTOR DE EJECUCIÓN ---
 # ----------------------------------------------------------------------
@@ -91,9 +108,9 @@ def run_multi_symbol_backtest(
     backtest_objects = {} 
     
     # Extracción de parámetros genéricos
-    cash = params_generales.get('cash', 10000)
-    commission = params_generales.get('commission', 0.0)
-    stoploss_percentage = params_generales.get('stoploss_percentage_below_close', 0.0)
+    cash = _safe_float(params_generales.get('cash', 10000), 10000.0)
+    commission = _safe_float(params_generales.get('commission', 0.0), 0.0)
+    stoploss_percentage = _safe_float(params_generales.get('stoploss_percentage_below_close', 0.0), 0.0)
     
     # Definición de columnas requeridas (usando la constante de core)
     # NOTA: Asegúrate de que REQUIRED_COLS esté definido en trading_engine.core.constants

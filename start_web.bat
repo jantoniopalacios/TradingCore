@@ -59,11 +59,30 @@ if %errorlevel% equ 0 (
 echo [*] Lanzando servidor con Waitress en segundo plano...
 powershell -windowstyle hidden -command "Start-Process -FilePath 'C:\Users\juant\Proyectos\Python\TradingCore\.venv\Scripts\python.exe' -ArgumentList '-m %APP_PATH% --host=0.0.0.0 --port=5000 --no-debug --no-reloader' -WorkingDirectory 'C:\Users\juant\Proyectos\Python\TradingCore' -WindowStyle Hidden"
 
-timeout /t 4 >nul
+timeout /t 2 >nul
 
-:: Verificar que arrancó (comprobación HTTP real)
-powershell -NoProfile -Command "try { $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5000/login -TimeoutSec 6; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
-if %errorlevel% equ 0 (
+:: Verificar arranque con reintentos para evitar falsos negativos por inicio tardio
+set "WEB_READY=0"
+for /L %%i in (1,1,12) do (
+    powershell -NoProfile -Command "try { $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5000/login -TimeoutSec 3; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+    if not errorlevel 1 (
+        set "WEB_READY=1"
+        goto :web_ready
+    )
+    timeout /t 1 >nul
+)
+
+:web_ready
+if "%WEB_READY%" neq "1" (
+    :: Fallback: si el puerto ya escucha, evitar falso negativo de health-check HTTP
+    powershell -NoProfile -Command "if (Test-NetConnection -ComputerName 127.0.0.1 -Port 5000 -InformationLevel Quiet) { exit 0 } else { exit 1 }" >nul 2>&1
+    if %errorlevel% equ 0 (
+        set "WEB_READY=1"
+        echo [ADVERTENCIA] El puerto 5000 esta activo, pero /login aun no responde. Puede estar iniciando.
+    )
+)
+
+if "%WEB_READY%" equ "1" (
     echo.
     echo ==========================================
     echo [EXITO] Infraestructura lista y segura.
@@ -71,7 +90,7 @@ if %errorlevel% equ 0 (
     echo ==========================================
 ) else (
     echo.
-    echo [ERROR] El servidor no respondio en puerto 5000. Revisa los logs.
+    echo [ERROR] El servidor no respondio en puerto 5000 tras varios intentos. Revisa los logs.
     echo Logs: Backtesting\logs\trading_app.log
     echo ==========================================
 )

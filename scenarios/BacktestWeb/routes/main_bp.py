@@ -9,6 +9,7 @@ import time
 import sys
 import signal
 import subprocess
+import tempfile
 from pathlib import Path
 from flask import (
     Blueprint, render_template, request, redirect, url_for, 
@@ -36,6 +37,7 @@ from ..Backtest import ejecutar_backtest
 from ..database import db, ResultadoBacktest, Trade, Usuario, Simbolo # Importa tus modelos
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import ResourceClosedError
 
 main_bp = Blueprint('main', __name__) 
 
@@ -53,6 +55,7 @@ GRAPH_CACHE_TTL_SECONDS = int(os.getenv('BACKTEST_GRAPH_CACHE_TTL_SECONDS', '864
 GRAPH_CACHE_CLEANUP_INTERVAL_SECONDS = int(os.getenv('BACKTEST_GRAPH_CACHE_CLEANUP_INTERVAL_SECONDS', '3600'))
 _LAST_GRAPH_CACHE_CLEANUP_TS = 0.0
 _GRAPH_CACHE_CLEANUP_LOCK = threading.Lock()
+GRAPH_SNAPSHOT_PREFIX = "__GRAPH_SNAPSHOT_JSON__:"
 
 SAVEABLE_BOOLEAN_FIELDS = [
     'macd', 'rsi', 'ema_cruce_signal', 'bb_active', 'bb_buy_crossover', 'bb_sell_crossover',
@@ -133,6 +136,14 @@ def _sanitize_filename_component(value):
     return cleaned.strip('-_') or 'config'
 
 
+def _normalize_symbol_token(value):
+    token = str(value or '').strip().upper()
+    if not token:
+        return ''
+    allowed = ''.join(ch for ch in token if ch.isascii() and (ch.isalnum() or ch in ('.', '-', '_', '^', '=')))
+    return allowed.strip()
+
+
 def _user_config_snapshot_dir(username):
     return CONFIG_SNAPSHOT_BASE_DIR / str(username)
 
@@ -140,7 +151,8 @@ def _user_config_snapshot_dir(username):
 def _extract_symbols_from_form_data(form_data):
     contenido = form_data.get('symbols_content', '') or ''
     raw_activos = contenido.replace(';', ',').replace('\n', ',').replace('\r', ',')
-    return list(dict.fromkeys([s.strip().upper() for s in raw_activos.split(',') if s.strip()]))
+    normalized = [_normalize_symbol_token(s) for s in raw_activos.split(',')]
+    return list(dict.fromkeys([s for s in normalized if s]))
 
 
 def _build_config_params_from_form_data(form_data, include_dates=False):
@@ -168,7 +180,8 @@ def _persist_user_runtime_config(user, form_data):
     for sym_name in symbol_names:
         db.session.add(Simbolo(symbol=sym_name, name=sym_name, usuario_id=user.id))
 
-    user.config_actual = json.dumps(config_params, ensure_ascii=False)
+    # Guardar JSON en formato ASCII-safe evita errores de codificacion del driver/entorno (charmap)
+    user.config_actual = json.dumps(config_params, ensure_ascii=True)
     return config_params, symbol_names
 
 
@@ -197,6 +210,145 @@ def _write_config_snapshot(username, file_name, config_payload):
 
 def _utc_now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+def _extract_graph_snapshot_payload_from_db(resultado):
+    raw_blob = (resultado.grafico_html or '').strip()
+    if not raw_blob:
+        return None
+    if raw_blob.startswith(GRAPH_SNAPSHOT_PREFIX):
+        raw_blob = raw_blob[len(GRAPH_SNAPSHOT_PREFIX):]
+    else:
+        # Si no tiene prefijo, asumimos legacy HTML y no snapshot JSON.
+        return None
+    try:
+        payload = json.loads(raw_blob)
+        return payload if isinstance(payload, dict) else None
+    except Exception:
+        return None
+
+
+def _regenerate_graph_html_on_demand(resultado, requester_user_mode):
+    """Regenera el grafico para un unico activo en el momento de visualizarlo."""
+    symbol = (resultado.symbol or '').strip()
+    if not symbol:
+        return None
+
+    owner_username = requester_user_mode
+    try:
+        if resultado.propietario and resultado.propietario.username:
+            owner_username = resultado.propietario.username
+    except Exception:
+        pass
+
+    try:
+        from pandas import DataFrame
+        from trading_engine.core.Backtest_Runner import run_multi_symbol_backtest
+        from trading_engine.utils.Data_download import descargar_datos_YF
+        from ..estrategia_system import System
+        from ..configuracion import cargar_y_asignar_configuracion, asignar_parametros_a_system
+        from ..Backtest import _build_graph_snapshot_payload
+    except Exception as import_err:
+        logging.getLogger(__name__).warning("No se pudo importar motor de regeneracion de grafico: %s", import_err)
+        return None
+
+    try:
+        params = json.loads(resultado.params_tecnicos) if resultado.params_tecnicos else {}
+        if not isinstance(params, dict):
+            params = {}
+    except Exception:
+        params = {}
+
+    try:
+        base_config = cargar_y_asignar_configuracion(owner_username)
+    except Exception as cfg_err:
+        logging.getLogger(__name__).warning("No se pudo cargar configuracion para regenerar grafico (%s): %s", owner_username, cfg_err)
+        return None
+
+    config_final = {**base_config, **params}
+
+    start_date = resultado.fecha_inicio_datos or config_final.get('start_date') or config_final.get('START_DATE')
+    end_date = resultado.fecha_fin_datos or config_final.get('end_date') or config_final.get('END_DATE')
+    intervalo = resultado.intervalo or config_final.get('intervalo') or config_final.get('INTERVAL') or '1d'
+
+    if not start_date or not end_date:
+        logging.getLogger(__name__).warning("No hay rango de fechas para regenerar grafico de %s (resultado %s)", symbol, resultado.id)
+        return None
+
+    config_final['start_date'] = start_date
+    config_final['START_DATE'] = start_date
+    config_final['end_date'] = end_date
+    config_final['END_DATE'] = end_date
+    config_final['intervalo'] = intervalo
+    config_final['INTERVAL'] = intervalo
+
+    try:
+        asignar_parametros_a_system(config_final, config_final)
+    except Exception as sys_err:
+        logging.getLogger(__name__).warning("No se pudo sincronizar System para regenerar grafico: %s", sys_err)
+        return None
+
+    data_files_path = Path(config_final.get('data_files_path') or (PROJECT_ROOT / 'Data_files'))
+    simbolos_df = DataFrame([{'Symbol': symbol, 'Name': symbol}])
+
+    try:
+        stocks_data = descargar_datos_YF(simbolos_df, start_date, end_date, intervalo, data_files_path)
+    except Exception as dl_err:
+        logging.getLogger(__name__).warning("Error descargando datos para regenerar grafico %s: %s", symbol, dl_err)
+        return None
+
+    if stocks_data is None or stocks_data.empty:
+        return None
+
+    stocks_data_dict = {symbol: stocks_data[stocks_data['Symbol'] == symbol]}
+    if symbol not in stocks_data_dict or stocks_data_dict[symbol].empty:
+        return None
+
+    try:
+        _, _, backtest_objects = run_multi_symbol_backtest(
+            stocks_data_dict,
+            System,
+            config_final,
+            [symbol],
+            20,
+            logging.getLogger(__name__),
+        )
+    except Exception as bt_err:
+        logging.getLogger(__name__).warning("Error en backtest on-demand para grafico %s: %s", symbol, bt_err)
+        return None
+
+    bt_result = (backtest_objects or {}).get(symbol)
+    if bt_result is None:
+        return None
+
+    try:
+        # 1) Generar el HTML nativo del motor (mismo look & feel que antes)
+        fd, temp_html_path = tempfile.mkstemp(prefix=f"bt_{resultado.id}_", suffix=".html")
+        os.close(fd)
+        html = None
+        try:
+            bt_result.plot(filename=temp_html_path, open_browser=False)
+            if Path(temp_html_path).exists():
+                html = Path(temp_html_path).read_text(encoding='utf-8')
+        finally:
+            try:
+                Path(temp_html_path).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        # 2) Persistir snapshot estructurado como respaldo (sin guardar HTML pesado)
+        payload = _build_graph_snapshot_payload(symbol, intervalo, stocks_data_dict[symbol], bt_result)
+        resultado.grafico_html = GRAPH_SNAPSHOT_PREFIX + json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
+        db.session.commit()
+
+        # 3) Devolver HTML del motor; si no se pudo, fallback al render desde snapshot
+        if html:
+            return html
+        return _render_bokeh_html_from_snapshot(payload, resultado)
+    except Exception as regen_err:
+        db.session.rollback()
+        logging.getLogger(__name__).warning("No se pudo persistir grafico regenerado para %s (id=%s): %s", symbol, resultado.id, regen_err)
+        return None
 
 
 def _graph_cache_file_for_result(resultado):
@@ -381,37 +533,15 @@ def _is_graph_cache_valid(cache_file: Path, ttl_seconds: int = GRAPH_CACHE_TTL_S
 
 
 def _read_graph_html_with_cache(resultado):
-    """
-    Retorna HTML desde cache temporal si es valido.
-    Fallback compatible: si no hay cache valido, usa grafico_html de BD y regenera cache.
-    """
-    cache_file = _graph_cache_file_for_result(resultado)
-    try:
-        if _is_graph_cache_valid(cache_file):
-            return cache_file.read_text(encoding='utf-8')
-    except Exception as cache_err:
-        logging.getLogger(__name__).warning("No se pudo leer cache de grafico %s: %s", cache_file, cache_err)
-
-    db_html = (resultado.grafico_html or '').strip()
-    if db_html:
-        try:
-            cache_file.parent.mkdir(parents=True, exist_ok=True)
-            cache_file.write_text(db_html, encoding='utf-8')
-        except Exception as cache_write_err:
-            logging.getLogger(__name__).warning("No se pudo refrescar cache de grafico %s: %s", cache_file, cache_write_err)
-        return db_html
-
-    # Tercera via: regeneracion desde snapshot compacto persistido por resultado.
-    snapshot_payload = _read_graph_snapshot_payload(resultado)
+    # Modo sin cache de disco: reconstruir en cada visualizacion desde snapshot en BD.
+    snapshot_payload = _extract_graph_snapshot_payload_from_db(resultado)
     if snapshot_payload:
-        regenerated_html = _render_bokeh_html_from_snapshot(snapshot_payload, resultado)
-        if regenerated_html:
-            try:
-                cache_file.parent.mkdir(parents=True, exist_ok=True)
-                cache_file.write_text(regenerated_html, encoding='utf-8')
-            except Exception as cache_write_err:
-                logging.getLogger(__name__).warning("No se pudo guardar cache regenerado %s: %s", cache_file, cache_write_err)
-            return regenerated_html
+        return _render_bokeh_html_from_snapshot(snapshot_payload, resultado)
+
+    # Fallback legacy para registros historicos antiguos con HTML persistido.
+    db_html = (resultado.grafico_html or '').strip()
+    if db_html and not db_html.startswith(GRAPH_SNAPSHOT_PREFIX):
+        return db_html
 
     return None
 
@@ -561,6 +691,10 @@ def _build_expected_scheduler_jobs_from_db() -> list:
     return jobs
 
 
+# ── Funciones de estado para la carga de index ──────────────────────────────
+
+
+
 def _init_backtest_status(user_mode, run_id, tanda_id):
     with BACKTEST_STATUS_LOCK:
         BACKTEST_STATUS_BY_USER[user_mode] = {
@@ -657,12 +791,6 @@ def index():
 
     user_mode = session.get('user_mode')
 
-    # Mantenimiento liviano de cache HTML con frecuencia limitada.
-    try:
-        _prune_expired_graph_cache()
-    except Exception as cleanup_err:
-        logging.getLogger(__name__).warning("Fallo en limpieza de cache de graficos: %s", cleanup_err)
-
     try:
         u = Usuario.query.filter_by(username=user_mode).first()
     except Exception as exc:
@@ -695,15 +823,12 @@ def index():
     # ================================================================
     # --- LÓGICA GET (Carga de la página desde DB) ---
     # ================================================================
-    
-    # Intentamos cargar la configuración guardada del usuario
+
+    # Carga de configuración desde DB
     config_para_web = {}
     if u and u.config_actual:
         try:
             config_para_web = json.loads(u.config_actual) if isinstance(u.config_actual, str) else u.config_actual
-        
-            # --- NORMALIZADOR PARA EL HTML ---
-            # Esto convierte cualquier True booleano en "True" texto al vuelo
             for key, value in config_para_web.items():
                 if value is True:
                     config_para_web[key] = 'True'
@@ -712,7 +837,6 @@ def index():
         except:
             config_para_web = {}
 
-    # Si el usuario no tiene nada guardado, usamos los valores por defecto de la clase System
     if not config_para_web:
         for attr in dir(System):
             if not attr.startswith("__"):
@@ -720,63 +844,95 @@ def index():
                 if not callable(val):
                     config_para_web[attr] = str(val)
 
-    # Fecha fin operativa por defecto: siempre ayer en UI.
-    # No se persiste en config_actual para evitar arrastrar fechas historicas entre sesiones.
     ayer = date.today() - timedelta(days=1)
     config_para_web['end_date'] = ayer.isoformat()
 
-    # Preparar símbolos para el textarea
     simbolos_db = Simbolo.query.filter_by(usuario_id=u.id).all() if u else []
     symbols_text = ", ".join([s.symbol for s in simbolos_db]) if simbolos_db else "AAPL, MSFT"
 
     # Historial de resultados (Ordenado por fecha descendente)
+    # Las queries se hacen siempre desde la BD (los objetos SQLAlchemy no se cachean).
+    # Si el thread de background los cargó previamente, el pg buffer cache los acelera.
     registros_agrupados = {}
     try:
-        # 1. OPTIMIZACION: Eager loading de resultados con usuario relacionado
-        query_base = ResultadoBacktest.query.options(joinedload(ResultadoBacktest.propietario)).order_by(ResultadoBacktest.fecha_ejecucion.desc())
-        
+        # 1. OPTIMIZACION + PAGINACION POR TANDAS
+        # Importante: limitar por filas puede ocultar tandas antiguas cuando una tanda nueva
+        # genera muchos activos. Para evitar "desapariciones" visuales, primero limitamos
+        # las tandas recientes y luego cargamos todos sus registros.
+        tandas_limit = 50
+        activos_por_tanda = 25
+
+        tandas_query = db.session.query(
+            ResultadoBacktest.usuario_id,
+            ResultadoBacktest.id_estrategia,
+            func.max(ResultadoBacktest.fecha_ejecucion).label('max_fecha')
+        )
+
+        if user_mode != 'admin' and u:
+            tandas_query = tandas_query.filter(ResultadoBacktest.usuario_id == u.id)
+        elif user_mode != 'admin' and not u:
+            tandas_query = tandas_query.filter(False)
+
+        tandas_rows = tandas_query.group_by(
+            ResultadoBacktest.usuario_id,
+            ResultadoBacktest.id_estrategia
+        ).order_by(
+            func.max(ResultadoBacktest.fecha_ejecucion).desc()
+        ).limit(tandas_limit).all()
+
+        todos = []
         if user_mode == 'admin':
-            todos = query_base.all()
-            # Para admin: cargar TODOS los trades en una sola consulta (no por backtest)
-            todos_ids = [r.id for r in todos]
-            all_trades_dict = {}
-            if todos_ids:
-                trades_batch = Trade.query.filter(Trade.backtest_id.in_(todos_ids)).all()
-                for trade in trades_batch:
-                    if trade.backtest_id not in all_trades_dict or trade.id > all_trades_dict[trade.backtest_id].id:
-                        all_trades_dict[trade.backtest_id] = trade
+            for tanda in tandas_rows:
+                tanda_rows = ResultadoBacktest.query.options(
+                    joinedload(ResultadoBacktest.propietario)
+                ).filter(
+                    ResultadoBacktest.usuario_id == tanda.usuario_id,
+                    ResultadoBacktest.id_estrategia == tanda.id_estrategia,
+                ).order_by(
+                    ResultadoBacktest.fecha_ejecucion.desc()
+                ).limit(activos_por_tanda).all()
+                todos.extend(tanda_rows)
         else:
-            todos = query_base.filter_by(usuario_id=u.id).all()
-            # Para usuario normal: cargar trades de sus propios backtests
-            todos_ids = [r.id for r in todos]
-            all_trades_dict = {}
-            if todos_ids:
-                trades_batch = Trade.query.filter(Trade.backtest_id.in_(todos_ids)).all()
-                for trade in trades_batch:
-                    if trade.backtest_id not in all_trades_dict or trade.id > all_trades_dict[trade.backtest_id].id:
-                        all_trades_dict[trade.backtest_id] = trade
-        
+            if u:
+                for tanda in tandas_rows:
+                    tanda_rows = ResultadoBacktest.query.options(
+                        joinedload(ResultadoBacktest.propietario)
+                    ).filter(
+                        ResultadoBacktest.usuario_id == u.id,
+                        ResultadoBacktest.id_estrategia == tanda.id_estrategia,
+                    ).order_by(
+                        ResultadoBacktest.fecha_ejecucion.desc()
+                    ).limit(activos_por_tanda).all()
+                    todos.extend(tanda_rows)
+
+        # Para todos: cargar trades en una sola consulta
+        todos_ids = [r.id for r in todos]
+        all_trades_dict = {}
+        if todos_ids:
+            trades_batch = Trade.query.filter(Trade.backtest_id.in_(todos_ids)).all()
+            for trade in trades_batch:
+                if trade.backtest_id not in all_trades_dict or trade.id > all_trades_dict[trade.backtest_id].id:
+                    all_trades_dict[trade.backtest_id] = trade
+
         # 2. Agrupamos manteniendo el orden de aparición (que ya viene ordenado por fecha)
         for r in todos:
-            # La tanda_key identifica el grupo (por id_estrategia)
             tanda_key = f"{r.usuario_id}_{r.id_estrategia}" if user_mode == 'admin' else r.id_estrategia
-            
+
             if tanda_key not in registros_agrupados:
                 registros_agrupados[tanda_key] = {
                     'id_tanda': r.id_estrategia,
                     'usuario_id': r.usuario_id,
-                    'fecha_raw': r.fecha_ejecucion, # Guardamos el objeto datetime para ordenar
+                    'fecha_raw': r.fecha_ejecucion,
                     'fecha': r.fecha_ejecucion.strftime('%Y-%m-%d %H:%M'),
                     'usuario_nombre': r.propietario.username,
                     'titulo_estrategia': _build_strategy_short_title(r),
                     'activos': []
                 }
             registros_agrupados[tanda_key]['activos'].append(r)
-        
-        # 3. Enriquecer cada backtest (activo) con el último trade desde el diccionario precargado
+
+        # 3. Enriquecer cada backtest con el último trade
         for tanda_key, tanda_data in registros_agrupados.items():
             for backtest in tanda_data['activos']:
-                # Obtener último trade desde el diccionario precargado (O(1) en vez de SELECT por cada backtest)
                 last_trade = all_trades_dict.get(backtest.id)
                 if last_trade:
                     backtest.ultima_operacion_fecha = last_trade.fecha
@@ -785,26 +941,20 @@ def index():
                     backtest.ultima_operacion_fecha = '-'
                     backtest.ultima_operacion_tipo = '-'
 
-                has_db_graph = bool((backtest.grafico_html or '').strip())
-                cache_file = _graph_cache_file_for_result(backtest)
-                snapshot_file = _graph_snapshot_file_for_result(backtest)
-                backtest.graph_available = has_db_graph or _is_graph_cache_valid(cache_file) or snapshot_file.exists()
-                # Mantener visible la accion de grafico en historial SQL incluso si
-                # no hay artefacto local (p. ej. tras limpieza de grafico_html).
+                # El boton de grafico debe estar siempre disponible para regeneracion on-demand.
+                backtest.graph_available = True
                 backtest.has_graph = True
-            
+
     except Exception as e:
         print(f"Error historial: {e}")
 
-    # 4. EL CAMBIO FINAL: Ordenar el diccionario de tandas por la fecha del primer elemento de cada tanda
-    # Esto garantiza que la Tanda #10 aparezca antes que la #9 si se hizo después.
+    # 4. Ordenar tandas por fecha descendente
     tandas_ordenadas = dict(sorted(
-        registros_agrupados.items(), 
-        key=lambda x: x[1]['fecha_raw'], 
+        registros_agrupados.items(),
+        key=lambda x: x[1]['fecha_raw'],
         reverse=True
     ))
 
-# Inicializamos vacío por seguridad
     arbol_ficheros = []
 
     # docs visible para todos los usuarios autenticados
@@ -984,10 +1134,22 @@ def launch_strategy():
             logger.warning("Intento de acceso sin autenticación a /launch_strategy")
             return jsonify({"status": "error", "message": "No autenticado"}), 401
         
+        # Reset defensivo de sesion DB por si hubo un cursor cerrado en request previa.
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
         user_mode = session.get('user_mode')
         logger.info(f"[LAUNCH] Usuario {user_mode} lanzando backtest...")
-        
-        u = Usuario.query.filter_by(username=user_mode).first()
+
+        try:
+            u = Usuario.query.filter_by(username=user_mode).first()
+        except ResourceClosedError:
+            db.session.rollback()
+            db.session.remove()
+            u = Usuario.query.filter_by(username=user_mode).first()
+
         if not u:
             logger.error(f"[LAUNCH] Usuario {user_mode} no encontrado en BD")
             return jsonify({"status": "error", "message": "Usuario no encontrado"}), 404
@@ -1030,10 +1192,15 @@ def launch_strategy():
             elif value == "" or value.lower() == 'none':
                 config_web[key] = None
             else:
-                # Intentar convertir a número para el motor
+                # Intentar convertir a numero para el motor (acepta coma decimal)
+                raw_value = str(value).strip()
+                numeric_value = raw_value.replace(',', '.')
                 try:
-                    config_web[key] = float(value) if '.' in value else int(value)
-                except:
+                    if any(ch in numeric_value for ch in ('.', 'e', 'E')):
+                        config_web[key] = float(numeric_value)
+                    else:
+                        config_web[key] = int(numeric_value)
+                except Exception:
                     config_web[key] = value
 
         # 4. EL PASO CRUCIAL: Si un switch NO vino en el form_data, forzarlo a False
@@ -1878,11 +2045,12 @@ def load_config_file():
 
         runtime_config = dict(config_data)
         runtime_config.pop('end_date', None)
-        u.config_actual = json.dumps(runtime_config, ensure_ascii=False)
+        u.config_actual = json.dumps(runtime_config, ensure_ascii=True)
         Simbolo.query.filter_by(usuario_id=u.id).delete()
         for sym_name in activos:
-            normalized = str(sym_name).upper()
-            db.session.add(Simbolo(symbol=normalized, name=normalized, usuario_id=u.id))
+            normalized = _normalize_symbol_token(sym_name)
+            if normalized:
+                db.session.add(Simbolo(symbol=normalized, name=normalized, usuario_id=u.id))
         db.session.commit()
 
         return jsonify({
@@ -1949,14 +2117,18 @@ def ver_grafico_completo(reg_id):
             if resultado.usuario_id != usuario.id:
                 return "<h3>No tienes permiso para visualizar este gráfico.</h3>", 403
         
-        # 2. Cargar contenido desde cache temporal (si esta vigente) o fallback DB
-        graph_html = _read_graph_html_with_cache(resultado)
+        # 2. Regenerar on-demand para mantener el look original de gráficos.
+        #    Si falla, usar respaldo desde snapshot/legacy DB.
+        graph_html = _regenerate_graph_html_on_demand(resultado, user_mode)
+        if not graph_html:
+            graph_html = _read_graph_html_with_cache(resultado)
+
         if not graph_html:
             return (
                 "<html><body style='font-family:Segoe UI,Arial,sans-serif;padding:24px;'>"
                 "<h3>Grafico no disponible para este backtest</h3>"
-                "<p>Se limpiaron los HTML legacy y este resultado no tiene snapshot/cache local.</p>"
-                "<p>Para recuperar visualizacion, ejecuta nuevamente el backtest de este activo.</p>"
+                "<p>No se pudo regenerar el grafico para este activo en este momento.</p>"
+                "<p>Revisa que haya datos de mercado para el rango configurado y vuelve a intentarlo.</p>"
                 "</body></html>",
                 200,
             )
@@ -2162,9 +2334,21 @@ def login():
             session.clear()
             session['logged_in'] = True
             session['user_mode'] = user
-            return redirect(url_for('main.index'))
+            return redirect(url_for('main.cargando'))
         flash("❌ Usuario o contraseña incorrectos", "danger")
     return render_template('login.html')
+
+
+#-- RUTA DE CARGA CON PROGRESO POST-LOGIN --
+@main_bp.route('/cargando')
+def cargando():
+    """Pantalla de transición simple antes de renderizar index()."""
+    if not session.get('logged_in'):
+        return redirect(url_for('main.login'))
+    user_mode = session.get('user_mode', '')
+    delay_ms = 1200 if user_mode == 'admin' else 500
+    return render_template('cargando_simple.html', user_mode=user_mode, delay_ms=delay_ms)
+
 
 #-- RUTA DE LOGOUT --
 @main_bp.route('/logout')

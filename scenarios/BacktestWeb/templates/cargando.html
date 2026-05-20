@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingCore - Cargando...</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #0f1216;
+            background-image: radial-gradient(circle at 50% 50%, #1e242d 0%, #0f1216 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            color: #e0e6ed;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        .load-card {
+            background: #1a1e23;
+            border: 1px solid #2d343c;
+            border-radius: 14px;
+        }
+        .brand-logo {
+            font-size: 1.7rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            color: #0d6efd;
+        }
+        .progress {
+            height: 10px;
+            background-color: #12171e;
+        }
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+        .phase-badge {
+            font-size: 0.72rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .event-list {
+            max-height: 220px;
+            overflow-y: auto;
+            background: #12171e;
+            border-radius: 8px;
+            font-size: 0.82rem;
+        }
+        .event-list .event-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            padding: 5px 10px;
+            border-bottom: 1px solid #1e262f;
+        }
+        .event-list .event-row:last-child {
+            border-bottom: none;
+        }
+        .event-ts { color: #5a6473; min-width: 68px; }
+        .event-phase { color: #4d9be6; min-width: 90px; font-weight: 600; }
+        .event-msg { color: #c0cad6; }
+        .status-icon { font-size: 1.6rem; }
+    </style>
+</head>
+<body>
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6">
+
+            <div class="text-center mb-4">
+                <div class="brand-logo mb-1">
+                    <i class="fas fa-chart-line me-2"></i>TRADING<span class="text-light">CORE</span>
+                </div>
+                <p class="text-muted small">Preparando el sistema para <strong class="text-info">{{ user_mode }}</strong></p>
+            </div>
+
+            <div class="card load-card shadow-lg">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3 gap-3">
+                        <div id="statusIcon" class="status-icon text-primary">
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span id="phaseLabel" class="fw-bold text-light">Iniciando...</span>
+                                <span id="percentLabel" class="text-muted small fw-bold">0%</span>
+                            </div>
+                            <div class="progress">
+                                <div id="progressBar"
+                                     class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                     role="progressbar"
+                                     style="width: 0%"
+                                     aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="statusMsg" class="alert alert-dark border border-secondary small py-2 mb-3">
+                        Conectando con la base de datos...
+                    </div>
+
+                    <div class="mb-1">
+                        <small class="text-muted text-uppercase phase-badge">
+                            <i class="fas fa-list-ul me-1"></i>Proceso detallado
+                        </small>
+                    </div>
+                    <div class="event-list" id="eventList">
+                        <div class="event-row">
+                            <span class="event-ts">--:--:--</span>
+                            <span class="event-phase">Iniciando</span>
+                            <span class="event-msg text-muted">Esperando datos...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer border-top border-secondary bg-transparent text-center py-2">
+                    <small class="text-muted">
+                        <i class="fas fa-database me-1"></i>Cargando historial completo desde la base de datos
+                    </small>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var pollTimer = null;
+    var startTime = Date.now();
+
+    function formatTs(isoStr) {
+        if (!isoStr) return '--:--:--';
+        return isoStr.replace('T', ' ').slice(11, 19);
+    }
+
+    function renderStatus(data) {
+        var phaseEl    = document.getElementById('phaseLabel');
+        var percentEl  = document.getElementById('percentLabel');
+        var barEl      = document.getElementById('progressBar');
+        var msgEl      = document.getElementById('statusMsg');
+        var iconEl     = document.getElementById('statusIcon');
+        var eventsEl   = document.getElementById('eventList');
+
+        var total   = Number(data.phase_total || 5);
+        var current = Number(data.phase_index || 0);
+        var pct     = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
+
+        phaseEl.textContent   = data.phase   || 'Procesando...';
+        percentEl.textContent = pct + '%';
+        barEl.style.width     = pct + '%';
+        barEl.setAttribute('aria-valuenow', pct);
+        msgEl.textContent     = data.message || 'Procesando...';
+
+        var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+        if (data.status === 'error') {
+            barEl.classList.remove('bg-primary', 'bg-success', 'progress-bar-animated');
+            barEl.classList.add('bg-danger');
+            msgEl.className = 'alert alert-danger border small py-2 mb-3';
+            iconEl.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i>';
+            clearInterval(pollTimer);
+
+        } else if (data.status === 'ready') {
+            barEl.style.width = '100%';
+            barEl.classList.remove('bg-primary', 'bg-danger', 'progress-bar-animated');
+            barEl.classList.add('bg-success');
+            percentEl.textContent = '100%';
+            msgEl.className = 'alert alert-success border small py-2 mb-3';
+            msgEl.textContent = data.message + ' — Redirigiendo...';
+            iconEl.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
+            clearInterval(pollTimer);
+
+            // Redirigir al index
+            setTimeout(function () {
+                window.location.href = '/';
+            }, 600);
+
+        } else {
+            barEl.classList.remove('bg-success', 'bg-danger');
+            barEl.classList.add('bg-primary', 'progress-bar-animated');
+            iconEl.innerHTML = '<i class="fas fa-circle-notch fa-spin text-primary"></i>';
+            msgEl.className = 'alert alert-dark border border-secondary small py-2 mb-3';
+        }
+
+        // Renderizar eventos (más reciente primero)
+        var events = Array.isArray(data.events) ? data.events : [];
+        eventsEl.innerHTML = events.length > 0
+            ? events.slice().reverse().map(function (ev) {
+                var ts  = formatTs(ev.ts || '');
+                var ph  = ev.phase   || '';
+                var msg = ev.message || '';
+                return '<div class="event-row">'
+                    + '<span class="event-ts">' + ts + '</span>'
+                    + '<span class="event-phase">' + ph + '</span>'
+                    + '<span class="event-msg">' + msg + '</span>'
+                    + '</div>';
+            }).join('')
+            : '<div class="event-row"><span class="event-ts">--:--:--</span>'
+              + '<span class="event-phase">Esperando</span>'
+              + '<span class="event-msg text-muted">Iniciando thread de carga...</span></div>';
+    }
+
+    function poll() {
+        fetch('/cargando/status?t=' + Date.now())
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                renderStatus(data);
+            })
+            .catch(function () {
+                var msgEl = document.getElementById('statusMsg');
+                msgEl.className = 'alert alert-warning border small py-2 mb-3';
+                msgEl.textContent = 'No se pudo actualizar el estado. Reintentando...';
+            });
+    }
+
+    poll();
+    pollTimer = setInterval(poll, 1200);
+})();
+</script>
+</body>
+</html>

@@ -37,6 +37,8 @@ def setup_logging(app):
 
 def create_app(user_mode="admin"):
     app = Flask(__name__)
+    app.logger.info(f"create_app module file: {__file__}")
+    app.logger.info(f"create_app cwd: {os.getcwd()}")
     
     # Configuración básica
     app.config['SQLALCHEMY_DATABASE_URI'] = DB_URI 
@@ -48,19 +50,25 @@ def create_app(user_mode="admin"):
     setup_logging(app)
     db.init_app(app)
 
-    # 2. CARGA DE MÓDULOS DENTRO DEL CONTEXTO
+    # PASO 1: REGISTRAR BLUEPRINT PRIMERO (FUERA de app_context)
+    try:
+        from .routes.main_bp import main_bp 
+        app.register_blueprint(main_bp)
+        app.logger.info("✓ Blueprint main_bp registrado exitosamente")
+        cargando_rule = app.url_map._rules_by_endpoint.get('main.cargando', [])
+        app.logger.info(f"main.cargando rules after register: {[str(r) for r in cargando_rule]}")
+    except Exception as e:
+        app.logger.error(f"ERROR registrando blueprint: {e}")
+        sys.exit(1)
+
+    # PASO 2: OPERACIONES DE BASE DE DATOS (DENTRO de app_context)
     with app.app_context():
         try:
-            # Importamos aquí para romper el ciclo de importación
             from .database import Usuario 
             from .configuracion import cargar_y_asignar_configuracion
-            from .routes.main_bp import main_bp 
             
             db.create_all()
             
-            # Registramos rutas
-            app.register_blueprint(main_bp)
-
             # Cargamos la config del usuario (no crítico si BD no disponible aún)
             app.logger.info(f"Cargando parámetros para {user_mode}...")
             try:

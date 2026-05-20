@@ -11,6 +11,7 @@ import pandas as pd
 from .database import db, ResultadoBacktest, Trade
 
 logger = logging.getLogger(__name__)
+GRAPH_SNAPSHOT_PREFIX = "__GRAPH_SNAPSHOT_JSON__:"
 
 def _clean_value(val, default=0.0, dtype=float):
     """
@@ -28,7 +29,7 @@ def _clean_value(val, default=0.0, dtype=float):
     except (ValueError, TypeError):
         return dtype(default)
 
-def save_backtest_run(user_id, stats, config_dict, trades_df, grafico_html=None):
+def save_backtest_run(user_id, stats, config_dict, trades_df, grafico_html=None, graph_snapshot_payload=None):
     """
     Gestiona la persistencia de un backtest completo en PostgreSQL.
     Normaliza los datos de entrada para asegurar compatibilidad con el esquema.
@@ -43,6 +44,17 @@ def save_backtest_run(user_id, stats, config_dict, trades_df, grafico_html=None)
 
         # 2. Creación del registro maestro (Resultado)
         # Usamos nombres de columnas estándar de backtesting.py con limpieza integrada
+        stored_graph_blob = grafico_html
+        if graph_snapshot_payload:
+            try:
+                stored_graph_blob = GRAPH_SNAPSHOT_PREFIX + json.dumps(
+                    graph_snapshot_payload,
+                    ensure_ascii=False,
+                    separators=(',', ':'),
+                )
+            except Exception as snapshot_err:
+                logger.warning(f"⚠️ [DBStore] No se pudo serializar snapshot de gráfico: {snapshot_err}")
+
         nuevo_resultado = ResultadoBacktest(
             usuario_id=user_id,
             id_estrategia=_clean_value(config_dict.get('tanda_id'), 1, int),
@@ -69,7 +81,7 @@ def save_backtest_run(user_id, stats, config_dict, trades_df, grafico_html=None)
             comision=_clean_value(config_dict.get('COMMISSION', 0.0)),
             
             params_tecnicos=json.dumps(serializable_config),
-            grafico_html=grafico_html
+            grafico_html=stored_graph_blob
         )
 
         db.session.add(nuevo_resultado)

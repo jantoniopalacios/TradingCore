@@ -10,7 +10,6 @@ import sys
 import threading
 import time
 import json
-import gzip
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -48,25 +47,8 @@ from .estrategia_system import System
 # Configuración de Logger
 logger = logging.getLogger("Ejecucion")
 
-GRAPH_CACHE_BASE_DIR = BACKTESTING_BASE_DIR / 'Graphics' / 'cache'
 STORE_GRAPH_HTML_IN_DB = str(os.getenv('BACKTEST_STORE_GRAPH_HTML_IN_DB', '1')).strip().lower() in {'1', 'true', 'yes', 'on'}
-PREWARM_GRAPH_CACHE = str(os.getenv('BACKTEST_PREWARM_GRAPH_CACHE', '0')).strip().lower() in {'1', 'true', 'yes', 'on'}
-
-
-def _graph_cache_file_for_result(user_id: int, result_id: int, symbol: str) -> Path:
-    symbol_safe = ''.join(ch if ch.isalnum() or ch in ('-', '_', '+', '(', ')') else '-' for ch in str(symbol or 'N/A'))
-    while '--' in symbol_safe:
-        symbol_safe = symbol_safe.replace('--', '-')
-    symbol_safe = symbol_safe.strip('-_') or 'N-A'
-    return GRAPH_CACHE_BASE_DIR / f"user_{user_id}" / f"bt_{result_id}_{symbol_safe}.html"
-
-
-def _graph_snapshot_file_for_result(user_id: int, result_id: int, symbol: str) -> Path:
-    symbol_safe = ''.join(ch if ch.isalnum() or ch in ('-', '_', '+', '(', ')') else '-' for ch in str(symbol or 'N/A'))
-    while '--' in symbol_safe:
-        symbol_safe = symbol_safe.replace('--', '-')
-    symbol_safe = symbol_safe.strip('-_') or 'N-A'
-    return GRAPH_CACHE_BASE_DIR / f"user_{user_id}" / f"bt_{result_id}_{symbol_safe}_snapshot.json.gz"
+PREWARM_GRAPH_CACHE = False
 
 
 def _col_values(df: pd.DataFrame, candidates, default=None):
@@ -126,7 +108,16 @@ def _build_graph_snapshot_payload(symbol: str, intervalo: str, market_df: pd.Dat
         'volume': _to_num_list(_col_values(market_df, ['Volume', 'volume'], default=0.0)),
     }
 
-    equity_df = bt_results.get('_equity_curve') if bt_results is not None else None
+    if bt_results is None:
+        equity_df = None
+        trades_df = None
+    elif isinstance(bt_results, dict):
+        equity_df = bt_results.get('_equity_curve')
+        trades_df = bt_results.get('_trades')
+    else:
+        equity_df = getattr(bt_results, '_equity_curve', None)
+        trades_df = getattr(bt_results, '_trades', None)
+
     if isinstance(equity_df, pd.DataFrame) and not equity_df.empty:
         eq_index = list(equity_df.index)
         equity = {
@@ -137,7 +128,6 @@ def _build_graph_snapshot_payload(symbol: str, intervalo: str, market_df: pd.Dat
     else:
         equity = {'index': [], 'equity': [], 'drawdown_pct': []}
 
-    trades_df = bt_results.get('_trades') if bt_results is not None else None
     if isinstance(trades_df, pd.DataFrame) and not trades_df.empty:
         trades = {
             'entry_time': _to_iso_list(_col_values(trades_df, ['EntryTime', 'Entry Time'])),
@@ -167,12 +157,6 @@ def _build_graph_snapshot_payload(symbol: str, intervalo: str, market_df: pd.Dat
         'trades': trades,
     }
 
-
-def _write_graph_snapshot(user_id: int, result_id: int, symbol: str, payload: dict):
-    snapshot_file = _graph_snapshot_file_for_result(user_id, result_id, symbol)
-    snapshot_file.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(snapshot_file, 'wt', encoding='utf-8') as gz:
-        json.dump(payload, gz, ensure_ascii=False, separators=(',', ':'))
 
 # ----------------------------------------------------------------------
 
@@ -206,11 +190,17 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
         logger.info("✅ System sincronizado")
 
         # 3. Extraer rutas y parámetros
-        start_date = config_final.get('start_date') 
-        end_date = config_final.get('end_date')
+        start_date = config_final.get('start_date') or config_final.get('START_DATE')
+        end_date = config_final.get('end_date') or config_final.get('END_DATE')
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+            config_final['start_date'] = start_date
+            config_final['START_DATE'] = start_date
+            logger.info(f"ℹ️ start_date no definido; se usará por defecto: {start_date}")
         if not end_date:
             end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
             config_final['end_date'] = end_date
+            config_final['END_DATE'] = end_date
             logger.info(f"ℹ️ end_date no definido; se usará por defecto: {end_date}")
         intervalo = config_final.get('intervalo', '1d')
         filtro_fundamental = config_final.get('filtro_fundamental', False) 
@@ -345,35 +335,26 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
                         graph_html = diccionario_graficos_html.get(ticker) if PREWARM_GRAPH_CACHE else None
                         bt_result_for_symbol = backtest_objects.get(ticker)
                         market_df_for_symbol = stocks_data_dict.get(ticker, pd.DataFrame())
-                        result_id = save_backtest_run(
-                            user_id=current_user_id,
-                            stats=row.to_dict(),
-                            config_dict=config_final,
-                            trades_df=trades_df[trades_df['Symbol'] == ticker] if not trades_df.empty else None,
-                            grafico_html=graph_html if STORE_GRAPH_HTML_IN_DB else None
-                        )
-
-                        # Snapshot compacto para reconstruir graficos sin depender de HTML en BD.
-                        if result_id and bt_result_for_symbol is not None:
+                        snapshot_payload = None
+                        if bt_result_for_symbol is not None:
                             try:
-                                payload = _build_graph_snapshot_payload(
+                                snapshot_payload = _build_graph_snapshot_payload(
                                     symbol=ticker,
                                     intervalo=intervalo,
                                     market_df=market_df_for_symbol,
                                     bt_results=bt_result_for_symbol,
                                 )
-                                _write_graph_snapshot(current_user_id, result_id, ticker, payload)
                             except Exception as snapshot_err:
-                                logger.warning(f"⚠️  No se pudo guardar snapshot de gráfico para {ticker}: {snapshot_err}")
+                                logger.warning(f"⚠️  No se pudo construir snapshot de gráfico para {ticker}: {snapshot_err}")
 
-                        # Cache temporal en disco para visualizacion si hubo prewarm.
-                        if graph_html and result_id:
-                            try:
-                                cache_file = _graph_cache_file_for_result(current_user_id, result_id, ticker)
-                                cache_file.parent.mkdir(parents=True, exist_ok=True)
-                                cache_file.write_text(graph_html, encoding='utf-8')
-                            except Exception as cache_err:
-                                logger.warning(f"⚠️  No se pudo escribir cache de gráfico para {ticker}: {cache_err}")
+                        result_id = save_backtest_run(
+                            user_id=current_user_id,
+                            stats=row.to_dict(),
+                            config_dict=config_final,
+                            trades_df=trades_df[trades_df['Symbol'] == ticker] if not trades_df.empty else None,
+                            grafico_html=graph_html if STORE_GRAPH_HTML_IN_DB else None,
+                            graph_snapshot_payload=snapshot_payload,
+                        )
 
                         saved_count += 1
                     except Exception as e:
