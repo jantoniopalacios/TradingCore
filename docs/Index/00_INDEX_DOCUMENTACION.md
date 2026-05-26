@@ -1,54 +1,26 @@
 # Índice de Documentación - Proyecto TradingCore
 
-Este índice lista la documentación canonicalizada dentro de `docs/`.
+Este índice lista la documentación activa dentro de `docs/`.
 
-## Documentación Principal
+## Arquitectura y Referencia
 
-- [ARCHITECTURE.md](../ARCHITECTURE.md)
-- [FLUJO_ARQUITECTURA_MEJORADO.md](../Architecture/FLUJO_ARQUITECTURA_MEJORADO.md)
-- [README.md](../README.md)
-- [CONVENCIONES_DOCUMENTACION.md](./CONVENCIONES_DOCUMENTACION.md)
+- [README.md](../README.md) — Estructura del proyecto y inicio rápido
+- [ARCHITECTURE.md](../ARCHITECTURE.md) — Arquitectura canónica: módulos, flujo, contratos, modelo de datos
 
-## Guías y Quickstarts
+## Guías Operativas
 
-- [GUIDE_TEST_NKE.md](../Guides/GUIDE_TEST_NKE.md)
-- [QUICK_START_BACKTEST_WEB.md](../Guides/QUICK_START_BACKTEST_WEB.md)
-- [GUIA_COMBINACION_INDICADORES.md](../Guides/GUIA_COMBINACION_INDICADORES.md)
-- [GUIA_TRAILING_STOP_RSI.md](../Guia/GUIA_TRAILING_STOP_RSI.md)
+- [QUICK_START_BACKTEST_WEB.md](../Guides/QUICK_START_BACKTEST_WEB.md) — Validación rápida del flujo web completo
+- [GUIDE_TEST_NKE.md](../Guides/GUIDE_TEST_NKE.md) — Backtest de referencia con NKE
+- [GUIA_COMBINACION_INDICADORES.md](../Guides/GUIA_COMBINACION_INDICADORES.md) — Combinaciones recomendadas de indicadores y calibración ATR
+- [GUIA_STOPS_Y_PROTECCION.md](../Guides/GUIA_STOPS_Y_PROTECCION.md) — Stops, trailing stop RSI y protección de capital
 
-## Referencia API
+## Referencia API (MkDocs)
 
-- [motor_core.md](../api/motor_core.md)
-- [motor_indicators.md](../api/motor_indicators.md)
-- [motor_utils.md](../api/motor_utils.md)
+- [motor_core.md](../api/motor_core.md) — API del núcleo de trading
+- [motor_indicators.md](../api/motor_indicators.md) — API de indicadores técnicos
+- [motor_utils.md](../api/motor_utils.md) — API de utilidades del motor
 
-## Diagnóstico
+## Meta-documentación
 
-- [DIAGNOSTICO_BACKTEST_WEB.md](../Diagnosis/DIAGNOSTICO_BACKTEST_WEB.md)
-- [DIAGNOSTICO_FILTRO_RSI_BROKEN.md](../Diagnosis/DIAGNOSTICO_FILTRO_RSI_BROKEN.md)
-- [DIAGNOSTICO_FILTRO_ATR_VOLATILIDAD.md](../Diagnosis/DIAGNOSTICO_FILTRO_ATR_VOLATILIDAD.md)
+- [CONVENCIONES_DOCUMENTACION.md](./CONVENCIONES_DOCUMENTACION.md) — Formato y convenciones para mantener este directorio
 
-## Fixes
-
-- [FIX_EMA_DESCENDENTE_VENTA.md](../Fixes/FIX_EMA_DESCENDENTE_VENTA.md)
-
-## Históricos
-
-- [RESUMEN_FINAL_VISUAL.md](../Summaries/RESUMEN_FINAL_VISUAL.md)
-- [ESTADO_PROYECTO_TRADINGCORE.md](../Plans/ESTADO_PROYECTO_TRADINGCORE.md)
-- [Registro_Cambios_2026-02-23.md](../Registro_Cambios_2026-02-23.md)
-
-## Planes
-
-- [PLAN_VALIDACION_BACKTESTS.md](../Plans/PLAN_VALIDACION_BACKTESTS.md)
-- [PLAN_VALIDACION_INTEGRAL_PROYECTO.md](../Plans/PLAN_VALIDACION_INTEGRAL_PROYECTO.md)
-- [PLAN_PROTECCION_CAPITAL_INICIAL.md](../Plans/PLAN_PROTECCION_CAPITAL_INICIAL.md)
-
-## Estado
-
-- `docs/ARCHITECTURE.md` es la referencia canónica de arquitectura actual.
-- Archivos en `Diagnosis/`, `Fixes/`, `Summaries/` y `Plans/` pueden describir estados puntuales de febrero 2026.
-
----
-
-Si no encuentras un archivo listado aquí, busca por nombre en `docs/`.

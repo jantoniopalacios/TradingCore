@@ -63,7 +63,46 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 `scenarios/BacktestWeb/DBStore.py`
 - Persistencia transaccional de resultados y trades (`save_backtest_run`).
 
-## 3. Flujo End-to-End
+## 3. Fases de ejecución (orquestador)
+
+`ejecutar_backtest()` reporta el progreso en 11 fases mediante `progress_callback`:
+
+```
+[1/11] Configuracion
+[2/11] System
+[3/11] Base de datos
+[4/11] Datos de mercado
+[5/11] Fundamentales (opcional)
+[6/11] Filtros
+[7/11] Motor
+[8/11] Graficos
+[9/11] Persistencia SQL
+[10/11] Cierre
+[11/11] Notificacion
+```
+
+## 4. Contratos entre módulos
+
+Contrato de decisión en cada vela:
+
+1. `System.next()`
+2. Si hay posición: `manage_existing_position(self)`
+3. Si no hay posición: `check_buy_signal(self)`
+
+Contrato de indicadores:
+
+- `update_*_state()` actualiza flags `*_STATE`.
+- `check_*_buy_signal()` y `check_*_sell_signal()` retornan señal + motivo.
+- `apply_*_filter()` aplica veto/permiso global cuando corresponde.
+
+Contrato de la capa HTTP (`main_bp.py`):
+
+- Expone `GET /backtest_status` para polling de progreso desde la UI.
+- Gestiona estado de ejecución en memoria por usuario (`queued`, `running`, `completed`, `error`).
+- En guardado de configuración, devuelve JSON cuando el request es AJAX (`X-Requested-With: XMLHttpRequest`).
+- El visor web de ficheros restringe lectura a rutas controladas (`logs/`, `docs/`) y evita path traversal fuera de esas raíces.
+
+## 5. Flujo End-to-End
 
 1. El usuario guarda parámetros en la web.
 2. Se persiste configuración en `usuarios.config_actual` (JSON), excepto parámetros operativos no persistentes (por ejemplo `end_date`).
@@ -81,10 +120,10 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 Notas de UX del formulario:
 
 - Navegar entre sub-pestañas de `Configuracion` no persiste automáticamente en base de datos.
-- `Guardar Config` es la acción explícita de persistencia de parámetros.
+- `Guardar Config` es la acción explícita de persistencia de parámetros (ejecutada por AJAX, sin recarga de página).
 - Los cambios no guardados permanecen en memoria del formulario mientras no exista recarga de página.
 
-## 4. Patrón de Decisión de Señales
+## 6. Patrón de Decisión de Señales
 
 En cada vela:
 
@@ -94,7 +133,7 @@ En cada vela:
 4. Si cumple, ejecuta compra y registra trazabilidad (`technical_reasons`).
 5. Si hay posición, evalúa cierres técnicos OR y luego trailing/stop.
 
-## 5. Modelo de Datos (PostgreSQL)
+## 7. Modelo de Datos (PostgreSQL)
 
 `usuarios`
 - Credenciales y `config_actual` JSON.
@@ -109,7 +148,15 @@ En cada vela:
 `trades`
 - Registro detallado de operaciones (entrada/salida/PnL).
 
-## 6. Reglas de Extensión
+## 8. Persistencia y trazabilidad
+
+- `end_date`: parámetro operativo no persistente en `config_actual`; se define por defecto como `ayer` y puede sobreescribirse por ejecución.
+- Logging estructurado del ciclo completo en `logs/`.
+- Motivos técnicos consolidados en los registros de trade (`technical_reasons`).
+- Estado operativo visible en la UI durante la ejecución (fase actual, mensaje y eventos recientes).
+- Estado de pestañas (`activeTabKey` y `activeSubTabKey`) persistido en `localStorage` para mantener contexto visual entre recargas.
+
+## 9. Reglas de Extensión
 
 Para añadir un nuevo indicador o filtro:
 
