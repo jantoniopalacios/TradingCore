@@ -154,7 +154,7 @@ function ejecutarLimpiezaDatos() {
                 
                 <td class="text-center">
                     {% if datos.ultima_operacion_tipo and datos.ultima_operacion_tipo != '-' %}
-                        <span class="badge {{ 'bg-success' if datos.ultima_operacion_tipo == 'COMPRA' else 'bg-danger' }}">
+                        <span class="badge {{ 'bg-success' if datos.ultima_operacion_tipo == 'Dentro' else 'bg-secondary' }}">
                             {{ datos.ultima_operacion_tipo }}
                         </span>
                     {% else %}
@@ -193,12 +193,21 @@ function ejecutarLimpiezaDatos() {
                                     <th>SHARPE</th>
                                     <th>MAX DD</th>
                                     <th>WIN RATE</th>
-                                    <th>ÚLTIMA OP.</th>
-                                    <th>TIPO</th>
+                                    <th>ÚLTIMO CAMBIO</th>
+                                    <th>ESTADO</th>
                                     <th>OPERACIONES / GRÁFICO</th>
                                 </tr>
                             </thead>
                             <tbody>
+                                {% if datos.diagnostico_lote %}
+                                <tr>
+                                    <td colspan="8">
+                                        <div class="alert alert-warning py-2 px-3 mb-2 small">
+                                            <strong>Activos omitidos en la ejecución:</strong> {{ datos.diagnostico_lote }}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endif %}
                                 {% for r in datos.activos %}
                                 <tr>
                                     <td class="fw-bold text-primary">{{ r.symbol }}</td>
@@ -224,7 +233,7 @@ function ejecutarLimpiezaDatos() {
                                     </td>
                                     <td class="text-center">
                                         {% if r.ultima_operacion_tipo and r.ultima_operacion_tipo != '-' %}
-                                            <span class="badge {{ 'bg-success' if r.ultima_operacion_tipo == 'COMPRA' else 'bg-danger' }}">
+                                            <span class="badge {{ 'bg-success' if r.ultima_operacion_tipo == 'Dentro' else 'bg-secondary' }}">
                                                 {{ r.ultima_operacion_tipo }}
                                             </span>
                                         {% else %}

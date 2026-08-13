@@ -10,6 +10,7 @@ simplificada para los datos OHLCV, guardando la totalidad de la historia solicit
 
 import os
 import re
+import shutil
 import pandas as pd
 from datetime import datetime
 import time 
@@ -34,6 +35,50 @@ except ImportError:
 from trading_engine.core.database_pg import engine_pg
 
 logger = logging.getLogger(__name__)
+
+
+def _load_cached_ohlcv(csv_path: Path) -> pd.DataFrame:
+    data = pd.read_csv(csv_path, index_col='Date', parse_dates=True)
+    data.index = pd.to_datetime(data.index)
+    if hasattr(data.index, 'tz') and data.index.tz is not None:
+        data.index = data.index.tz_localize(None)
+    return data
+
+
+def _normalize_downloaded_ohlcv(data: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    normalized = data.copy()
+    normalized.index.name = 'Date'
+    if hasattr(normalized.index, 'tz') and normalized.index.tz is not None:
+        normalized.index = normalized.index.tz_localize(None)
+    normalized["Symbol"] = symbol
+    return normalized
+
+
+def _is_degraded_download(
+    downloaded_data: pd.DataFrame,
+    cached_data: pd.DataFrame,
+    start_dt: datetime,
+) -> tuple[bool, str]:
+    if cached_data.empty or downloaded_data.empty:
+        return False, ""
+
+    cached_rows = len(cached_data)
+    downloaded_rows = len(downloaded_data)
+    cached_min = cached_data.index.min()
+    downloaded_min = downloaded_data.index.min()
+
+    if cached_min <= start_dt and downloaded_min > start_dt:
+        return True, (
+            f"la descarga empieza en {downloaded_min:%Y-%m-%d} y la caché previa cubría "
+            f"desde {cached_min:%Y-%m-%d}"
+        )
+
+    if cached_rows >= 50 and downloaded_rows < max(20, int(cached_rows * 0.25)):
+        return True, (
+            f"la descarga solo trae {downloaded_rows} velas frente a {cached_rows} en la caché previa"
+        )
+
+    return False, ""
 
 
 # --------------------------------------------------------------------------------
@@ -82,6 +127,7 @@ def descargar_datos_YF(
     logger.info(f"Usando directorio de caché OHLCV: {data_dir}")
 
     all_data = pd.DataFrame()
+    download_diagnostics = []
     
     start_dt = datetime.strptime(start_date, '%Y-%m-%d')
     end_dt = datetime.strptime(end_date, '%Y-%m-%d')
@@ -99,11 +145,14 @@ def descargar_datos_YF(
         # 🎯 CAMBIO CLAVE 1: Nombre de archivo MAX
         csv_file_name_max = f"{symbol}_{intervalo}_MAX.csv"
         csv_file_path_max = data_dir / csv_file_name_max
+        csv_file_path_backup = data_dir / f"{symbol}_{intervalo}_MAX.prev.csv"
 
         logger.info(f"--- Verificando caché para {symbol} ---")
 
         data_to_use = pd.DataFrame()
         needs_download = True
+        cached_data = pd.DataFrame()
+        source_used = "none"
         
         # 1. Verificar si el archivo MAX existe y si está fresco (fecha de modificación = hoy)
         if csv_file_path_max.exists():
@@ -115,14 +164,22 @@ def descargar_datos_YF(
                 needs_download = False
                 
                 try:
-                    data_to_use = pd.read_csv(csv_file_path_max, index_col='Date', parse_dates=True)
-                    data_to_use.index = pd.to_datetime(data_to_use.index)
-                    # Normalizar timezone en carga desde caché (por si fue guardado con tz)
-                    if hasattr(data_to_use.index, 'tz') and data_to_use.index.tz is not None:
-                        data_to_use.index = data_to_use.index.tz_localize(None)
+                    cached_data = _load_cached_ohlcv(csv_file_path_max)
+                    if not cached_data.empty and csv_file_path_backup.exists():
+                        try:
+                            backup_data = _load_cached_ohlcv(csv_file_path_backup)
+                            degraded_cache, _ = _is_degraded_download(cached_data, backup_data, start_dt)
+                            if degraded_cache:
+                                logger.warning(f"↩️ La caché principal de {symbol} parece truncada; se reutiliza el respaldo previo.")
+                                cached_data = backup_data
+                        except Exception as backup_err:
+                            logger.warning(f"No se pudo validar el respaldo de caché para {symbol}: {backup_err}")
+                    data_to_use = cached_data.copy()
                     if data_to_use.empty:
                         logger.warning(f"La caché MAX de {symbol} está vacía. Forzando descarga.")
                         needs_download = True
+                    else:
+                        source_used = "cache_fresh"
                 except Exception as e:
                     logger.error(f"Error al leer la caché MAX ({csv_file_name_max}): {e}. Forzando descarga.")
                     needs_download = True
@@ -130,6 +187,19 @@ def descargar_datos_YF(
                 # El archivo existe pero no es de hoy
                 logger.info(f"1. Caché MAX encontrada, pero está **obsoleta** (Modificación: {mod_date_str}).")
                 needs_download = True
+                try:
+                    cached_data = _load_cached_ohlcv(csv_file_path_max)
+                    if not cached_data.empty and csv_file_path_backup.exists():
+                        try:
+                            backup_data = _load_cached_ohlcv(csv_file_path_backup)
+                            degraded_cache, _ = _is_degraded_download(cached_data, backup_data, start_dt)
+                            if degraded_cache:
+                                logger.warning(f"↩️ La caché obsoleta de {symbol} parece truncada; se reutiliza el respaldo previo.")
+                                cached_data = backup_data
+                        except Exception as backup_err:
+                            logger.warning(f"No se pudo validar el respaldo de caché para {symbol}: {backup_err}")
+                except Exception as e:
+                    logger.warning(f"No se pudo leer la caché obsoleta de {symbol}: {e}")
         else:
             logger.info(f"1. Archivo de caché MAX no encontrado: {csv_file_name_max}.")
             needs_download = True
@@ -146,7 +216,7 @@ def descargar_datos_YF(
             # 🎯 CAMBIO CLAVE 2: Usar period='max' para obtener el historial completo
             logger.info(f"2. Descargando historial (period='{period_to_use}') para {symbol}...")
             try:
-                data = yf.download(
+                downloaded_data = yf.download(
                     symbol,
                     period=period_to_use,
                     interval=intervalo,
@@ -154,24 +224,68 @@ def descargar_datos_YF(
                     rounding=4,
                 )
 
-                if data.empty:
+                if downloaded_data.empty:
                     logger.warning(f"Advertencia: No se encontraron datos para {symbol}.")
-                    continue
-
-                data.index.name = 'Date'
-                # Normalizar timezone: yfinance devuelve tz-aware para intradiarios
-                if hasattr(data.index, 'tz') and data.index.tz is not None:
-                    data.index = data.index.tz_localize(None)
-                data["Symbol"] = symbol
-                
-                # Guardar datos en un CSV (Sobrescribe o crea el archivo MAX)
-                data.to_csv(csv_file_path_max)
-                logger.info(f"3. Descarga COMPLETA guardada/actualizada en {csv_file_path_max}")
-                data_to_use = data
+                    if not cached_data.empty:
+                        logger.warning(f"↩️ Se reutiliza la caché previa de {symbol} al no recibirse datos nuevos.")
+                        data_to_use = cached_data.copy()
+                        source_used = "cache_fallback_empty_download"
+                    elif csv_file_path_backup.exists():
+                        try:
+                            data_to_use = _load_cached_ohlcv(csv_file_path_backup)
+                            source_used = "backup_fallback_empty_download"
+                            logger.warning(f"↩️ Se reutiliza la copia de respaldo para {symbol}.")
+                        except Exception as backup_err:
+                            logger.warning(f"No se pudo leer el respaldo de {symbol}: {backup_err}")
+                    if data_to_use.empty:
+                        download_diagnostics.append({
+                            "symbol": symbol,
+                            "source": "download_empty",
+                            "status": "no_data",
+                            "candle_count": 0,
+                        })
+                        continue
+                else:
+                    downloaded_data = _normalize_downloaded_ohlcv(downloaded_data, symbol)
+                    degraded, degraded_reason = _is_degraded_download(downloaded_data, cached_data, start_dt)
+                    if degraded and not cached_data.empty:
+                        logger.warning(
+                            f"⚠️ Descarga degradada para {symbol}; se conserva la caché previa porque {degraded_reason}."
+                        )
+                        data_to_use = cached_data.copy()
+                        source_used = "cache_fallback_degraded_download"
+                    else:
+                        if csv_file_path_max.exists() and not cached_data.empty:
+                            try:
+                                shutil.copy2(csv_file_path_max, csv_file_path_backup)
+                            except OSError as backup_copy_err:
+                                logger.warning(f"No se pudo actualizar el respaldo de caché para {symbol}: {backup_copy_err}")
+                        downloaded_data.to_csv(csv_file_path_max)
+                        logger.info(f"3. Descarga COMPLETA guardada/actualizada en {csv_file_path_max}")
+                        data_to_use = downloaded_data
+                        source_used = "download_fresh"
 
             except Exception as e:
                 logger.error(f"Error al descargar datos para {symbol}: {e}")
-                continue
+                if not cached_data.empty:
+                    logger.warning(f"↩️ Se reutiliza la caché previa de {symbol} tras el fallo de descarga.")
+                    data_to_use = cached_data.copy()
+                    source_used = "cache_fallback_download_error"
+                elif csv_file_path_backup.exists():
+                    try:
+                        data_to_use = _load_cached_ohlcv(csv_file_path_backup)
+                        source_used = "backup_fallback_download_error"
+                        logger.warning(f"↩️ Se reutiliza la copia de respaldo para {symbol}.")
+                    except Exception as backup_err:
+                        logger.warning(f"No se pudo leer el respaldo de {symbol}: {backup_err}")
+                if data_to_use.empty:
+                    download_diagnostics.append({
+                        "symbol": symbol,
+                        "source": "download_error",
+                        "status": "error",
+                        "candle_count": 0,
+                    })
+                    continue
         
         # 4. Recorte Final y Consolidación
         #    Incluye ventana de warm-up para que los indicadores estén estabilizados
@@ -185,6 +299,12 @@ def descargar_datos_YF(
                     f"Advertencia: No hay datos en el rango [{start_date} - {end_date}]. "
                     f"Saltando {symbol}."
                 )
+                download_diagnostics.append({
+                    "symbol": symbol,
+                    "source": source_used,
+                    "status": "out_of_range",
+                    "candle_count": 0,
+                })
                 continue
             
             # Asegurar que solo se incluyan las columnas estándar antes de consolidar
@@ -194,8 +314,17 @@ def descargar_datos_YF(
                  logger.warning(f"Fallo al filtrar columnas estándar para {symbol}: {e}")
 
             all_data = pd.concat([all_data, final_data], axis=0)
+            download_diagnostics.append({
+                "symbol": symbol,
+                "source": source_used,
+                "status": "ok",
+                "candle_count": len(final_data),
+                "range_start": final_data.index.min().strftime('%Y-%m-%d'),
+                "range_end": final_data.index.max().strftime('%Y-%m-%d'),
+            })
 
     logger.info("Descarga y gestión de caché OHLCV completada.")
+    all_data.attrs['download_diagnostics'] = download_diagnostics
     return all_data
 
 # --------------------------------------------------------------------------------

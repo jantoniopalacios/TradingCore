@@ -32,7 +32,7 @@ from ..configuracion import (
     cargar_y_asignar_configuracion, System, BACKTESTING_BASE_DIR, PROJECT_ROOT
 ) 
 from trading_engine.core.constants import VARIABLE_COMMENTS
-from ..Backtest import ejecutar_backtest 
+from ..Backtest import ejecutar_backtest, format_position_state
 
 from ..database import db, ResultadoBacktest, Trade, Usuario, Simbolo # Importa tus modelos
 from sqlalchemy import func
@@ -926,6 +926,7 @@ def index():
                     'fecha': r.fecha_ejecucion.strftime('%Y-%m-%d %H:%M'),
                     'usuario_nombre': r.propietario.username,
                     'titulo_estrategia': _build_strategy_short_title(r),
+                    'diagnostico_lote': r.notas,
                     'activos': []
                 }
             registros_agrupados[tanda_key]['activos'].append(r)
@@ -936,7 +937,7 @@ def index():
                 last_trade = all_trades_dict.get(backtest.id)
                 if last_trade:
                     backtest.ultima_operacion_fecha = last_trade.fecha
-                    backtest.ultima_operacion_tipo = last_trade.tipo
+                    backtest.ultima_operacion_tipo = format_position_state(last_trade.tipo)
                 else:
                     backtest.ultima_operacion_fecha = '-'
                     backtest.ultima_operacion_tipo = '-'
@@ -1074,11 +1075,15 @@ def run_backtest_and_save(app_instance, config_web, user_mode):
             db.session.remove()
             
             # 2. Validar resultados
+            skipped_count = int((resultados_df.attrs.get('skipped_symbols_count', 0) if resultados_df is not None else 0) or 0)
             if resultados_df is not None and not resultados_df.empty:
+                completion_message = f"Backtest finalizado. {len(resultados_df)} resultados guardados."
+                if skipped_count:
+                    completion_message += f" {skipped_count} activos omitidos por falta de datos suficientes o válidos."
                 _finish_backtest_status(
                     user_mode=user_mode,
                     status='completed',
-                    message=f"Backtest finalizado. {len(resultados_df)} resultados guardados.",
+                    message=completion_message,
                     result_count=len(resultados_df)
                 )
                 logger.info(f"✅ ÉXITO | {len(resultados_df)} resultados procesados")
@@ -1086,10 +1091,13 @@ def run_backtest_and_save(app_instance, config_web, user_mode):
                 logger.info(f"{'='*70}\n")
                 print(f"✅ Backtest finalizado para {user_mode}. {len(resultados_df)} resultados guardados.")
             else:
+                completion_message = 'Backtest finalizado sin resultados para guardar.'
+                if skipped_count:
+                    completion_message += f" {skipped_count} activos omitidos por falta de datos suficientes o válidos."
                 _finish_backtest_status(
                     user_mode=user_mode,
                     status='completed',
-                    message='Backtest finalizado sin resultados para guardar.',
+                    message=completion_message,
                     result_count=0
                 )
                 logger.warning(f"⚠️  ADVERTENCIA | El backtest no generó resultados")

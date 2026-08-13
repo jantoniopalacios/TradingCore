@@ -104,6 +104,7 @@ def run_multi_symbol_backtest(
     
     resultados_finales = []
     all_trades = []
+    symbol_diagnostics = []
     # Almacena los objetos Backtest (bt) por símbolo
     backtest_objects = {} 
     
@@ -124,6 +125,13 @@ def run_multi_symbol_backtest(
         data_for_symbol = stocks_data.get(symbol)
         if data_for_symbol is None:
             logger.warning(f"Símbolo {symbol}: Datos no encontrados. Saltando.")
+            symbol_diagnostics.append({
+                "symbol": symbol,
+                "status": "missing_market_data",
+                "message": "Sin datos de mercado descargados para el símbolo.",
+                "required_period": required_period,
+                "candle_count": 0,
+            })
             continue
 
         # Selecciona columnas según si el filtro fundamental está activo
@@ -135,9 +143,17 @@ def run_multi_symbol_backtest(
         # Solo filtra columnas que existan en el DataFrame
         cols_present = [col for col in required_cols if col in data_for_symbol.columns]
         data_clean = data_for_symbol[cols_present].copy().dropna()
+        candle_count = len(data_clean)
 
-        if data_clean.empty or len(data_clean) < required_period:
-            logger.warning(f"Símbolo {symbol}: Datos insuficientes después de limpieza ({len(data_clean)} velas). Mínimo requerido: {required_period}. Saltando.")
+        if data_clean.empty or candle_count < required_period:
+            logger.warning(f"Símbolo {symbol}: Datos insuficientes después de limpieza ({candle_count} velas). Mínimo requerido: {required_period}. Saltando.")
+            symbol_diagnostics.append({
+                "symbol": symbol,
+                "status": "insufficient_data",
+                "message": f"Datos insuficientes tras limpieza: {candle_count} velas (mínimo {required_period}).",
+                "required_period": required_period,
+                "candle_count": candle_count,
+            })
             continue
 
         # 2. Ejecutar backtest para el símbolo
@@ -153,11 +169,27 @@ def run_multi_symbol_backtest(
             )
         except Exception as e:
             logger.exception(f"Error CRÍTICO durante la ejecución del backtest para {symbol}")
+            symbol_diagnostics.append({
+                "symbol": symbol,
+                "status": "backtest_error",
+                "message": f"{type(e).__name__}: {e}",
+                "required_period": required_period,
+                "candle_count": candle_count,
+            })
             continue
 
         # 3. Recolección de resultados
         all_trades.extend(trades_log) 
         backtest_objects[symbol] = bt_obj
+        symbol_diagnostics.append({
+            "symbol": symbol,
+            "status": "processed",
+            "message": f"Procesado correctamente con {int(stats_dict.get('# Trades', 0))} operaciones.",
+            "required_period": required_period,
+            "candle_count": candle_count,
+            "total_trades": int(stats_dict.get("# Trades", 0)),
+            "return_pct": round(float(stats_dict.get("Return [%]") if pd.notna(stats_dict.get("Return [%]")) else 0.0), 2),
+        })
         
         # Recolección de estadísticas resumidas con protección contra pd.NA
         resultados_finales.append({
@@ -178,5 +210,12 @@ def run_multi_symbol_backtest(
         trades_df = trades_df.sort_values('Fecha').reset_index(drop=True)
     elif not trades_df.empty and 'Entry Time' in trades_df.columns:
         trades_df = trades_df.sort_values('Entry Time').reset_index(drop=True)
+
+    processed_count = len([d for d in symbol_diagnostics if d.get('status') == 'processed'])
+    skipped_count = len(symbol_diagnostics) - processed_count
+    resultados_df.attrs['symbol_diagnostics'] = symbol_diagnostics
+    resultados_df.attrs['processed_symbols_count'] = processed_count
+    resultados_df.attrs['skipped_symbols_count'] = skipped_count
+    trades_df.attrs['symbol_diagnostics'] = symbol_diagnostics
     
     return resultados_df, trades_df, backtest_objects

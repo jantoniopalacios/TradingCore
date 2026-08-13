@@ -51,6 +51,42 @@ STORE_GRAPH_HTML_IN_DB = str(os.getenv('BACKTEST_STORE_GRAPH_HTML_IN_DB', '1')).
 PREWARM_GRAPH_CACHE = False
 
 
+def format_position_state(raw_value):
+    value = str(raw_value or '').strip().lower()
+    if value in {'compra', 'buy'} or 'compra' in value or 'buy' in value:
+        return 'Dentro'
+    if value in {'venta', 'sell'} or 'venta' in value or 'sell' in value:
+        return 'Fuera'
+    if value in {'', '-', 'none', 'nan'}:
+        return '-'
+    return str(raw_value)
+
+
+def summarize_symbol_diagnostics(symbol_diagnostics):
+    diagnostics = symbol_diagnostics if isinstance(symbol_diagnostics, list) else []
+    requested_count = len(diagnostics)
+    processed = [item for item in diagnostics if item.get('status') == 'processed']
+    skipped = [item for item in diagnostics if item.get('status') != 'processed']
+
+    skipped_items = []
+    for item in skipped:
+        symbol = item.get('symbol', 'N/A')
+        message = str(item.get('message') or item.get('status') or 'Sin detalle').strip()
+        skipped_items.append(f"{symbol} ({message})")
+
+    summary_text = '; '.join(skipped_items)
+    if len(summary_text) > 800:
+        summary_text = summary_text[:797].rstrip(' ;') + '...'
+
+    return {
+        'requested_count': requested_count,
+        'processed_count': len(processed),
+        'skipped_count': len(skipped),
+        'skipped_items': skipped_items,
+        'summary_text': summary_text,
+    }
+
+
 def _col_values(df: pd.DataFrame, candidates, default=None):
     for c in candidates:
         if c in df.columns:
@@ -292,10 +328,24 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
         resultados_df, trades_df, backtest_objects = run_multi_symbol_backtest(
             stocks_data_dict, System, config_final, simbolos_a_procesar, 20, logger
         )
+        symbol_diagnostics = resultados_df.attrs.get('symbol_diagnostics', []) if resultados_df is not None else []
+        diagnostics_summary = summarize_symbol_diagnostics(symbol_diagnostics)
+        if diagnostics_summary['skipped_count']:
+            logger.warning(
+                "⚠️ %s de %s activos omitidos: %s",
+                diagnostics_summary['skipped_count'],
+                diagnostics_summary['requested_count'],
+                diagnostics_summary['summary_text'],
+            )
         
         if resultados_df is None or resultados_df.empty:
             logger.warning("⚠️  El motor de backtest no retornó resultados")
-            return None, None, {}
+            if resultados_df is None:
+                resultados_df = pd.DataFrame()
+            resultados_df.attrs['symbol_diagnostics'] = symbol_diagnostics
+            resultados_df.attrs['processed_symbols_count'] = diagnostics_summary['processed_count']
+            resultados_df.attrs['skipped_symbols_count'] = diagnostics_summary['skipped_count']
+            return resultados_df, trades_df, {}
         
         logger.info(f"✅ Backtest completado: {len(resultados_df)} resultados")
 
@@ -329,6 +379,7 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
             try:
                 current_user_id = config_dict.get('user_id', u_actual.id)
                 saved_count = 0
+                batch_notes = diagnostics_summary['summary_text'] if diagnostics_summary['skipped_count'] else None
                 for _, row in resultados_df.iterrows():
                     ticker = row.get('Symbol', 'UNKNOWN')
                     try:
@@ -354,6 +405,7 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
                             trades_df=trades_df[trades_df['Symbol'] == ticker] if not trades_df.empty else None,
                             grafico_html=graph_html if STORE_GRAPH_HTML_IN_DB else None,
                             graph_snapshot_payload=snapshot_payload,
+                            notes=batch_notes,
                         )
 
                         saved_count += 1
@@ -372,20 +424,19 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
         _progress(10, 11, 'Cierre', f'Ciclo principal completado en {elapsed:.2f}s')
         logger.info(f"✨ Ciclo completado exitosamente en {elapsed:.2f}s")
 
-        # --- ENVÍO DE MAIL DE RECOMENDACIONES SI ESTÁ ACTIVADO ---
+        # --- ENVÍO DE MAIL DE ESTADO SI ESTÁ ACTIVADO ---
         enviar_mail = config_final.get('enviar_mail', False)
         destinatario_email = config_final.get('destinatario_email', None)
         usuario_nombre = user_mode
         if enviar_mail and destinatario_email:
-            _progress(11, 11, 'Notificacion', 'Enviando email de recomendaciones')
+            _progress(11, 11, 'Notificacion', 'Enviando email de estado')
             try:
-                # Construir tabla de recomendaciones SOLO para activos procesados
+                # Construir tabla de estado SOLO para activos procesados
                 activos_procesados = resultados_df['Symbol'].tolist() if resultados_df is not None else []
-                # Recomendación: última operación realizada por el backtest para cada activo
-                recomendaciones = []
+                estados = []
                 for symbol in activos_procesados:
                     trades_symbol = trades_df[trades_df['Symbol'] == symbol] if not trades_df.empty else None
-                    reco = 'Sin operaciones'
+                    estado = 'Sin cambios'
                     fecha_op = ''
                     if trades_symbol is not None and not trades_symbol.empty:
                         # Buscar la última operación (por fecha de cierre si existe, si no por fecha de entrada)
@@ -403,60 +454,55 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
                             fecha_op = ''
                         # Determinar tipo de última operación
                         if 'Tipo' in last_trade:
-                            tipo = str(last_trade['Tipo']).strip().lower()
-                            if tipo == 'compra':
-                                reco = 'Compra'
-                            elif tipo == 'venta':
-                                reco = 'Venta'
-                            else:
-                                reco = str(last_trade['Tipo'])
+                            estado = format_position_state(last_trade['Tipo'])
                         elif 'Side' in last_trade:
-                            if last_trade['Side'] == 'buy':
-                                reco = 'Compra'
-                            elif last_trade['Side'] == 'sell':
-                                reco = 'Venta'
-                            else:
-                                reco = str(last_trade['Side'])
+                            estado = format_position_state(last_trade['Side'])
                         elif 'Operacion' in last_trade:
-                            op = str(last_trade['Operacion']).lower()
-                            if 'compra' in op:
-                                reco = 'Compra'
-                            elif 'venta' in op:
-                                reco = 'Venta'
-                            else:
-                                reco = str(last_trade['Operacion'])
+                            estado = format_position_state(last_trade['Operacion'])
                         else:
-                            reco = 'Operación'
-                    recomendaciones.append((symbol, reco, fecha_op))
+                            estado = 'Cambio'
+                    estados.append((symbol, estado, fecha_op))
                 # Ordenar por fecha_op descendente (más reciente primero)
                 def parse_fecha(fecha):
                     try:
                         return pd.to_datetime(fecha)
                     except Exception:
                         return pd.NaT
-                recomendaciones.sort(key=lambda x: parse_fecha(x[2]), reverse=True)
+                estados.sort(key=lambda x: parse_fecha(x[2]), reverse=True)
 
                 now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
-                subject = f"Recomendaciones cartera {usuario_nombre} {now_str}"
-                header = f"{now_str} - Recomendaciones cartera {usuario_nombre}\n"
+                subject = f"Estado cartera {usuario_nombre} {now_str}"
+                header = f"{now_str} - Estado cartera {usuario_nombre}\n"
                 # Formato de tabla de texto plano
-                col1, col2, col3 = 'Activo', 'Ultima operación', 'Fecha Última Operación'
-                ancho1 = max(len(col1), max((len(str(s)) for s,_,_ in recomendaciones), default=6))
-                ancho2 = max(len(col2), max((len(str(r)) for _,r,_ in recomendaciones), default=13))
-                ancho3 = max(len(col3), max((len(str(f)) for _,_,f in recomendaciones), default=22))
+                col1, col2, col3 = 'Activo', 'Estado', 'Fecha Último Cambio'
+                ancho1 = max(len(col1), max((len(str(s)) for s,_,_ in estados), default=6))
+                ancho2 = max(len(col2), max((len(str(r)) for _,r,_ in estados), default=13))
+                ancho3 = max(len(col3), max((len(str(f)) for _,_,f in estados), default=22))
                 sep = f"{'-'*ancho1} {'-'*ancho2} {'-'*ancho3}"
                 table = f"{col1.ljust(ancho1)} {col2.ljust(ancho2)} {col3.ljust(ancho3)}\n{sep}\n"
-                for symbol, reco, fecha_op in recomendaciones:
-                    table += f"{str(symbol).ljust(ancho1)} {str(reco).ljust(ancho2)} {str(fecha_op).ljust(ancho3)}\n"
-                body = header + '\n' + table
+                for symbol, estado, fecha_op in estados:
+                    table += f"{str(symbol).ljust(ancho1)} {str(estado).ljust(ancho2)} {str(fecha_op).ljust(ancho3)}\n"
+
+                diagnostics_block = ''
+                if diagnostics_summary['skipped_count']:
+                    diagnostics_block = (
+                        f"\nActivos omitidos: {diagnostics_summary['skipped_count']} de "
+                        f"{diagnostics_summary['requested_count']}\n"
+                        f"{diagnostics_summary['summary_text']}\n"
+                    )
+
+                body = header + '\n' + table + diagnostics_block
                 mail_config_path = str(project_root / "trading_engine" / "utils" / "Config" / "setup_mail.env")
                 send_email(subject, body, destinatario_email, config_path=mail_config_path)
-                logger.info(f"✉️  Mail de recomendaciones enviado a {destinatario_email}")
+                logger.info(f"✉️  Mail de estado enviado a {destinatario_email}")
             except Exception as e:
-                logger.error(f"❌ Error enviando mail de recomendaciones: {e}")
+                logger.error(f"❌ Error enviando mail de estado: {e}")
         else:
             _progress(11, 11, 'Notificacion', 'Envio de email desactivado')
 
+        resultados_df.attrs['symbol_diagnostics'] = symbol_diagnostics
+        resultados_df.attrs['processed_symbols_count'] = diagnostics_summary['processed_count']
+        resultados_df.attrs['skipped_symbols_count'] = diagnostics_summary['skipped_count']
         return resultados_df, trades_df, diccionario_graficos_html
     
     except Exception as e:

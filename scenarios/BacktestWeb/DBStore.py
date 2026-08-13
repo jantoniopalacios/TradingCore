@@ -29,7 +29,7 @@ def _clean_value(val, default=0.0, dtype=float):
     except (ValueError, TypeError):
         return dtype(default)
 
-def save_backtest_run(user_id, stats, config_dict, trades_df, grafico_html=None, graph_snapshot_payload=None):
+def save_backtest_run(user_id, stats, config_dict, trades_df, grafico_html=None, graph_snapshot_payload=None, notes=None):
     """
     Gestiona la persistencia de un backtest completo en PostgreSQL.
     Normaliza los datos de entrada para asegurar compatibilidad con el esquema.
@@ -81,6 +81,7 @@ def save_backtest_run(user_id, stats, config_dict, trades_df, grafico_html=None,
             comision=_clean_value(config_dict.get('COMMISSION', 0.0)),
             
             params_tecnicos=json.dumps(serializable_config),
+            notas=str(notes).strip() if notes else None,
             grafico_html=stored_graph_blob
         )
 
