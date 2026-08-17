@@ -860,7 +860,6 @@ def index():
         # genera muchos activos. Para evitar "desapariciones" visuales, primero limitamos
         # las tandas recientes y luego cargamos todos sus registros.
         tandas_limit = 50
-        activos_por_tanda = 25
 
         tandas_query = db.session.query(
             ResultadoBacktest.usuario_id,
@@ -890,7 +889,7 @@ def index():
                     ResultadoBacktest.id_estrategia == tanda.id_estrategia,
                 ).order_by(
                     ResultadoBacktest.fecha_ejecucion.desc()
-                ).limit(activos_por_tanda).all()
+                ).all()
                 todos.extend(tanda_rows)
         else:
             if u:
@@ -902,7 +901,7 @@ def index():
                         ResultadoBacktest.id_estrategia == tanda.id_estrategia,
                     ).order_by(
                         ResultadoBacktest.fecha_ejecucion.desc()
-                    ).limit(activos_por_tanda).all()
+                    ).all()
                     todos.extend(tanda_rows)
 
         # Para todos: cargar trades en una sola consulta

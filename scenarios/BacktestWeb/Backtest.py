@@ -87,6 +87,31 @@ def summarize_symbol_diagnostics(symbol_diagnostics):
     }
 
 
+def summarize_download_diagnostics(download_diagnostics):
+    diagnostics = download_diagnostics if isinstance(download_diagnostics, list) else []
+    warning_items = []
+    for item in diagnostics:
+        warning = str(item.get('warning') or '').strip()
+        if not warning:
+            continue
+        symbol = item.get('symbol', 'N/A')
+        range_end = item.get('range_end')
+        if range_end:
+            warning_items.append(f"{symbol} ({warning} Último dato utilizable: {range_end})")
+        else:
+            warning_items.append(f"{symbol} ({warning})")
+
+    summary_text = '; '.join(warning_items)
+    if len(summary_text) > 800:
+        summary_text = summary_text[:797].rstrip(' ;') + '...'
+
+    return {
+        'warning_count': len(warning_items),
+        'warning_items': warning_items,
+        'summary_text': summary_text,
+    }
+
+
 def _col_values(df: pd.DataFrame, candidates, default=None):
     for c in candidates:
         if c in df.columns:
@@ -269,6 +294,14 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
             logger.error("❌ Sin datos históricos descargados")
             return None, None, {}
         logger.info(f"✅ Datos descargados: {len(stocks_data)} registros")
+        download_diagnostics = stocks_data.attrs.get('download_diagnostics', []) if hasattr(stocks_data, 'attrs') else []
+        download_summary = summarize_download_diagnostics(download_diagnostics)
+        if download_summary['warning_count']:
+            logger.warning(
+                "⚠️ %s activos reutilizaron caché o respaldo por no haber una descarga mejor: %s",
+                download_summary['warning_count'],
+                download_summary['summary_text'],
+            )
 
         financial_data = None
         if filtro_fundamental:
@@ -379,7 +412,12 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
             try:
                 current_user_id = config_dict.get('user_id', u_actual.id)
                 saved_count = 0
-                batch_notes = diagnostics_summary['summary_text'] if diagnostics_summary['skipped_count'] else None
+                batch_note_parts = []
+                if diagnostics_summary['skipped_count']:
+                    batch_note_parts.append(diagnostics_summary['summary_text'])
+                if download_summary['warning_count']:
+                    batch_note_parts.append(download_summary['summary_text'])
+                batch_notes = ' | '.join(part for part in batch_note_parts if part) or None
                 for _, row in resultados_df.iterrows():
                     ticker = row.get('Symbol', 'UNKNOWN')
                     try:
@@ -491,7 +529,14 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
                         f"{diagnostics_summary['summary_text']}\n"
                     )
 
-                body = header + '\n' + table + diagnostics_block
+                cache_block = ''
+                if download_summary['warning_count']:
+                    cache_block = (
+                        f"\nActivos con caché conservada: {download_summary['warning_count']}\n"
+                        f"{download_summary['summary_text']}\n"
+                    )
+
+                body = header + '\n' + table + diagnostics_block + cache_block
                 mail_config_path = str(project_root / "trading_engine" / "utils" / "Config" / "setup_mail.env")
                 send_email(subject, body, destinatario_email, config_path=mail_config_path)
                 logger.info(f"✉️  Mail de estado enviado a {destinatario_email}")

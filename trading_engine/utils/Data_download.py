@@ -81,6 +81,40 @@ def _is_degraded_download(
     return False, ""
 
 
+def _is_not_better_or_updated_download(
+    downloaded_data: pd.DataFrame,
+    cached_data: pd.DataFrame,
+) -> tuple[bool, str]:
+    if cached_data.empty or downloaded_data.empty:
+        return False, ""
+
+    cached_rows = len(cached_data)
+    downloaded_rows = len(downloaded_data)
+    cached_min = cached_data.index.min()
+    cached_max = cached_data.index.max()
+    downloaded_min = downloaded_data.index.min()
+    downloaded_max = downloaded_data.index.max()
+
+    if downloaded_max < cached_max:
+        return True, (
+            f"la descarga llega hasta {downloaded_max:%Y-%m-%d} y la caché ya cubre "
+            f"hasta {cached_max:%Y-%m-%d}"
+        )
+
+    if (
+        downloaded_max == cached_max
+        and downloaded_min >= cached_min
+        and downloaded_rows <= cached_rows
+    ):
+        return True, (
+            f"la descarga no mejora la cobertura existente ({downloaded_rows} velas, "
+            f"desde {downloaded_min:%Y-%m-%d} hasta {downloaded_max:%Y-%m-%d}) frente a "
+            f"la caché ({cached_rows} velas, desde {cached_min:%Y-%m-%d} hasta {cached_max:%Y-%m-%d})"
+        )
+
+    return False, ""
+
+
 # --------------------------------------------------------------------------------
 # --- DESCARGA DE DATOS OHLCV (YAHOO FINANCE) - MODIFICADA ---
 # --------------------------------------------------------------------------------
@@ -255,15 +289,23 @@ def descargar_datos_YF(
                         data_to_use = cached_data.copy()
                         source_used = "cache_fallback_degraded_download"
                     else:
-                        if csv_file_path_max.exists() and not cached_data.empty:
-                            try:
-                                shutil.copy2(csv_file_path_max, csv_file_path_backup)
-                            except OSError as backup_copy_err:
-                                logger.warning(f"No se pudo actualizar el respaldo de caché para {symbol}: {backup_copy_err}")
-                        downloaded_data.to_csv(csv_file_path_max)
-                        logger.info(f"3. Descarga COMPLETA guardada/actualizada en {csv_file_path_max}")
-                        data_to_use = downloaded_data
-                        source_used = "download_fresh"
+                        not_improved, not_improved_reason = _is_not_better_or_updated_download(downloaded_data, cached_data)
+                        if not_improved and not cached_data.empty:
+                            logger.warning(
+                                f"⚠️ Descarga sin mejora para {symbol}; se conserva la caché previa y NO se sobrescribe porque {not_improved_reason}."
+                            )
+                            data_to_use = cached_data.copy()
+                            source_used = "cache_fallback_not_improved_download"
+                        else:
+                            if csv_file_path_max.exists() and not cached_data.empty:
+                                try:
+                                    shutil.copy2(csv_file_path_max, csv_file_path_backup)
+                                except OSError as backup_copy_err:
+                                    logger.warning(f"No se pudo actualizar el respaldo de caché para {symbol}: {backup_copy_err}")
+                            downloaded_data.to_csv(csv_file_path_max)
+                            logger.info(f"3. Descarga COMPLETA guardada/actualizada en {csv_file_path_max}")
+                            data_to_use = downloaded_data
+                            source_used = "download_fresh"
 
             except Exception as e:
                 logger.error(f"Error al descargar datos para {symbol}: {e}")
@@ -314,14 +356,28 @@ def descargar_datos_YF(
                  logger.warning(f"Fallo al filtrar columnas estándar para {symbol}: {e}")
 
             all_data = pd.concat([all_data, final_data], axis=0)
-            download_diagnostics.append({
+            diagnostic_row = {
                 "symbol": symbol,
                 "source": source_used,
                 "status": "ok",
                 "candle_count": len(final_data),
                 "range_start": final_data.index.min().strftime('%Y-%m-%d'),
                 "range_end": final_data.index.max().strftime('%Y-%m-%d'),
-            })
+            }
+            if source_used == "cache_fallback_degraded_download":
+                diagnostic_row["warning"] = "Se conserva la caché previa porque la descarga nueva llegó truncada o con menos cobertura."
+            elif source_used == "cache_fallback_not_improved_download":
+                diagnostic_row["warning"] = "Se conserva la caché previa porque Yahoo no devolvió datos mejores ni más actualizados."
+            elif source_used == "cache_fallback_empty_download":
+                diagnostic_row["warning"] = "Se conserva la caché previa porque Yahoo no devolvió datos."
+            elif source_used == "cache_fallback_download_error":
+                diagnostic_row["warning"] = "Se conserva la caché previa porque la descarga falló."
+            elif source_used == "backup_fallback_empty_download":
+                diagnostic_row["warning"] = "Se usa la copia de respaldo porque Yahoo no devolvió datos y la caché principal no era utilizable."
+            elif source_used == "backup_fallback_download_error":
+                diagnostic_row["warning"] = "Se usa la copia de respaldo porque la descarga falló y la caché principal no era utilizable."
+
+            download_diagnostics.append(diagnostic_row)
 
     logger.info("Descarga y gestión de caché OHLCV completada.")
     all_data.attrs['download_diagnostics'] = download_diagnostics
