@@ -23,20 +23,19 @@ class TestDatabase(unittest.TestCase):
         with self.app.app_context():
             nuevo_resultado = ResultadoBacktest(
                 usuario_id=1,
-                simbolo="AAPL",
-                periodo="1d",
-                beneficio_neto=150.50,
+                id_estrategia=1,
+                symbol="AAPL",
+                intervalo="1d",
+                return_pct=150.50,
                 win_rate=65.0,
-                grafico_html="<html>Gráfico Simulodo</html>"
+                grafico_html="<html>Gráfico Simulado</html>"
             )
             db.session.add(nuevo_resultado)
             db.session.commit()
-            
-            # Recuperamos y validamos
-            res = ResultadoBacktest.query.filter_by(simbolo="AAPL").first()
+
+            res = ResultadoBacktest.query.filter_by(symbol="AAPL").first()
             self.assertIsNotNone(res)
-            self.assertEqual(res.beneficio_neto, 150.50)
-            print(f"\n✅ Registro en DB validado: {res.simbolo} | Neto: {res.beneficio_neto}")
+            self.assertEqual(res.return_pct, 150.50)
 
 if __name__ == '__main__':
     unittest.main()
