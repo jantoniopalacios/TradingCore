@@ -153,8 +153,8 @@ Backtesting/
 │   ├── invitado/                Gráficos del usuario invitado
 │   └── semana/                  Gráficos de ejecuciones programadas semanales
 ├── Run_Results/             🟡 Resultados en CSV de ejecuciones batch históricas
-├── logs/                    🟡 Logs de backtesting (errores, trazas de ejecución)
-└── tradingcore.db           🟡 BD SQLite legacy (solo lectura, sustituida por PostgreSQL)
+└── logs/                    🟡 Logs de backtesting (errores, trazas de ejecución)
+
 ```
 
 ---
