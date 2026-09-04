@@ -1,5 +1,7 @@
 # TradingCore: Motor Central y Arquitectura Modular
 
+Última actualización: 04/09/2026
+
 Este repositorio contiene la arquitectura central (Motor) para múltiples escenarios de trading (Backtesting, Live Trading, Web Apps).
 
 ---
@@ -170,22 +172,34 @@ logs/
 
 ---
 
-### 🟡 Scripts de análisis y validación (`scripts/`)
+### 🟡 Scripts operativos y auxiliares (`scripts/`)
 
-Scripts de uso técnico para auditoría, optimización y validación del motor. No son parte del flujo de producción pero son esenciales para el desarrollo.
+Los scripts auxiliares se agrupan por finalidad. No forman parte del núcleo del motor de trading, aunque algunos tienen funciones operativas de apoyo a la aplicación.
 
 ```
 scripts/
 ├── analysis/                Análisis de resultados de backtests
-├── debug/                   Scripts de diagnóstico y depuración
+├── diagnostics/             Diagnóstico manual de rutas, login y estado de la app
+├── experiments/             Pruebas puntuales y experimentos de estrategias e indicadores
+├── maintenance/             Utilidades de administración y mantenimiento
 ├── presets/                 Configuraciones predefinidas de estrategias
-├── tests/                   Tests funcionales del motor
+├── scheduler/               Scheduler de backtests periódicos
+│   └── backtest_scheduler.py
 ├── optimize_rsi.py          Barrido de parámetros RSI
 ├── sweep_rsi_filter.py      Optimización por grilla del filtro RSI
 ├── audit_stops_combinations.py  Auditoría de combinaciones de stops
 ├── batch_replay_by_ids.py   Re-ejecución batch de estrategias por ID
 ├── query_backtest_results.py    Consulta y exportación de resultados
 └── verificar_backtest_web.py    Verificación de integridad de la app web
+```
+
+Los tests automatizados se mantienen separados del resto de scripts auxiliares:
+
+```
+tests/
+├── unit/                    Pruebas unitarias del motor
+├── integration/             Pruebas de integración, incluida la persistencia
+└── web/                     Pruebas de rutas y comportamiento de la aplicación web
 ```
 
 ---
@@ -199,26 +213,6 @@ scenarios/Fundamental_Data/
 ├── manager.py               Descarga y actualiza datos fundamentales vía yfinance
 ├── Fundamental_Manager.py   Lógica de acceso y consulta de fundamentales
 └── database.py              Capa de persistencia de datos fundamentales
-```
-
----
-
-### 🟢 Utilidades de mantenimiento (`Utils/`)
-
-Scripts de administración y mantenimiento operacional. No intervienen en el flujo de trading.
-
-```
-Utils/
-├── backtest_scheduler.py    Scheduler para lanzar backtests periódicos automáticos
-├── ejecutar_bollinger.py    Script standalone para backtest de Bollinger
-├── fix_sequences.py         Corrección de secuencias de la BD PostgreSQL
-├── hacer_backup.ps1         Script PowerShell de backup de la BD
-├── Restaurar_db.ps1         Script PowerShell de restauración de backup
-├── limpiar_grafico_html.ps1 Limpieza de gráficos HTML obsoletos en BD
-├── inyectar_graficos_test.py    Test de inyección de gráficos
-├── test_db_integration.py   Test de integración con BD
-├── test_indicadores.py      Test de cálculo de indicadores
-└── test_signals.py          Test de señales de trading
 ```
 
 ---
