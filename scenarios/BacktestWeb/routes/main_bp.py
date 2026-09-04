@@ -46,7 +46,7 @@ main_bp = Blueprint('main', __name__)
 BACKTEST_STATUS_BY_USER = {}
 BACKTEST_STATUS_LOCK = threading.Lock()
 
-SCHEDULER_SCRIPT_PATH = PROJECT_ROOT / 'Utils' / 'backtest_scheduler.py'
+SCHEDULER_SCRIPT_PATH = PROJECT_ROOT / 'scripts' / 'scheduler' / 'backtest_scheduler.py'
 SCHEDULER_STATUS_PATH = PROJECT_ROOT / 'logs' / 'backtest_scheduler_status.json'
 SCHEDULER_PID_PATH = PROJECT_ROOT / 'logs' / 'backtest_scheduler.pid'
 CONFIG_SNAPSHOT_BASE_DIR = PROJECT_ROOT / 'Data_files' / 'Backtest_config'
