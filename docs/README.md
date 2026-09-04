@@ -256,7 +256,7 @@ docs/
 | `start_web.bat` / `stop_web.bat` | Arranque y parada rápida de la app web |
 | `backup_trading_db_20260227.dump` | Backup puntual de la BD PostgreSQL |
 | `mkdocs.yml` | Configuración de MkDocs para generar documentación estática |
-| `OPTIMIZACIONES_IMPLEMENTADAS.md` | Registro de optimizaciones de rendimiento aplicadas |
+| `docs/Summaries/OPTIMIZACIONES_IMPLEMENTADAS.md` | Registro de optimizaciones de rendimiento aplicadas |
 
 ---
 
