@@ -43,3 +43,9 @@ def test_index_without_csv(client):
     assert response.status_code == 200
     print("âœ… Sistema validado: Index operativo 100% DB.")
 
+def test_scheduler_script_path_exists():
+    """Verifica que la ruta configurada para el scheduler apunta a un script existente."""
+    from scenarios.BacktestWeb.routes.main_bp import SCHEDULER_SCRIPT_PATH
+
+    assert SCHEDULER_SCRIPT_PATH.exists()
+    assert SCHEDULER_SCRIPT_PATH.name == "backtest_scheduler.py"
