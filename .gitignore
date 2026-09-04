@@ -63,3 +63,4 @@ test_conn.py
 *.dump
 *.bak
 backup_*
+site/
