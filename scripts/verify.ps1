@@ -11,9 +11,10 @@ Write-Host "COMPILE OK"
 
 Write-Host "`n[2/3] Baseline tests"
 python -m pytest `
-    Utils/test_db_integration.py `
-    Utils/test_indicadores.py `
-    Utils/test_signals.py `
+    tests/integration/test_db_integration.py `
+    tests/unit/test_indicadores.py `
+    tests/unit/test_signals.py `
+    tests/web/test_routes.py `
     tests/web/test_routes.py `
     -q
 
