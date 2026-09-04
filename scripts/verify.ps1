@@ -14,6 +14,7 @@ python -m pytest `
     Utils/test_db_integration.py `
     Utils/test_indicadores.py `
     Utils/test_signals.py `
+    scripts/tests/test_routes.py `
     -q
 
 if ($LASTEXITCODE -ne 0) {
