@@ -12,7 +12,7 @@ from pathlib import Path
 import shutil
 
 # Importamos db
-from trading_engine.core.database_pg import db
+from trading_engine.core.database_pg import db, DATABASE_URL
 
 
 
@@ -52,7 +52,7 @@ BACKTESTING_BASE_DIR = PROJECT_ROOT / "Backtesting"
 DATA_FILES_BASE_PATH = PROJECT_ROOT / "Data_Files"
 
 # Restaurada la variable DB_URI que solicitaste
-DB_URI = "postgresql+pg8000://postgres:admin@localhost:5433/trading_db"
+DB_URI = DATABASE_URL
 
 # ----------------------------------------------------------------------
 # --- LOGGING CONFIGURATION ---
