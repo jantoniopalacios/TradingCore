@@ -64,3 +64,6 @@ test_conn.py
 *.bak
 backup_*
 site/
+
+# --- Configuraciones locales de usuarios de Backtest ---
+Data_files/Backtest_config/**/*.json
