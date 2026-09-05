@@ -2,6 +2,8 @@ from sqlalchemy import Column, Integer, String, Float, Date, DateTime, UniqueCon
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
 
+from trading_engine.core.database_pg import DATABASE_URL
+
 # --- ESTRUCTURA BASE ---
 Base = declarative_base()
 
@@ -29,15 +31,6 @@ class Simbolo(Base):
     __tablename__ = 'simbolos' 
     id = Column(Integer, primary_key=True)
     symbol = Column(String(10), unique=True, nullable=False)
-
-# --- CONFIGURACIÓN DE CONEXIÓN (Copiada de tu sistema pg8000) ---
-DB_USER = "postgres"
-DB_PASS = "admin"
-DB_HOST = "localhost"
-DB_PORT = "5433"
-DB_NAME = "trading_db"
-
-DATABASE_URL = f"postgresql+pg8000://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # Motor y Sesión
 engine = create_engine(DATABASE_URL, client_encoding='utf8')
