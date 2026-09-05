@@ -13,8 +13,17 @@
         body { background-color: #f8fafc; font-family: 'Inter', sans-serif; font-size: 13px; margin: 0; }
         
         /* Sidebar Estilizada */
-        .sidebar { width: var(--sb-width); background: var(--dark-bg); height: 100vh; position: fixed; padding: 1.5rem; color: #f8fafc; z-index: 1050; }
-        .main-content { margin-left: var(--sb-width); padding: 1.5rem; width: calc(100% - var(--sb-width)); min-height: 100vh; }
+        .sidebar { width: var(--sb-width); background: var(--dark-bg); height: 100vh; position: fixed; padding: 1.5rem; color: #f8fafc; z-index: 1050; transition: transform 0.25s ease; }
+        .main-content { margin-left: var(--sb-width); padding: 1.5rem; width: calc(100% - var(--sb-width)); min-height: 100vh; transition: margin-left 0.25s ease, width 0.25s ease; }
+        .sidebar-reveal-zone { position: fixed; inset: 0 auto 0 0; width: 16px; z-index: 1049; }
+        body.sidebar-hidden .sidebar { transform: translateX(calc(-1 * var(--sb-width))); }
+        body.sidebar-hidden .main-content { margin-left: 0; width: 100%; }
+
+        @media (max-width: 767.98px) {
+            .sidebar-reveal-zone { display: none; }
+            body.sidebar-hidden .sidebar { transform: none; }
+            body.sidebar-hidden .main-content { margin-left: var(--sb-width); width: calc(100% - var(--sb-width)); }
+        }
         
         /* Navegación Sidebar */
         .nav-sidebar .nav-link { font-size: 12px; color: #94a3b8; border-radius: 8px; margin-bottom: 5px; text-align: left; width: 100%; border: none; background: transparent; transition: 0.2s; }
@@ -139,7 +148,9 @@
 </head>
 <body>
 
-<div class="sidebar d-flex flex-column">
+<div class="sidebar-reveal-zone" aria-hidden="true"></div>
+
+<aside class="sidebar d-flex flex-column" aria-label="Menú principal">
     <div class="mb-4 px-1 d-flex align-items-center">
         <i class="bi bi-lightning-charge-fill text-primary fs-4 me-2"></i>
         <h5 class="fw-bold text-white mb-0">TRADINGCORE <span class="text-primary">PRO</span></h5>
@@ -205,7 +216,7 @@
             <i class="bi bi-box-arrow-left me-2"></i>Cerrar Sesión
         </a>
     </div>
-</div>
+</aside>
 
 <div class="main-content">
     
@@ -409,8 +420,19 @@
                     ? 'activeTabKey'
                     : 'activeSubTabKey';
                 localStorage.setItem(key, e.target.id);
+
+                if (key === 'activeTabKey' && window.innerWidth >= 768) {
+                    document.body.classList.add('sidebar-hidden');
+                }
             });
         });
+
+        const revealZone = document.querySelector('.sidebar-reveal-zone');
+        const sidebar = document.querySelector('.sidebar');
+        const showSidebar = () => document.body.classList.remove('sidebar-hidden');
+
+        revealZone.addEventListener('mouseenter', showSidebar);
+        sidebar.addEventListener('focusin', showSidebar);
 
         // 4. Fecha fin por defecto = ayer (solo si está vacía)
         const fechaFinInput = document.querySelector('#end_date')
