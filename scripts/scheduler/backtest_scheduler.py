@@ -46,6 +46,7 @@ if str(project_root) not in sys.path:
 
 from scenarios.BacktestWeb.Backtest import ejecutar_backtest
 from scenarios.BacktestWeb.database import Usuario, db
+from trading_engine.core.database_pg import DATABASE_URL
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -76,12 +77,6 @@ STATUS_STATE = {
 # Flask / BD  (mismo DSN que la app principal)
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
-DB_USER = "postgres"
-DB_PASS = "admin"
-DB_HOST = "localhost"
-DB_PORT = "5433"
-DB_NAME = "trading_db"
-DATABASE_URL = f"postgresql+pg8000://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 db.init_app(app)
 
