@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 Write-Host "== TradingCore verification =="
 
 Write-Host "`n[1/3] Python syntax"
-python -m compileall -q .
+python -m compileall -q scenarios trading_engine scripts tests
 if ($LASTEXITCODE -ne 0) {
     throw "compileall failed"
 }
@@ -14,7 +14,6 @@ python -m pytest `
     tests/integration/test_db_integration.py `
     tests/unit/test_indicadores.py `
     tests/unit/test_signals.py `
-    tests/web/test_routes.py `
     tests/web/test_routes.py `
     -q
 

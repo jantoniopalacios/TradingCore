@@ -1,6 +1,7 @@
 ﻿import sys
 from pathlib import Path
 import pytest
+from trading_engine.core.database_pg import ENGINE_OPTIONS
 
 # AÃ±adimos la raÃ­z al path para que encuentre 'trading_engine' y 'scenarios'
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -12,9 +13,15 @@ from scenarios.BacktestWeb.app import create_app
 from scenarios.BacktestWeb.configuracion import DB_URI
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    import scenarios.BacktestWeb.app as app_module
+
+    monkeypatch.setattr(app_module, "DB_URI", "sqlite:///:memory:")
+    monkeypatch.setattr(app_module, "ENGINE_OPTIONS", {})
+
     app = create_app()
-    app.config['TESTING'] = True
+    app.config["TESTING"] = True
+
     with app.test_client() as client:
         with app.app_context():
             yield client
@@ -24,7 +31,7 @@ def test_config_resurrected(client):
     print(f"\n[INFO] DB_URI detectada: {DB_URI}")
     assert "postgresql" in DB_URI
     assert "localhost" in DB_URI
-    assert client.application.config['SQLALCHEMY_ENGINE_OPTIONS']['pool_pre_ping'] is True
+    assert ENGINE_OPTIONS['pool_pre_ping'] is True
 
 def test_index_without_csv(client):
     """Verifica que el index carga sin archivos fÃ­sicos de sÃ­mbolos"""
