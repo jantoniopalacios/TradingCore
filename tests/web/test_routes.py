@@ -97,3 +97,16 @@ def test_scheduler_utc_now_iso_format():
     parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
 
     assert parsed.tzinfo == timezone.utc
+
+def test_scheduler_paths_match_web_paths():
+    from scripts.scheduler.backtest_scheduler import (
+        STATUS_FILE_PATH,
+        PID_FILE_PATH,
+    )
+    from scenarios.BacktestWeb.routes.main_bp import (
+        SCHEDULER_STATUS_PATH,
+        SCHEDULER_PID_PATH,
+    )
+
+    assert STATUS_FILE_PATH == SCHEDULER_STATUS_PATH
+    assert PID_FILE_PATH == SCHEDULER_PID_PATH
