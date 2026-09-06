@@ -74,3 +74,26 @@ def test_scheduler_reuses_core_database_url():
     from trading_engine.core.database_pg import DATABASE_URL
 
     assert scheduler_database_url == DATABASE_URL
+
+def test_scheduler_truthy_helper():
+    from scripts.scheduler.backtest_scheduler import _es_verdadero
+
+    assert _es_verdadero(True) is True
+    assert _es_verdadero(False) is False
+    assert _es_verdadero("true") is True
+    assert _es_verdadero("1") is True
+    assert _es_verdadero("yes") is True
+    assert _es_verdadero("false") is False
+    assert _es_verdadero("0") is False
+    assert _es_verdadero("no") is False
+
+
+def test_scheduler_utc_now_iso_format():
+    from datetime import datetime, timezone
+    from scripts.scheduler.backtest_scheduler import _utc_now_iso
+
+    value = _utc_now_iso()
+
+    parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
+    assert parsed.tzinfo == timezone.utc
