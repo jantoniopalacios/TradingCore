@@ -1,6 +1,6 @@
 # TradingCore: Motor Central y Arquitectura Modular
 
-Última actualización: 04/09/2026
+Última actualización: 06/09/2026
 
 Este repositorio contiene la arquitectura central (Motor) para múltiples escenarios de trading (Backtesting, Live Trading, Web Apps).
 
@@ -124,7 +124,7 @@ Data_files/
 ├── SYMBOL_1wk_MAX.csv       Datos semanales
 ├── SYMBOL_1h_MAX.csv        Datos horarios (solo algunos símbolos)
 ├── SYMBOL_1mo_MAX.csv       Datos mensuales (solo algunos símbolos)
-├── Backtest_config/         Configuraciones de backtest guardadas por el usuario
+├── Backtest_config/         Configuraciones locales de backtest guardadas por el usuario (no versionadas)
 └── Fundamentals/            Datos fundamentales descargados (ratios, métricas)
 ```
 
