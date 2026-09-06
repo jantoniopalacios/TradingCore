@@ -3,6 +3,9 @@ setlocal
 title Gestor TradingCore
 
 :: --- CONFIGURACIÓN (Rutas ajustadas a tu laboratorio) ---
+set "PROJECT_ROOT=%~dp0"
+set "PYTHON_EXE=%PROJECT_ROOT%.venv\Scripts\python.exe"
+
 set "PG_BIN=.\pgsql\bin\pg_ctl.exe"
 set "PG_DATA=data_pg"
 set "LOG_PG=logfile.txt"
@@ -51,13 +54,14 @@ if %errorlevel% equ 0 (
     echo.
     echo [ADVERTENCIA] El servidor %TASK_NAME% ya esta activo.
     echo No se lanzara otra instancia.
+
     timeout /t 5
     exit /b
 )
 
 :: 3. LANZAR SERVIDOR WAITRESS (Modo Oculto, sobrevive al cierre de terminal/SSH)
 echo [*] Lanzando servidor con Waitress en segundo plano...
-powershell -windowstyle hidden -command "Start-Process -FilePath 'C:\Users\juant\Proyectos\Python\TradingCore\.venv\Scripts\python.exe' -ArgumentList '-m %APP_PATH% --host=0.0.0.0 --port=5000 --no-debug --no-reloader' -WorkingDirectory 'C:\Users\juant\Proyectos\Python\TradingCore' -WindowStyle Hidden"
+powershell -windowstyle hidden -command "Start-Process -FilePath '%PYTHON_EXE%' -ArgumentList '-m %APP_PATH% --host=0.0.0.0 --port=5000 --no-debug --no-reloader' -WorkingDirectory '%PROJECT_ROOT%' -WindowStyle Hidden"
 
 timeout /t 2 >nul
 
