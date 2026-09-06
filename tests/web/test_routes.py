@@ -49,3 +49,28 @@ def test_scheduler_script_path_exists():
 
     assert SCHEDULER_SCRIPT_PATH.exists()
     assert SCHEDULER_SCRIPT_PATH.name == "backtest_scheduler.py"
+
+
+def test_database_url_uses_default_connection_values():
+    import os
+    import pytest
+    from trading_engine.core.database_pg import DATABASE_URL
+
+    env_vars = [
+        "TRADINGCORE_DB_USER",
+        "TRADINGCORE_DB_PASS",
+        "TRADINGCORE_DB_HOST",
+        "TRADINGCORE_DB_PORT",
+        "TRADINGCORE_DB_NAME",
+    ]
+
+    if any(os.getenv(name) is not None for name in env_vars):
+        pytest.skip("La conexión de BD está sobrescrita mediante variables de entorno")
+
+    assert DATABASE_URL == "postgresql+pg8000://postgres:admin@localhost:5433/trading_db"
+
+def test_scheduler_reuses_core_database_url():
+    from scripts.scheduler.backtest_scheduler import DATABASE_URL as scheduler_database_url
+    from trading_engine.core.database_pg import DATABASE_URL
+
+    assert scheduler_database_url == DATABASE_URL
