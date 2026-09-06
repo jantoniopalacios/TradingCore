@@ -14,8 +14,8 @@ configurado. Al finalizar cada ejecución se envía el mail con el formato
 estándar ya implementado en Backtest.py.
 
 Uso:
-    python Utils/backtest_scheduler.py
-    python Utils/backtest_scheduler.py --ahora        # ejecuta todos de inmediato y sale
+    python scripts/scheduler/backtest_scheduler.py
+    python scripts/scheduler/backtest_scheduler.py --ahora        # ejecuta todos de inmediato y sale
 
 Refresco de configuración:
     Cada 6 horas el scheduler re-lee la BD y actualiza los jobs automáticamente
