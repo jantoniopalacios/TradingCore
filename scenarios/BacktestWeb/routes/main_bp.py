@@ -1985,7 +1985,7 @@ def save_config_file():
 
         payload = {
             "usuario": user_mode,
-            "fecha_guardado": datetime.utcnow().isoformat(),
+            "fecha_guardado": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             "configuracion": config_params,
             "activos": symbols_list,
         }

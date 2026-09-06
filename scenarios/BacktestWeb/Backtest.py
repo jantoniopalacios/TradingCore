@@ -10,7 +10,7 @@ import sys
 import threading
 import time
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # 2. Third Party (Data & Viz)
@@ -212,7 +212,7 @@ def _build_graph_snapshot_payload(symbol: str, intervalo: str, market_df: pd.Dat
         'version': 1,
         'symbol': str(symbol),
         'intervalo': str(intervalo or '1d'),
-        'created_at': datetime.utcnow().isoformat() + 'Z',
+        'created_at': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         'ohlcv': ohlcv,
         'equity': equity,
         'trades': trades,
