@@ -533,15 +533,6 @@ def obtener_usuarios_registrados():
         logging.getLogger(__name__).warning("Fallo recuperando usuarios registrados: %s", exc)
         return {"admin": "admin"} # Fallback de emergencia
 
-def get_user_paths(username):
-    rutas = inicializar_configuracion_usuario(username)
-    return {
-        'results_dir': rutas['results_dir'],
-        'graph_dir': rutas['graph_dir'],
-        'logs_dir': BACKTESTING_BASE_DIR / "logs",
-        'fichero_simbolos': rutas['fichero_simbolos']
-    }
-
 # --- RUTA PRINCIPAL (INDEX) ---
 @main_bp.route('/', methods=['GET', 'POST'])
 def index():
