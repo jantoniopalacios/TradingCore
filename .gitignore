@@ -8,6 +8,7 @@ env/
 __pycache__/
 *.pyc
 *.pyo
+*.py[cod]
 
 # --- Build / Distribución ---
 build/
@@ -39,9 +40,6 @@ Backtesting/Logs/**
 # Evitar subir configuraciones locales
 Backtesting/Config/*.env
 !Backtesting/Config/variables_setup.env.example
-# Python
-__pycache__/
-*.py[cod]
 
 # --- Configuración local ---
 # Ignora todos los .env en cualquier subcarpeta
