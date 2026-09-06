@@ -54,6 +54,10 @@ from .backtest_status import (
     _set_backtest_progress,
     _finish_backtest_status,
 )
+from .scheduler_helpers import (
+    _is_scheduler_running_from_pid,
+    _read_scheduler_status_file,
+)
 
 from ..database import db, ResultadoBacktest, Trade, Usuario, Simbolo # Importa tus modelos
 from sqlalchemy import func
@@ -488,44 +492,6 @@ def _prune_expired_graph_cache(force: bool = False):
             _LAST_GRAPH_CACHE_CLEANUP_TS = time.time()
 
     return deleted
-
-
-def _is_scheduler_running_from_pid() -> bool:
-    if not SCHEDULER_PID_PATH.exists():
-        return False
-    try:
-        pid = int(SCHEDULER_PID_PATH.read_text(encoding='utf-8').strip())
-    except Exception:
-        return False
-
-    if os.name == 'nt':
-        # Use tasklist on Windows because OpenProcess/GetExitCodeProcess can fail
-        # with permission/flag combinations for detached processes.
-        try:
-            out = subprocess.check_output(
-                ["tasklist", "/FI", f"PID eq {pid}"],
-                text=True,
-                encoding='utf-8',
-                errors='ignore',
-            )
-            return str(pid) in out and "No tasks are running" not in out
-        except Exception:
-            return False
-    else:
-        try:
-            os.kill(pid, 0)
-            return True
-        except Exception:
-            return False
-
-
-def _read_scheduler_status_file() -> dict:
-    if not SCHEDULER_STATUS_PATH.exists():
-        return {}
-    try:
-        return json.loads(SCHEDULER_STATUS_PATH.read_text(encoding='utf-8'))
-    except Exception:
-        return {}
 
 
 def _build_expected_scheduler_jobs_from_db() -> list:
@@ -1081,7 +1047,7 @@ def scheduler_status():
     if session.get('user_mode') != 'admin':
         return jsonify({"status": "error", "message": "No autorizado"}), 403
 
-    status_data = _read_scheduler_status_file()
+    status_data = _read_scheduler_status_file(SCHEDULER_STATUS_PATH)
     if not isinstance(status_data, dict):
         status_data = {}
     status_data.setdefault('scheduler', {})
@@ -1094,7 +1060,7 @@ def scheduler_status():
         if not str((j or {}).get('id', '')).startswith('_')
     ]
 
-    pid_is_running = _is_scheduler_running_from_pid()
+    pid_is_running = _is_scheduler_running_from_pid(SCHEDULER_PID_PATH)
 
     # El JSON sigue siendo la referencia principal, pero si el PID está vivo
     # y el JSON quedó stale por una ejecución inmediata, reconciliamos a running.
@@ -1184,7 +1150,7 @@ def scheduler_start():
     immediate = request.json.get('immediate', False) if request.is_json else request.args.get('immediate', False)
 
     # Chequear por PID para saber si estaba corriendo
-    was_running = _is_scheduler_running_from_pid()
+    was_running = _is_scheduler_running_from_pid(SCHEDULER_PID_PATH)
     
     if was_running:
         # Ya hay un proceso: si se solicita inmediato, simplemente ejecutar --ahora
@@ -1211,7 +1177,7 @@ def scheduler_start():
         return jsonify({"status": "error", "message": f"No existe script: {SCHEDULER_SCRIPT_PATH}"}), 500
 
     try:
-        status_data = _read_scheduler_status_file()
+        status_data = _read_scheduler_status_file(SCHEDULER_STATUS_PATH)
         if not isinstance(status_data, dict):
             status_data = {}
         status_data.setdefault('scheduler', {})
@@ -1270,7 +1236,7 @@ def scheduler_stop():
     if not SCHEDULER_PID_PATH.exists():
         # No hay PID file: marcar JSON como stopped por si acaso estaba corriendo
         try:
-            status_data = _read_scheduler_status_file()
+            status_data = _read_scheduler_status_file(SCHEDULER_STATUS_PATH)
             if isinstance(status_data, dict):
                 status_data.setdefault('scheduler', {})
                 status_data['scheduler']['status'] = 'stopped'
@@ -1322,7 +1288,7 @@ def scheduler_stop():
 
     # Marcar el JSON como stopped
     try:
-        status_data = _read_scheduler_status_file()
+        status_data = _read_scheduler_status_file(SCHEDULER_STATUS_PATH)
         if isinstance(status_data, dict):
             status_data.setdefault('scheduler', {})
             status_data['scheduler']['status'] = 'stopped'
