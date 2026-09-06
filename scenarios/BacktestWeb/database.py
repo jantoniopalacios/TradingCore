@@ -14,10 +14,14 @@ Cada tabla está diseñada para almacenar información relevante y facilitar la 
 # En resumen, este módulo es esencial para la gestión de datos en la aplicación de backtesting web.
 """
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Inicializamos el objeto de la base de datos
 from trading_engine.core.database_pg import db
+
+
+def utcnow_naive():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 
@@ -88,7 +92,7 @@ class ResultadoBacktest(db.Model):
     notas = db.Column(db.Text, nullable=True)
     grafico_html = db.Column(db.Text, nullable=True)
 
-    fecha_ejecucion = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_ejecucion = db.Column(db.DateTime, default=utcnow_naive)
     
     # Relación: Un backtest tiene muchos trades detallados
     # La relación inversa se define en la clase Trade con backref='backtest'
