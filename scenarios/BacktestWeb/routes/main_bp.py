@@ -42,6 +42,11 @@ from .helpers import (
     _parse_iso_datetimes,
     _scheduler_trigger_label,
 )
+from .config_helpers import (
+    _extract_symbols_from_form_data,
+    _build_config_params_from_form_data,
+    _build_default_snapshot_filename,
+)
 
 from ..database import db, ResultadoBacktest, Trade, Usuario, Simbolo # Importa tus modelos
 from sqlalchemy import func
@@ -80,33 +85,13 @@ def _user_config_snapshot_dir(username):
     return CONFIG_SNAPSHOT_BASE_DIR / str(username)
 
 
-def _extract_symbols_from_form_data(form_data):
-    contenido = form_data.get('symbols_content', '') or ''
-    raw_activos = contenido.replace(';', ',').replace('\n', ',').replace('\r', ',')
-    normalized = [_normalize_symbol_token(s) for s in raw_activos.split(',')]
-    return list(dict.fromkeys([s for s in normalized if s]))
-
-
-def _build_config_params_from_form_data(form_data, include_dates=False):
-    excluded = {'symbols_content', 'action', 'config_file_name'}
-    if not include_dates:
-        excluded.update({'end_date', 'fecha_fin'})
-    config_params = {k: v for k, v in form_data.items() if k not in excluded}
-
-    for field in SAVEABLE_BOOLEAN_FIELDS:
-        config_params[field] = 'True' if field in form_data else 'False'
-
-    if include_dates:
-        end_date_value = form_data.get('end_date') or form_data.get('fecha_fin')
-        if end_date_value:
-            config_params['end_date'] = end_date_value
-
-    return config_params
-
-
 def _persist_user_runtime_config(user, form_data):
     symbol_names = _extract_symbols_from_form_data(form_data)
-    config_params = _build_config_params_from_form_data(form_data, include_dates=False)
+    config_params = _build_config_params_from_form_data(
+        form_data,
+        SAVEABLE_BOOLEAN_FIELDS,
+        include_dates=False,
+    )
 
     Simbolo.query.filter_by(usuario_id=user.id).delete()
     for sym_name in symbol_names:
@@ -115,13 +100,6 @@ def _persist_user_runtime_config(user, form_data):
     # Guardar JSON en formato ASCII-safe evita errores de codificacion del driver/entorno (charmap)
     user.config_actual = json.dumps(config_params, ensure_ascii=True)
     return config_params, symbol_names
-
-
-def _build_default_snapshot_filename(username, config_params):
-    stamp = datetime.now().strftime('%Y%m%d')
-    strategy_title = _sanitize_filename_component(_build_strategy_short_title_from_params(config_params))
-    username_part = _sanitize_filename_component(username)
-    return f"{stamp}-{strategy_title}-{username_part}.json"
 
 
 def _write_config_snapshot(username, file_name, config_payload):
@@ -1869,7 +1847,11 @@ def save_config_file():
         if 'fecha_fin' in form_data and 'end_date' not in form_data:
             form_data['end_date'] = form_data['fecha_fin']
 
-        config_params = _build_config_params_from_form_data(form_data, include_dates=True)
+        config_params = _build_config_params_from_form_data(
+            form_data,
+            SAVEABLE_BOOLEAN_FIELDS,
+            include_dates=False,
+        )
         symbols_list = _extract_symbols_from_form_data(form_data)
         requested_name = form_data.get('config_file_name') or _build_default_snapshot_filename(user_mode, config_params)
 
