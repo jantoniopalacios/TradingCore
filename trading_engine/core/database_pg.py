@@ -1,12 +1,13 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import create_engine
+import os
 
 # --- CONFIGURACIÓN ---
-DB_USER = "postgres"
-DB_PASS = "admin"
-DB_HOST = "localhost"
-DB_PORT = "5433"
-DB_NAME = "trading_db"
+DB_USER = os.getenv("TRADINGCORE_DB_USER", "postgres")
+DB_PASS = os.getenv("TRADINGCORE_DB_PASS", "admin")
+DB_HOST = os.getenv("TRADINGCORE_DB_HOST", "localhost")
+DB_PORT = os.getenv("TRADINGCORE_DB_PORT", "5433")
+DB_NAME = os.getenv("TRADINGCORE_DB_NAME", "trading_db")
 
 DATABASE_URL = f"postgresql+pg8000://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
