@@ -47,6 +47,13 @@ from .config_helpers import (
     _build_config_params_from_form_data,
     _build_default_snapshot_filename,
 )
+from .backtest_status import (
+    BACKTEST_STATUS_BY_USER,
+    BACKTEST_STATUS_LOCK,
+    _init_backtest_status,
+    _set_backtest_progress,
+    _finish_backtest_status,
+)
 
 from ..database import db, ResultadoBacktest, Trade, Usuario, Simbolo # Importa tus modelos
 from sqlalchemy import func
@@ -54,11 +61,6 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import ResourceClosedError
 
 main_bp = Blueprint('main', __name__) 
-
-# Estado de ejecucion en memoria para mostrar progreso en UI sin refrescar.
-# Clave: username | Valor: dict de estado de la ultima ejecucion lanzada.
-BACKTEST_STATUS_BY_USER = {}
-BACKTEST_STATUS_LOCK = threading.Lock()
 
 SCHEDULER_SCRIPT_PATH = PROJECT_ROOT / 'scripts' / 'scheduler' / 'backtest_scheduler.py'
 SCHEDULER_STATUS_PATH = PROJECT_ROOT / 'logs' / 'backtest_scheduler_status.json'
@@ -116,10 +118,6 @@ def _write_config_snapshot(username, file_name, config_payload):
     file_path = user_dir / safe_name
     file_path.write_text(json.dumps(config_payload, indent=2, ensure_ascii=False), encoding='utf-8')
     return file_path
-
-
-def _utc_now_iso():
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _extract_graph_snapshot_payload_from_db(resultado):
@@ -558,79 +556,6 @@ def _build_expected_scheduler_jobs_from_db() -> list:
     jobs.sort(key=lambda j: j.get('id', ''))
     return jobs
 
-
-# ── Funciones de estado para la carga de index ──────────────────────────────
-
-
-
-def _init_backtest_status(user_mode, run_id, tanda_id):
-    with BACKTEST_STATUS_LOCK:
-        BACKTEST_STATUS_BY_USER[user_mode] = {
-            'run_id': run_id,
-            'tanda_id': tanda_id,
-            'status': 'queued',
-            'phase_index': 0,
-            'phase_total': 0,
-            'phase': 'En cola',
-            'message': 'Backtest en cola de ejecucion',
-            'events': [{
-                'timestamp': _utc_now_iso(),
-                'phase': 'En cola',
-                'message': 'Backtest en cola de ejecucion'
-            }],
-            'started_at': _utc_now_iso(),
-            'updated_at': _utc_now_iso(),
-            'finished_at': None,
-            'result_count': 0,
-            'error': None,
-        }
-
-
-def _append_backtest_event(user_mode, phase, message):
-    with BACKTEST_STATUS_LOCK:
-        state = BACKTEST_STATUS_BY_USER.get(user_mode)
-        if not state:
-            return
-        state['events'].append({
-            'timestamp': _utc_now_iso(),
-            'phase': str(phase),
-            'message': str(message),
-        })
-        state['events'] = state['events'][-120:]
-        state['updated_at'] = _utc_now_iso()
-
-
-def _set_backtest_progress(user_mode, phase_index, phase_total, phase, message, status='running'):
-    with BACKTEST_STATUS_LOCK:
-        state = BACKTEST_STATUS_BY_USER.get(user_mode)
-        if not state:
-            return
-        state['status'] = status
-        state['phase_index'] = int(phase_index)
-        state['phase_total'] = int(phase_total)
-        state['phase'] = str(phase)
-        state['message'] = str(message)
-        state['updated_at'] = _utc_now_iso()
-    _append_backtest_event(user_mode, phase, message)
-
-
-def _finish_backtest_status(user_mode, status, message, result_count=0, error=None):
-    with BACKTEST_STATUS_LOCK:
-        state = BACKTEST_STATUS_BY_USER.get(user_mode)
-        if not state:
-            return
-        state['status'] = status
-        state['message'] = str(message)
-        state['result_count'] = int(result_count or 0)
-        state['error'] = str(error) if error else None
-        state['finished_at'] = _utc_now_iso()
-        state['updated_at'] = _utc_now_iso()
-        state['events'].append({
-            'timestamp': _utc_now_iso(),
-            'phase': 'Finalizado' if status == 'completed' else 'Error',
-            'message': str(message),
-        })
-        state['events'] = state['events'][-120:]
 
 def obtener_usuarios_registrados():
     
