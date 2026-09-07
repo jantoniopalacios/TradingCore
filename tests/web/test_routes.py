@@ -164,3 +164,59 @@ def test_view_graph_missing_result_returns_404(client):
     response = client.get('/backtest/ver_grafico/999999')
 
     assert response.status_code == 404
+
+
+def test_view_graph_uses_legacy_html_fallback(client, monkeypatch):
+    from scenarios.BacktestWeb.database import db, ResultadoBacktest, Usuario
+    import scenarios.BacktestWeb.routes.main_bp as main_bp
+
+    user = Usuario(username='legacy_graph_user', password='123')
+    db.session.add(user)
+    db.session.flush()
+    resultado = ResultadoBacktest(
+        usuario_id=user.id,
+        id_estrategia=1,
+        symbol='AAPL',
+        grafico_html='<html><body><div>LEGACY_GRAPH</div></body></html>',
+    )
+    db.session.add(resultado)
+    db.session.commit()
+
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'admin'
+
+    monkeypatch.setattr(main_bp, '_regenerate_graph_html_on_demand', lambda resultado, user_mode: None)
+
+    response = client.get(f'/backtest/ver_grafico/{resultado.id}')
+
+    assert response.status_code == 200
+    assert 'LEGACY_GRAPH' in response.get_data(as_text=True)
+
+
+def test_view_graph_returns_unavailable_message_when_no_graph(client, monkeypatch):
+    from scenarios.BacktestWeb.database import db, ResultadoBacktest, Usuario
+    import scenarios.BacktestWeb.routes.main_bp as main_bp
+
+    user = Usuario(username='empty_graph_user', password='123')
+    db.session.add(user)
+    db.session.flush()
+    resultado = ResultadoBacktest(
+        usuario_id=user.id,
+        id_estrategia=1,
+        symbol='AAPL',
+        grafico_html=None,
+    )
+    db.session.add(resultado)
+    db.session.commit()
+
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'admin'
+
+    monkeypatch.setattr(main_bp, '_regenerate_graph_html_on_demand', lambda resultado, user_mode: None)
+
+    response = client.get(f'/backtest/ver_grafico/{resultado.id}')
+
+    assert response.status_code == 200
+    assert 'Grafico no disponible para este backtest' in response.get_data(as_text=True)
