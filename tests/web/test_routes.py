@@ -110,3 +110,40 @@ def test_scheduler_paths_match_web_paths():
 
     assert STATUS_FILE_PATH == SCHEDULER_STATUS_PATH
     assert PID_FILE_PATH == SCHEDULER_PID_PATH
+
+
+def test_backtest_status_idle(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'admin'
+
+    response = client.get('/backtest_status')
+
+    assert response.status_code == 200
+    assert response.get_json()['status'] == 'idle'
+
+
+def test_scheduler_status_requires_admin(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'user'
+
+    response = client.get('/scheduler/status')
+
+    assert response.status_code == 403
+    assert response.get_json()['status'] == 'error'
+
+
+def test_graph_cache_helpers_without_snapshot():
+    from types import SimpleNamespace
+    from scenarios.BacktestWeb.routes.graph_cache import (
+        _graph_cache_file_for_result,
+        _graph_snapshot_file_for_result,
+        _read_graph_snapshot_payload,
+    )
+
+    resultado = SimpleNamespace(id=123, usuario_id=7, symbol="AAPL")
+
+    assert str(_graph_cache_file_for_result(resultado)).endswith("bt_123_AAPL.html")
+    assert str(_graph_snapshot_file_for_result(resultado)).endswith("bt_123_AAPL_snapshot.json.gz")
+    assert _read_graph_snapshot_payload(resultado) is None
