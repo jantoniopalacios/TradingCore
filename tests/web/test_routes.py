@@ -258,3 +258,89 @@ def test_render_native_backtest_html_cleans_temp_file_when_plot_fails():
         _render_native_backtest_html(fake_bt_result, 123)
 
     assert not Path(fake_bt_result.filename).exists()
+
+
+def test_effective_graph_config_params_override_base_config():
+    from types import SimpleNamespace
+    from scenarios.BacktestWeb.routes.config_helpers import _build_effective_graph_config
+
+    resultado = SimpleNamespace(
+        params_tecnicos='{"start_date": "2024-02-01", "end_date": "2024-02-29", "intervalo": "1wk"}',
+        fecha_inicio_datos=None,
+        fecha_fin_datos=None,
+        intervalo=None,
+    )
+    base_config = {
+        'start_date': '2024-01-01',
+        'end_date': '2024-01-31',
+        'intervalo': '1d',
+    }
+
+    config_final, start_date, end_date, intervalo = _build_effective_graph_config(resultado, base_config)
+
+    assert (start_date, end_date, intervalo) == ('2024-02-01', '2024-02-29', '1wk')
+    assert config_final['start_date'] == config_final['START_DATE'] == start_date
+    assert config_final['end_date'] == config_final['END_DATE'] == end_date
+    assert config_final['intervalo'] == config_final['INTERVAL'] == intervalo
+
+
+def test_effective_graph_config_result_dates_have_priority():
+    from types import SimpleNamespace
+    from scenarios.BacktestWeb.routes.config_helpers import _build_effective_graph_config
+
+    resultado = SimpleNamespace(
+        params_tecnicos='{"start_date": "2024-02-01", "end_date": "2024-02-29", "intervalo": "1wk"}',
+        fecha_inicio_datos='2024-03-01',
+        fecha_fin_datos='2024-03-31',
+        intervalo='1h',
+    )
+    base_config = {
+        'start_date': '2024-01-01',
+        'end_date': '2024-01-31',
+        'intervalo': '1d',
+    }
+
+    config_final, start_date, end_date, intervalo = _build_effective_graph_config(resultado, base_config)
+
+    assert (start_date, end_date, intervalo) == ('2024-03-01', '2024-03-31', '1h')
+    assert config_final['start_date'] == config_final['START_DATE'] == start_date
+    assert config_final['end_date'] == config_final['END_DATE'] == end_date
+    assert config_final['intervalo'] == config_final['INTERVAL'] == intervalo
+
+
+def test_effective_graph_config_invalid_params_json_uses_base_config():
+    from types import SimpleNamespace
+    from scenarios.BacktestWeb.routes.config_helpers import _build_effective_graph_config
+
+    resultado = SimpleNamespace(
+        params_tecnicos='{invalid json',
+        fecha_inicio_datos=None,
+        fecha_fin_datos=None,
+        intervalo=None,
+    )
+    base_config = {
+        'start_date': '2024-01-01',
+        'end_date': '2024-01-31',
+        'intervalo': '1d',
+    }
+
+    config_final, start_date, end_date, intervalo = _build_effective_graph_config(resultado, base_config)
+
+    assert (start_date, end_date, intervalo) == ('2024-01-01', '2024-01-31', '1d')
+    assert config_final['start_date'] == config_final['START_DATE'] == start_date
+    assert config_final['end_date'] == config_final['END_DATE'] == end_date
+    assert config_final['intervalo'] == config_final['INTERVAL'] == intervalo
+
+
+def test_effective_graph_config_missing_date_returns_none():
+    from types import SimpleNamespace
+    from scenarios.BacktestWeb.routes.config_helpers import _build_effective_graph_config
+
+    resultado = SimpleNamespace(
+        params_tecnicos=None,
+        fecha_inicio_datos=None,
+        fecha_fin_datos='2024-01-31',
+        intervalo=None,
+    )
+
+    assert _build_effective_graph_config(resultado, {'start_date': None}) is None

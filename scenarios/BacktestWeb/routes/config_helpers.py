@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from .helpers import (
@@ -39,3 +40,30 @@ def _build_default_snapshot_filename(username, config_params):
     )
     username_part = _sanitize_filename_component(username)
     return f"{stamp}-{strategy_title}-{username_part}.json"
+
+
+def _build_effective_graph_config(resultado, base_config):
+    try:
+        params = json.loads(resultado.params_tecnicos) if resultado.params_tecnicos else {}
+        if not isinstance(params, dict):
+            params = {}
+    except Exception:
+        params = {}
+
+    config_final = {**base_config, **params}
+
+    start_date = resultado.fecha_inicio_datos or config_final.get('start_date') or config_final.get('START_DATE')
+    end_date = resultado.fecha_fin_datos or config_final.get('end_date') or config_final.get('END_DATE')
+    intervalo = resultado.intervalo or config_final.get('intervalo') or config_final.get('INTERVAL') or '1d'
+
+    if not start_date or not end_date:
+        return None
+
+    config_final['start_date'] = start_date
+    config_final['START_DATE'] = start_date
+    config_final['end_date'] = end_date
+    config_final['END_DATE'] = end_date
+    config_final['intervalo'] = intervalo
+    config_final['INTERVAL'] = intervalo
+
+    return config_final, start_date, end_date, intervalo

@@ -37,6 +37,7 @@ from .config_helpers import (
     _extract_symbols_from_form_data,
     _build_config_params_from_form_data,
     _build_default_snapshot_filename,
+    _build_effective_graph_config,
 )
 from .backtest_status import (
     BACKTEST_STATUS_BY_USER,
@@ -146,34 +147,16 @@ def _regenerate_graph_html_on_demand(resultado, requester_user_mode):
         return None
 
     try:
-        params = json.loads(resultado.params_tecnicos) if resultado.params_tecnicos else {}
-        if not isinstance(params, dict):
-            params = {}
-    except Exception:
-        params = {}
-
-    try:
         base_config = cargar_y_asignar_configuracion(owner_username)
     except Exception as cfg_err:
         logging.getLogger(__name__).warning("No se pudo cargar configuracion para regenerar grafico (%s): %s", owner_username, cfg_err)
         return None
 
-    config_final = {**base_config, **params}
-
-    start_date = resultado.fecha_inicio_datos or config_final.get('start_date') or config_final.get('START_DATE')
-    end_date = resultado.fecha_fin_datos or config_final.get('end_date') or config_final.get('END_DATE')
-    intervalo = resultado.intervalo or config_final.get('intervalo') or config_final.get('INTERVAL') or '1d'
-
-    if not start_date or not end_date:
+    effective_config = _build_effective_graph_config(resultado, base_config)
+    if effective_config is None:
         logging.getLogger(__name__).warning("No hay rango de fechas para regenerar grafico de %s (resultado %s)", symbol, resultado.id)
         return None
-
-    config_final['start_date'] = start_date
-    config_final['START_DATE'] = start_date
-    config_final['end_date'] = end_date
-    config_final['END_DATE'] = end_date
-    config_final['intervalo'] = intervalo
-    config_final['INTERVAL'] = intervalo
+    config_final, start_date, end_date, intervalo = effective_config
 
     try:
         asignar_parametros_a_system(config_final, config_final)
