@@ -1,4 +1,7 @@
 import json
+import os
+import tempfile
+from pathlib import Path
 
 from bokeh.embed import file_html
 from bokeh.layouts import column
@@ -161,3 +164,20 @@ def _read_graph_html_with_cache(resultado):
         return db_html
 
     return None
+
+
+def _render_native_backtest_html(bt_result, result_id):
+    fd, temp_html_path = tempfile.mkstemp(prefix=f"bt_{result_id}_", suffix=".html")
+    os.close(fd)
+    html = None
+    try:
+        bt_result.plot(filename=temp_html_path, open_browser=False)
+        if Path(temp_html_path).exists():
+            html = Path(temp_html_path).read_text(encoding='utf-8')
+    finally:
+        try:
+            Path(temp_html_path).unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    return html

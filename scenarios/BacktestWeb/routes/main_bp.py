@@ -8,7 +8,6 @@ import time
 import sys
 import signal
 import subprocess
-import tempfile
 from pathlib import Path
 from flask import (
     Blueprint, render_template, request, redirect, url_for, 
@@ -56,6 +55,7 @@ from .graph_cache import (
 )
 from .graph_render import (
     GRAPH_SNAPSHOT_PREFIX,
+    _render_native_backtest_html,
     _render_bokeh_html_from_snapshot,
     _read_graph_html_with_cache,
 )
@@ -216,18 +216,7 @@ def _regenerate_graph_html_on_demand(resultado, requester_user_mode):
 
     try:
         # 1) Generar el HTML nativo del motor (mismo look & feel que antes)
-        fd, temp_html_path = tempfile.mkstemp(prefix=f"bt_{resultado.id}_", suffix=".html")
-        os.close(fd)
-        html = None
-        try:
-            bt_result.plot(filename=temp_html_path, open_browser=False)
-            if Path(temp_html_path).exists():
-                html = Path(temp_html_path).read_text(encoding='utf-8')
-        finally:
-            try:
-                Path(temp_html_path).unlink(missing_ok=True)
-            except Exception:
-                pass
+        html = _render_native_backtest_html(bt_result, resultado.id)
 
         # 2) Persistir snapshot estructurado como respaldo (sin guardar HTML pesado)
         payload = _build_graph_snapshot_payload(symbol, intervalo, stocks_data_dict[symbol], bt_result)
