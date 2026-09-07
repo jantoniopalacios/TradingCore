@@ -220,3 +220,41 @@ def test_view_graph_returns_unavailable_message_when_no_graph(client, monkeypatc
 
     assert response.status_code == 200
     assert 'Grafico no disponible para este backtest' in response.get_data(as_text=True)
+
+
+def test_render_native_backtest_html_returns_html_and_cleans_temp_file():
+    from pathlib import Path
+    from scenarios.BacktestWeb.routes.graph_render import _render_native_backtest_html
+
+    class FakeBacktestResult:
+        filename = None
+
+        def plot(self, filename, open_browser=False):
+            self.filename = filename
+            Path(filename).write_text('<html><body>NATIVE_GRAPH</body></html>', encoding='utf-8')
+
+    fake_bt_result = FakeBacktestResult()
+
+    html = _render_native_backtest_html(fake_bt_result, 123)
+
+    assert html == '<html><body>NATIVE_GRAPH</body></html>'
+    assert not Path(fake_bt_result.filename).exists()
+
+
+def test_render_native_backtest_html_cleans_temp_file_when_plot_fails():
+    from pathlib import Path
+    from scenarios.BacktestWeb.routes.graph_render import _render_native_backtest_html
+
+    class FailingBacktestResult:
+        filename = None
+
+        def plot(self, filename, open_browser=False):
+            self.filename = filename
+            raise RuntimeError('plot failed')
+
+    fake_bt_result = FailingBacktestResult()
+
+    with pytest.raises(RuntimeError, match='plot failed'):
+        _render_native_backtest_html(fake_bt_result, 123)
+
+    assert not Path(fake_bt_result.filename).exists()
