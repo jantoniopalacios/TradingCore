@@ -65,6 +65,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import ResourceClosedError
 
+from werkzeug.exceptions import HTTPException
+
 main_bp = Blueprint('main', __name__) 
 
 SCHEDULER_SCRIPT_PATH = PROJECT_ROOT / 'scripts' / 'scheduler' / 'backtest_scheduler.py'
@@ -1721,6 +1723,8 @@ def ver_grafico_completo(reg_id):
         # Usamos Response para asegurar el mimetype correcto
         return Response(page_html, mimetype='text/html')
     
+    except HTTPException:
+        raise
     except Exception as e:
         return f"<h3>Error al recuperar gráfico: {str(e)}</h3>", 500
     

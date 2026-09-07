@@ -147,3 +147,20 @@ def test_graph_cache_helpers_without_snapshot():
     assert str(_graph_cache_file_for_result(resultado)).endswith("bt_123_AAPL.html")
     assert str(_graph_snapshot_file_for_result(resultado)).endswith("bt_123_AAPL_snapshot.json.gz")
     assert _read_graph_snapshot_payload(resultado) is None
+
+
+def test_view_graph_requires_login(client):
+    response = client.get('/backtest/ver_grafico/999999')
+
+    assert response.status_code == 302
+    assert response.headers['Location'] == '/login'
+
+
+def test_view_graph_missing_result_returns_404(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'admin'
+
+    response = client.get('/backtest/ver_grafico/999999')
+
+    assert response.status_code == 404
