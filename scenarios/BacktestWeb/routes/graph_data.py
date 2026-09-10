@@ -17,3 +17,22 @@ def _load_graph_market_data(
         return None
 
     return {symbol: datos_filtrados}
+
+
+def _run_graph_backtest(
+    stocks_data_dict,
+    system_cls,
+    config_final,
+    symbol,
+    run_backtest_func,
+    logger,
+):
+    _, _, backtest_objects = run_backtest_func(
+        stocks_data_dict,
+        system_cls,
+        config_final,
+        [symbol],
+        20,
+        logger,
+    )
+    return (backtest_objects or {}).get(symbol)

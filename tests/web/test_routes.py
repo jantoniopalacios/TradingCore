@@ -399,3 +399,47 @@ def test_load_graph_market_data_returns_none_when_symbol_missing():
     )
 
     assert result is None
+
+
+def test_run_graph_backtest_returns_symbol_result():
+    from scenarios.BacktestWeb.routes.graph_data import _run_graph_backtest
+
+    calls = []
+    objeto_resultado = {'stats': 'ok'}
+
+    def fake_run_backtest(stocks_data_dict, system_cls, config_final, symbols, bar_count, logger):
+        calls.append((stocks_data_dict, system_cls, config_final, symbols, bar_count, logger))
+        return None, None, {'AAPL': objeto_resultado}
+
+    stocks_dict = {'AAPL': 'df'}
+    sys_cls = object()
+    cfg = {'param': 1}
+    logger_obj = object()
+
+    result = _run_graph_backtest(
+        stocks_dict, sys_cls, cfg, 'AAPL', fake_run_backtest, logger_obj
+    )
+
+    assert result is objeto_resultado
+    assert len(calls) == 1
+    assert calls[0] == (stocks_dict, sys_cls, cfg, ['AAPL'], 20, logger_obj)
+
+
+def test_run_graph_backtest_returns_none_when_symbol_missing():
+    from scenarios.BacktestWeb.routes.graph_data import _run_graph_backtest
+
+    def fake_run_backtest_empty(*args):
+        return None, None, {}
+
+    result_empty = _run_graph_backtest(
+        {}, None, {}, 'AAPL', fake_run_backtest_empty, None
+    )
+    assert result_empty is None
+
+    def fake_run_backtest_none(*args):
+        return None, None, None
+
+    result_none = _run_graph_backtest(
+        {}, None, {}, 'AAPL', fake_run_backtest_none, None
+    )
+    assert result_none is None

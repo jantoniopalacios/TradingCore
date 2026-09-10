@@ -60,7 +60,7 @@ from .graph_render import (
     _render_bokeh_html_from_snapshot,
     _read_graph_html_with_cache,
 )
-from .graph_data import _load_graph_market_data
+from .graph_data import _load_graph_market_data, _run_graph_backtest
 
 from ..database import db, ResultadoBacktest, Trade, Usuario, Simbolo # Importa tus modelos
 from sqlalchemy import func
@@ -185,19 +185,18 @@ def _regenerate_graph_html_on_demand(resultado, requester_user_mode):
         return None
 
     try:
-        _, _, backtest_objects = run_multi_symbol_backtest(
+        bt_result = _run_graph_backtest(
             stocks_data_dict,
             System,
             config_final,
-            [symbol],
-            20,
+            symbol,
+            run_multi_symbol_backtest,
             logging.getLogger(__name__),
         )
     except Exception as bt_err:
         logging.getLogger(__name__).warning("Error en backtest on-demand para grafico %s: %s", symbol, bt_err)
         return None
 
-    bt_result = (backtest_objects or {}).get(symbol)
     if bt_result is None:
         return None
 
