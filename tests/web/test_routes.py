@@ -443,3 +443,27 @@ def test_run_graph_backtest_returns_none_when_symbol_missing():
         {}, None, {}, 'AAPL', fake_run_backtest_none, None
     )
     assert result_none is None
+
+
+def test_scheduler_pid_helper_removes_invalid_pid_file(tmp_path):
+    from scenarios.BacktestWeb.routes.scheduler_helpers import _is_scheduler_running_from_pid
+
+    pid_path = tmp_path / "backtest_scheduler.pid"
+    pid_path.write_text("abc", encoding="utf-8")
+
+    result = _is_scheduler_running_from_pid(pid_path)
+
+    assert result is False
+    assert not pid_path.exists()
+
+
+def test_scheduler_pid_helper_removes_orphan_pid_file(tmp_path):
+    from scenarios.BacktestWeb.routes.scheduler_helpers import _is_scheduler_running_from_pid
+
+    pid_path = tmp_path / "backtest_scheduler.pid"
+    pid_path.write_text("999999", encoding="utf-8")
+
+    result = _is_scheduler_running_from_pid(pid_path)
+
+    assert result is False
+    assert not pid_path.exists()
