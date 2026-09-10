@@ -25,6 +25,7 @@ Refresco de configuración:
 import sys
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import argparse
 import os
 import time
@@ -45,18 +46,47 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from scenarios.BacktestWeb.Backtest import ejecutar_backtest
+from scenarios.BacktestWeb.configuracion import BACKTESTING_BASE_DIR
 from scenarios.BacktestWeb.database import Usuario, db
 from trading_engine.core.database_pg import DATABASE_URL
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s – %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
 logger = logging.getLogger("backtest_scheduler")
+
+
+def _setup_logging():
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+
+    log_dir = BACKTESTING_BASE_DIR / "logs"
+    log_file_path = log_dir / "backtest_scheduler.log"
+
+    has_console_handler = any(
+        getattr(h, '_is_backtest_scheduler_console', False) for h in root_logger.handlers
+    )
+    if not has_console_handler:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        console_handler._is_backtest_scheduler_console = True
+        root_logger.addHandler(console_handler)
+
+    has_file_handler = any(
+        isinstance(h, logging.FileHandler) and Path(h.baseFilename) == log_file_path
+        for h in root_logger.handlers
+    )
+    if not has_file_handler:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            log_file_path,
+            maxBytes=500 * 1024,
+            backupCount=3,
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
 
 STATUS_FILE_PATH = project_root / "logs" / "backtest_scheduler_status.json"
 PID_FILE_PATH = project_root / "logs" / "backtest_scheduler.pid"
@@ -473,6 +503,7 @@ def ejecutar_todos_ahora() -> None:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    _setup_logging()
     parser = argparse.ArgumentParser(description="Scheduler automático de backtests por usuario.")
     parser.add_argument(
         '--ahora', action='store_true',
