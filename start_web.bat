@@ -48,13 +48,25 @@ if "%PG_READY%" neq "1" (
     exit /b 1
 )
 
-:: 2. COMPROBAR SI LA WEB YA ESTÁ CORRIENDO (detección robusta)
-powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match 'scenarios.BacktestWeb.app' }; if ($p) { exit 0 } else { exit 1 }" >nul 2>&1
+:: 2. COMPROBAR SI EL PUERTO WEB YA ESTA OCUPADO
+echo [*] Comprobando servidor web en puerto 5000...
+powershell -NoProfile -Command "if (Test-NetConnection -ComputerName 127.0.0.1 -Port 5000 -InformationLevel Quiet) { exit 0 } else { exit 1 }" >nul 2>&1
+
 if %errorlevel% equ 0 (
     echo.
-    echo [ADVERTENCIA] El servidor %TASK_NAME% ya esta activo.
-    echo No se lanzara otra instancia.
+    echo [ADVERTENCIA] El puerto 5000 ya esta ocupado.
+    echo No se lanzara otra instancia de %TASK_NAME%.
+    timeout /t 5
+    exit /b
+)
 
+:: Comprobacion adicional por proceso
+powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -match 'scenarios.BacktestWeb.app' }; if ($p) { exit 0 } else { exit 1 }" >nul 2>&1
+
+if %errorlevel% equ 0 (
+    echo.
+    echo [ADVERTENCIA] Se ha detectado una instancia de %TASK_NAME% en ejecucion.
+    echo No se lanzara otra instancia.
     timeout /t 5
     exit /b
 )
