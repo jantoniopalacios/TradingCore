@@ -1,7 +1,18 @@
 @echo off
+setlocal
+
 cd /d "%~dp0"
-REM Activar entorno virtual
-call .venv\Scripts\activate.bat
-REM Ejecutar el script de backtest scheduler
-python scripts\scheduler\backtest_scheduler.py
+
+set "PROJECT_ROOT=%~dp0"
+set "PYTHON_EXE=%PROJECT_ROOT%..\..\TradingCore\.venv\Scripts\python.exe"
+
+if not exist "%PYTHON_EXE%" (
+    echo [ERROR] No se encuentra el entorno virtual del proyecto:
+    echo %PYTHON_EXE%
+    pause
+    exit /b 1
+)
+
+"%PYTHON_EXE%" "%PROJECT_ROOT%scripts\scheduler\backtest_scheduler.py"
+
 pause
