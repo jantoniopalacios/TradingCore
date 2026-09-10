@@ -60,6 +60,7 @@ from .graph_render import (
     _render_bokeh_html_from_snapshot,
     _read_graph_html_with_cache,
 )
+from .graph_data import _load_graph_market_data
 
 from ..database import db, ResultadoBacktest, Trade, Usuario, Simbolo # Importa tus modelos
 from sqlalchemy import func
@@ -165,19 +166,22 @@ def _regenerate_graph_html_on_demand(resultado, requester_user_mode):
         return None
 
     data_files_path = Path(config_final.get('data_files_path') or (PROJECT_ROOT / 'Data_files'))
-    simbolos_df = DataFrame([{'Symbol': symbol, 'Name': symbol}])
 
     try:
-        stocks_data = descargar_datos_YF(simbolos_df, start_date, end_date, intervalo, data_files_path)
+        stocks_data_dict = _load_graph_market_data(
+            symbol,
+            start_date,
+            end_date,
+            intervalo,
+            data_files_path,
+            descargar_datos_YF,
+            DataFrame,
+        )
     except Exception as dl_err:
         logging.getLogger(__name__).warning("Error descargando datos para regenerar grafico %s: %s", symbol, dl_err)
         return None
 
-    if stocks_data is None or stocks_data.empty:
-        return None
-
-    stocks_data_dict = {symbol: stocks_data[stocks_data['Symbol'] == symbol]}
-    if symbol not in stocks_data_dict or stocks_data_dict[symbol].empty:
+    if stocks_data_dict is None:
         return None
 
     try:

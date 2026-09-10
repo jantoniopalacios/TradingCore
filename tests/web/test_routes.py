@@ -344,3 +344,58 @@ def test_effective_graph_config_missing_date_returns_none():
     )
 
     assert _build_effective_graph_config(resultado, {'start_date': None}) is None
+
+
+def test_load_graph_market_data_returns_filtered_symbol():
+    import pandas as pd
+    from scenarios.BacktestWeb.routes.graph_data import _load_graph_market_data
+
+    market_data = pd.DataFrame([
+        {'Symbol': 'AAPL', 'Close': 100},
+        {'Symbol': 'MSFT', 'Close': 200},
+    ])
+
+    def descargar_datos_func(*args):
+        return market_data
+
+    result = _load_graph_market_data(
+        'AAPL', '2024-01-01', '2024-01-31', '1d',
+        Path('Data_files'), descargar_datos_func, pd.DataFrame,
+    )
+
+    assert set(result) == {'AAPL'}
+    assert result['AAPL']['Symbol'].tolist() == ['AAPL']
+
+
+def test_load_graph_market_data_returns_none_when_download_empty():
+    import pandas as pd
+    from scenarios.BacktestWeb.routes.graph_data import _load_graph_market_data
+
+    def descargar_datos_func(*args):
+        return pd.DataFrame()
+
+    result = _load_graph_market_data(
+        'AAPL', '2024-01-01', '2024-01-31', '1d',
+        Path('Data_files'), descargar_datos_func, pd.DataFrame,
+    )
+
+    assert result is None
+
+
+def test_load_graph_market_data_returns_none_when_symbol_missing():
+    import pandas as pd
+    from scenarios.BacktestWeb.routes.graph_data import _load_graph_market_data
+
+    market_data = pd.DataFrame([
+        {'Symbol': 'MSFT', 'Close': 200},
+    ])
+
+    def descargar_datos_func(*args):
+        return market_data
+
+    result = _load_graph_market_data(
+        'AAPL', '2024-01-01', '2024-01-31', '1d',
+        Path('Data_files'), descargar_datos_func, pd.DataFrame,
+    )
+
+    assert result is None
