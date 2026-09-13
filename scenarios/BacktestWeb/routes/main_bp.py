@@ -484,7 +484,7 @@ def index():
 def get_strategy_params(reg_id):
 
     
-    res = ResultadoBacktest.query.get_or_404(reg_id)
+    res = db.get_or_404(ResultadoBacktest, reg_id)
     if not res.params_tecnicos:
         return jsonify({"error": "Sin parámetros"}), 404
     
@@ -1221,7 +1221,7 @@ def export_tanda(tanda_id):
         # En caso contrario usamos el usuario de la sesión.
         usuario_id_param = request.args.get('usuario_id', type=int)
         if usuario_id_param is not None:
-            u = Usuario.query.get(usuario_id_param)
+            u = db.session.get(Usuario, usuario_id_param)
         else:
             u = Usuario.query.filter_by(username=user_mode).first()
 
@@ -1398,7 +1398,7 @@ def limpiar_datos_admin():
         fecha_limite = datetime.strptime(fecha_limite_str, '%Y-%m-%d').date()
         
         # Verificar que el usuario existe
-        usuario = Usuario.query.get(usuario_id)
+        usuario = db.session.get(Usuario, usuario_id)
         if not usuario:
             return jsonify({"success": False, "message": "Usuario no encontrado"}), 404
         
@@ -1593,7 +1593,7 @@ def ver_grafico_completo(reg_id):
         user_mode = session.get('user_mode')
 
         # 1. Buscamos en la DB (Asegúrate de que reg_id coincida con el nombre del argumento)
-        resultado = ResultadoBacktest.query.get_or_404(reg_id)
+        resultado = db.get_or_404(ResultadoBacktest, reg_id)
 
         # 1.1 Control de acceso: admin ve todo; usuario normal solo sus registros
         if user_mode != 'admin':
@@ -1750,7 +1750,7 @@ def admin_users_update(user_id):
     if not ok:
         return resp
 
-    target = Usuario.query.get_or_404(user_id)
+    target = db.get_or_404(Usuario, user_id)
     new_username = request.form.get('username', '').strip().lower()
     new_password = request.form.get('password', '').strip()
 
@@ -1789,7 +1789,7 @@ def admin_users_delete(user_id):
     if not ok:
         return resp
 
-    target = Usuario.query.get_or_404(user_id)
+    target = db.get_or_404(Usuario, user_id)
     current_user = session.get('user_mode', '').lower().strip()
 
     if target.username.lower() == 'admin':
