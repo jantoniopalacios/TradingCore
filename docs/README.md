@@ -1,33 +1,42 @@
 # TradingCore: Motor Central y Arquitectura Modular
 
-Última actualización: 06/09/2026
+Última actualización: 14/09/2026
 
 Este repositorio contiene la arquitectura central (Motor) para múltiples escenarios de trading (Backtesting, Live Trading, Web Apps).
 
 ---
 
-## Inicio Rapido (Backtest Web)
+## Inicio Rápido (Backtest Web)
 
 Para ejecutar la aplicación web de backtesting desde la raíz del repo:
 
 1. **Activar entorno virtual:**
+
    ```bash
    .\.venv\Scripts\activate
    ```
+
 2. **Instalar dependencias (si aplica):**
+
    ```bash
    pip install -r requirements.txt
    ```
+
 3. **Iniciar PostgreSQL embebido:**
+
    ```bat
    pg_start.bat
    ```
+
 4. **Iniciar servidor Flask:**
+
    ```bash
    python scenarios/BacktestWeb/app.py
    ```
+
 5. **Abrir la aplicación:**
-   ```
+
+   ```text
    http://localhost:5000
    ```
 
@@ -47,32 +56,32 @@ Las leyendas indican la criticidad de cada componente:
 
 Núcleo reutilizable con toda la lógica de negocio. No tiene dependencia de ningún escenario concreto.
 
-```
+```text
 trading_engine/
-├── core/                    🔴 Núcleo de ejecución
-│   ├── Logica_Trading.py        Gestión de señales de entrada/salida, stops y trailing
-│   ├── Backtest_Runner.py       Orquestador del ciclo de backtesting (barra a barra)
-│   ├── database_pg.py           Capa de acceso a PostgreSQL (ORM ligero, queries, modelos)
-│   └── constants.py             Constantes globales del motor (nombres de columnas, estados)
-├── indicators/              🔴 Filtros técnicos (uno por indicador)
-│   ├── Filtro_EMA.py            Cruce de medias / precio vs EMA
-│   ├── Filtro_RSI.py            Relative Strength Index
-│   ├── Filtro_MACD.py           MACD y señal
-│   ├── Filtro_ATR.py            Average True Range (volatilidad, stops dinámicos)
-│   ├── Filtro_BollingerBands.py Bandas de Bollinger
-│   ├── Filtro_Stochastic.py     Oscilador Estocástico
-│   ├── Filtro_MoS.py            Margin of Safety (filtro de precio justo)
-│   └── Filtro_Volume.py         Filtro de volumen relativo
-└── utils/                   🔴 Utilidades compartidas del motor
-    ├── Calculos_Financieros.py  Cálculos de rentabilidad, métricas de cartera
-    ├── Calculos_Tecnicos.py     Cálculo de indicadores técnicos sobre DataFrames
-    ├── Data_download.py         Descarga de datos OHLCV vía yfinance
-    ├── Graficos_financieros.py  Generación de gráficos Bokeh interactivos
-    ├── Historico_manager.py     Lectura y cacheo de CSVs históricos de Data_files/
-    ├── setup.py                 Configuración de entorno del motor
-    ├── utils_mail.py            Envío de alertas por correo electrónico
+├── core/                         🔴 Núcleo de ejecución
+│   ├── Logica_Trading.py             Gestión de señales de entrada/salida, stops y trailing
+│   ├── Backtest_Runner.py            Orquestador del ciclo de backtesting
+│   ├── database_pg.py                Configuración y acceso compartido a PostgreSQL
+│   └── constants.py                  Constantes globales del motor
+├── indicators/                   🔴 Filtros técnicos
+│   ├── Filtro_EMA.py                 Cruce de medias / precio vs EMA
+│   ├── Filtro_RSI.py                 Relative Strength Index
+│   ├── Filtro_MACD.py                MACD y señal
+│   ├── Filtro_ATR.py                 Average True Range
+│   ├── Filtro_BollingerBands.py      Bandas de Bollinger
+│   ├── Filtro_Stochastic.py          Oscilador Estocástico
+│   ├── Filtro_MoS.py                 Margin of Safety
+│   └── Filtro_Volume.py              Filtro de volumen relativo
+└── utils/                        🔴 Utilidades compartidas
+    ├── Calculos_Financieros.py       Cálculos y ratios financieros
+    ├── Calculos_Tecnicos.py          Cálculos técnicos sobre series y DataFrames
+    ├── Data_download.py              Descarga y gestión de datos de mercado y fundamentales
+    ├── Graficos_financieros.py       Generación de gráficos Bokeh interactivos
+    ├── Historico_manager.py          Lectura y cacheo de históricos
+    ├── setup.py                      Configuración de entorno del motor
+    ├── utils_mail.py                 Envío de alertas por correo electrónico
     └── Config/
-        └── setup_mail.env       Credenciales de correo (no versionar en producción)
+        └── setup_mail.env             Configuración local de correo (no versionar credenciales)
 ```
 
 ---
@@ -81,94 +90,106 @@ trading_engine/
 
 Aplicación Flask que expone el motor de trading como interfaz web multiusuario.
 
-```
+```text
 scenarios/BacktestWeb/
-├── app.py                   🔴 Punto de entrada Flask, registro de blueprints, login
-├── Backtest.py              🔴 Capa de orquestación: lanza backtests, persiste resultados
-├── estrategia_system.py     🔴 Sistema de parámetros de estrategia (preset/config dinámica)
-├── configuracion.py         🟡 Carga y validación de configuración de usuario (JSON)
-├── database.py              🟡 Modelos SQLAlchemy y sesión de BD (PostgreSQL)
-├── DBStore.py               🟡 Persistencia de resultados, snapshots y gráficos
-├── file_handler.py          🟡 Gestión de ficheros de configuración y caché en disco
+├── app.py                       🔴 Punto de entrada Flask
+├── Backtest.py                  🔴 Orquestación de backtests y persistencia
+├── estrategia_system.py         🔴 Sistema de parámetros de estrategia
+├── configuracion.py             🟡 Carga y validación de configuración
+├── database.py                  🟡 Modelos SQLAlchemy de la aplicación
+├── DBStore.py                   🟡 Persistencia de resultados y snapshots
+├── file_handler.py              🟡 Gestión de configuración y caché
 ├── routes/
-│   └── main_bp.py           🔴 Blueprint principal: todas las rutas HTTP de la app
-└── templates/               🔴 Plantillas HTML Jinja2
-    ├── index.html               Layout principal (tabs de configuración)
-    ├── login.html               Pantalla de autenticación
-    ├── cargando.html            Página de espera durante ejecución
-    ├── _tab_global.html         Tab: parámetros globales de estrategia
-    ├── _tab_ema.html            Tab: parámetros EMA
-    ├── _tab_rsi.html            Tab: parámetros RSI
-    ├── _tab_macd.html           Tab: parámetros MACD
-    ├── _tab_atr.html            Tab: parámetros ATR / stops dinámicos
-    ├── _tab_bb.html             Tab: parámetros Bollinger Bands
-    ├── _tab_stoch.html          Tab: parámetros Estocástico
-    ├── _tab_mos_volume.html     Tab: parámetros MoS y Volumen
-    ├── _tab_symbols.html        Tab: selección de símbolos y temporalidad
-    ├── _tab_historial.html      Tab: historial de resultados con paginación por tandas
-    ├── _tab_charts_viewer.html  Tab: visor de gráficos Bokeh
-    ├── _tab_scheduler.html      Tab: programación de backtests automáticos
-    ├── _tab_ficheros.html       Tab: gestión de ficheros de configuración
-    └── _tab_user_management.html Tab: administración de usuarios
+│   ├── main_bp.py               🔴 Blueprint principal
+│   ├── config_helpers.py        🟡 Helpers de configuración
+│   ├── graph_data.py            🟡 Carga y ejecución para gráficos
+│   ├── graph_render.py          🟡 Renderizado y fallback de gráficos
+│   └── scheduler_helpers.py     🟡 Estado y PID del scheduler
+└── templates/                   🔴 Plantillas HTML Jinja2
+    ├── index.html                   Layout principal
+    ├── login.html                   Pantalla de autenticación
+    ├── cargando.html                Página de espera durante ejecución
+    ├── _tab_global.html             Parámetros globales
+    ├── _tab_ema.html                Parámetros EMA
+    ├── _tab_rsi.html                Parámetros RSI
+    ├── _tab_macd.html               Parámetros MACD
+    ├── _tab_atr.html                Parámetros ATR / stops
+    ├── _tab_bb.html                 Parámetros Bollinger Bands
+    ├── _tab_stoch.html              Parámetros Estocástico
+    ├── _tab_mos_volume.html         Parámetros MoS y Volumen
+    ├── _tab_symbols.html            Símbolos y temporalidad
+    ├── _tab_historial.html          Historial de resultados
+    ├── _tab_charts_viewer.html      Visor de gráficos
+    ├── _tab_scheduler.html          Programación automática
+    ├── _tab_ficheros.html           Gestión de ficheros
+    └── _tab_user_management.html    Administración de usuarios
 ```
 
 ---
 
 ### 🟡 Datos históricos (`Data_files/`)
 
-Ficheros CSV con datos OHLCV descargados de yfinance, organizados por símbolo y temporalidad (`SYMBOL_INTERVAL_MAX.csv`). El motor los lee directamente sin BD para el backtesting. Contiene cientos de activos de S&P 500, Ibex 35, eurostoxx y otros índices globales.
+Ficheros CSV con datos OHLCV descargados principalmente mediante Yahoo Finance, organizados por símbolo y temporalidad.
 
-```
+```text
 Data_files/
-├── SYMBOL_1d_MAX.csv        Datos diarios (ej. AAPL_1d_MAX.csv)
-├── SYMBOL_1wk_MAX.csv       Datos semanales
-├── SYMBOL_1h_MAX.csv        Datos horarios (solo algunos símbolos)
-├── SYMBOL_1mo_MAX.csv       Datos mensuales (solo algunos símbolos)
-├── Backtest_config/         Configuraciones locales de backtest guardadas por el usuario (no versionadas)
-└── Fundamentals/            Datos fundamentales descargados (ratios, métricas)
+├── SYMBOL_1d_MAX.csv          Datos diarios
+├── SYMBOL_1wk_MAX.csv         Datos semanales
+├── SYMBOL_1h_MAX.csv          Datos horarios para los símbolos disponibles
+├── SYMBOL_1mo_MAX.csv         Datos mensuales para los símbolos disponibles
+├── Backtest_config/           Configuraciones locales de backtest
+└── Fundamentals/              Caché de datos fundamentales
 ```
+
+El motor reutiliza estos ficheros para reducir descargas y acelerar los backtests.
 
 ---
 
 ### 🟡 Base de datos PostgreSQL embebida (`data_pg/` + `pgsql/`)
 
-```
-data_pg/                     🟡 Directorio de datos del servidor PostgreSQL
-pgsql/                       🟡 Binarios del servidor PostgreSQL portable (Windows)
-pg_start.bat                 🟡 Script de arranque del servidor PostgreSQL
-pg_stop.bat                  🟡 Script de parada del servidor PostgreSQL
+```text
+data_pg/                       🟡 Directorio de datos de PostgreSQL
+pgsql/                         🟡 Binarios del servidor PostgreSQL portable
+pg_start.bat                   🟡 Arranque del servidor PostgreSQL
+pg_stop.bat                    🟡 Parada del servidor PostgreSQL
 ```
 
-La BD PostgreSQL almacena: usuarios, estrategias, resultados de backtests, trades, snapshots de gráficos y configuraciones. Es la fuente de verdad de la aplicación web.
+La BD PostgreSQL almacena usuarios, estrategias, resultados de backtests, trades, configuraciones y snapshots necesarios para la aplicación web.
 
 ---
 
 ### 🟡 Resultados y artefactos de backtesting (`Backtesting/`)
 
-Directorio de salida y legado de ejecuciones anteriores.
+Directorio de salida y de artefactos generados por las ejecuciones.
 
-```
+```text
 Backtesting/
-├── Graphics/                🟡 Caché de gráficos HTML generados por Bokeh, por usuario
-│   ├── juan/                    Gráficos del usuario juan
-│   ├── pedro/                   Gráficos del usuario pedro
-│   ├── invitado/                Gráficos del usuario invitado
-│   └── semana/                  Gráficos de ejecuciones programadas semanales
-├── Run_Results/             🟡 Resultados en CSV de ejecuciones batch históricas
-└── logs/                    🟡 Logs de backtesting (errores, trazas de ejecución)
+├── Graphics/                  🟡 Caché de gráficos HTML por usuario
+├── Run_Results/               🟡 Resultados CSV de ejecuciones históricas
+└── logs/                      🟡 Logs persistentes de la aplicación y backtesting
+```
 
+El log persistente específico del scheduler se guarda en:
+
+```text
+Backtesting/logs/backtest_scheduler.log
 ```
 
 ---
 
-### 🟡 Logs de la aplicación (`logs/`)
+### 🟡 Logs y estado operativo (`logs/`)
 
-```
+El directorio raíz `logs/` contiene principalmente información de estado necesaria para controlar procesos de la aplicación.
+
+```text
 logs/
-├── backtest_scheduler_web.log   Log del scheduler de backtests periódicos
-├── server_local.log             Log del servidor Flask
-└── batch_*.log                  Logs de ejecuciones batch
+├── backtest_scheduler_status.json   Estado actual del scheduler
+├── backtest_scheduler.pid           PID del scheduler en ejecución
+├── server_local.log                 Log local del servidor, cuando se utiliza
+└── batch_*.log                      Logs de ejecuciones batch, cuando se generan
 ```
+
+El fichero PID puede quedar temporalmente huérfano si el proceso es finalizado de forma forzada. La aplicación comprueba que el PID corresponda realmente al scheduler y elimina automáticamente los PID inválidos detectados.
 
 ---
 
@@ -176,44 +197,91 @@ logs/
 
 Los scripts auxiliares se agrupan por finalidad. No forman parte del núcleo del motor de trading, aunque algunos tienen funciones operativas de apoyo a la aplicación.
 
-```
+```text
 scripts/
-├── analysis/                Análisis de resultados de backtests
-├── diagnostics/             Diagnóstico manual de rutas, login y estado de la app
-├── experiments/             Pruebas puntuales y experimentos de estrategias e indicadores
-├── maintenance/             Utilidades de administración y mantenimiento
-├── presets/                 Configuraciones predefinidas de estrategias
-├── scheduler/               Scheduler de backtests periódicos
+├── analysis/                    Análisis de resultados de backtests
+├── diagnostics/                 Diagnóstico manual de rutas, login y estado
+├── experiments/                 Experimentos de estrategias e indicadores
+├── maintenance/                 Administración y mantenimiento
+├── presets/                     Configuraciones predefinidas
+├── scheduler/                   Scheduler de backtests periódicos
 │   └── backtest_scheduler.py
-├── optimize_rsi.py          Barrido de parámetros RSI
-├── sweep_rsi_filter.py      Optimización por grilla del filtro RSI
+├── optimize_rsi.py              Barrido de parámetros RSI
+├── sweep_rsi_filter.py          Optimización por grilla del filtro RSI
 ├── audit_stops_combinations.py  Auditoría de combinaciones de stops
-├── batch_replay_by_ids.py   Re-ejecución batch de estrategias por ID
+├── batch_replay_by_ids.py       Re-ejecución batch por ID
 ├── query_backtest_results.py    Consulta y exportación de resultados
 └── verificar_backtest_web.py    Verificación de integridad de la app web
 ```
 
-Los tests automatizados se mantienen separados del resto de scripts auxiliares:
+El scheduler utiliza APScheduler y mantiene su estado mediante los ficheros de `logs/`. Su log persistente se almacena en `Backtesting/logs/backtest_scheduler.log`.
 
-```
+---
+
+### 🟢 Tests automatizados (`tests/`)
+
+Los tests se mantienen separados de los scripts auxiliares:
+
+```text
 tests/
-├── unit/                    Pruebas unitarias del motor
-├── integration/             Pruebas de integración, incluida la persistencia
-└── web/                     Pruebas de rutas y comportamiento de la aplicación web
+├── unit/                       Pruebas unitarias del motor y señales técnicas
+├── integration/                Pruebas de integración y persistencia
+└── web/                        Pruebas de rutas y comportamiento web
 ```
+
+La batería incluye cobertura específica de señales y filtros técnicos para EMA, RSI, MACD, Stochastic, ATR, Volumen y Bollinger Bands.
+
+La verificación habitual del proyecto puede ejecutarse mediante:
+
+```powershell
+.\scripts\verify.ps1
+```
+
+Este script comprueba sintaxis Python, tests baseline y estado de Git.
 
 ---
 
 ### 🟡 Escenario Datos Fundamentales (`scenarios/Fundamental_Data/`)
 
-Módulo para la descarga y gestión de datos fundamentales (ratios financieros, métricas de empresa).
+Conjunto de utilidades auxiliares para la descarga, actualización, migración y mantenimiento de datos fundamentales.
 
+Actualmente, el flujo productivo utilizado por el backtest web obtiene los datos fundamentales mediante Alpha Vantage:
+
+```text
+scenarios/BacktestWeb/Backtest.py
+        ↓
+trading_engine/utils/Data_download.py
+        ↓
+manage_fundamental_data()
+        ↓
+download_fundamentals_AlphaV()
 ```
+
+El directorio `scenarios/Fundamental_Data/` contiene utilidades standalone y de mantenimiento y no constituye actualmente la ruta principal utilizada por el backtest web.
+
+```text
 scenarios/Fundamental_Data/
-├── manager.py               Descarga y actualiza datos fundamentales vía yfinance
-├── Fundamental_Manager.py   Lógica de acceso y consulta de fundamentales
-└── database.py              Capa de persistencia de datos fundamentales
+├── manager.py               Utilidades standalone de actualización y migración
+├── Fundamental_Manager.py   Utilidades auxiliares de sincronización
+└── database.py              Persistencia para estas utilidades
 ```
+
+#### Revisión pendiente de fundamentales
+
+La arquitectura de datos fundamentales está pendiente de una revisión más profunda.
+
+La evolución prevista es:
+
+- estudiar las métricas fundamentales disponibles mediante Yahoo Finance;
+- utilizar Yahoo Finance como fuente principal cuando proporcione los datos e histórico necesarios;
+- utilizar Alpha Vantage como fuente complementaria para ampliar el histórico cuando sea necesario;
+- determinar exactamente qué métricas fundamentales necesita cada estrategia;
+- desacoplar el motor de backtest del proveedor concreto de datos;
+- unificar el formato de datos procedentes de distintos proveedores;
+- mejorar la lógica de caché, antigüedad y actualización incremental;
+- evitar que el número de trimestre de un fichero sea el único criterio para determinar si una caché está actualizada.
+
+No debe asumirse una profundidad histórica fija de Yahoo Finance hasta que esta parte sea revisada y comprobada específicamente.
 
 ---
 
@@ -221,7 +289,7 @@ scenarios/Fundamental_Data/
 
 Espacio de experimentación y prototipos. Código no productivo.
 
-```
+```text
 Laboratorio/
 └── test_yfinance_symbols.py     Experimentos con la API de yfinance
 ```
@@ -230,19 +298,19 @@ Laboratorio/
 
 ### 🟢 Documentación (`docs/`)
 
-```
+```text
 docs/
-├── README.md                Este fichero
-├── ARCHITECTURE.md          Arquitectura canónica del sistema
-├── Architecture/            Diagramas y flujos de arquitectura detallados
-├── Index/                   Índice general de toda la documentación
-├── Guides/                  Guías de uso y configuración
-├── Guia/                    Guías operacionales
-├── Plans/                   Planes de desarrollo y mejoras pendientes
-├── Summaries/               Resúmenes de cambios y decisiones técnicas
-├── Fixes/                   Registro de correcciones importantes
-├── Diagnosis/               Diagnósticos de problemas resueltos
-└── api/                     Documentación de la API interna
+├── README.md                   Este fichero
+├── ARCHITECTURE.md             Arquitectura canónica del sistema
+├── Architecture/               Diagramas y flujos detallados
+├── Index/                      Índice general de documentación
+├── Guides/                     Guías de uso y configuración
+├── Guia/                       Guías operacionales
+├── Plans/                      Planes de desarrollo y mejoras
+├── Summaries/                  Resúmenes y decisiones técnicas
+├── Fixes/                      Registro de correcciones
+├── Diagnosis/                  Diagnósticos de problemas resueltos
+└── api/                        Documentación de la API interna
 ```
 
 ---
@@ -252,15 +320,17 @@ docs/
 | Fichero | Descripción |
 | :--- | :--- |
 | `requirements.txt` | Dependencias Python del proyecto |
-| `run_backtest_scheduler.bat` | Lanza el scheduler de backtests en segundo plano |
-| `start_web.bat` / `stop_web.bat` | Arranque y parada rápida de la app web |
+| `run_backtest_scheduler.bat` | Lanza el scheduler utilizando el entorno virtual del repositorio principal |
+| `start_web.bat` / `stop_web.bat` | Arranque y parada rápida de la aplicación web |
 | `backup_trading_db_20260227.dump` | Backup puntual de la BD PostgreSQL |
-| `mkdocs.yml` | Configuración de MkDocs para generar documentación estática |
-| `docs/Summaries/OPTIMIZACIONES_IMPLEMENTADAS.md` | Registro de optimizaciones de rendimiento aplicadas |
+| `mkdocs.yml` | Configuración de MkDocs |
+| `docs/Summaries/OPTIMIZACIONES_IMPLEMENTADAS.md` | Registro de optimizaciones implementadas |
+
+`start_web.bat` comprueba previamente si el puerto web ya está ocupado para evitar lanzar instancias duplicadas.
 
 ---
 
-## Documentacion Detallada
+## Documentación Detallada
 
 - Arquitectura canónica: **[ARCHITECTURE.md](ARCHITECTURE.md)**
 - Flujo web de ejecución: **[Architecture/FLUJO_ARQUITECTURA_MEJORADO.md](Architecture/FLUJO_ARQUITECTURA_MEJORADO.md)**
