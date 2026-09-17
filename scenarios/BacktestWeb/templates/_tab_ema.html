@@ -14,85 +14,54 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p><strong>¿Qué es la EMA?</strong> La Media Móvil Exponencial es un indicador de tendencia que sigue los cambios de precio recientes. Usa dos períodos: rápida (sensible) y lenta (suave).</p>
-                
-                <h6 class="mt-4 text-dark"><strong>Parámetros Configurables:</strong></h6>
+                <p><strong>¿Qué hace la EMA en esta implementación?</strong> La EMA se usa como filtro de tendencia y como fuente de señales de entrada/salida, pero la lógica real está condicionada por los flags activos del usuario y por los estados calculados del indicador.</p>
+
+                <h6 class="mt-4 text-dark"><strong>Parámetros actuales</strong></h6>
                 <ul class="mb-3">
-                    <li><strong>Período EMA Rápida:</strong> Por defecto 5. Detecta cambios rápidos (utilizado en cruces).</li>
-                    <li><strong>Período EMA Lenta:</strong> Por defecto 30. Define la tendencia general (utilizado en filtros de estado).</li>
+                    <li><strong>EMA rápida:</strong> <code>ema_fast_period</code>, default 5.</li>
+                    <li><strong>EMA lenta:</strong> <code>ema_slow_period</code>, default 30.</li>
+                    <li><strong>Compra por cruce:</strong> <code>ema_cruce_signal</code> (default False).</li>
+                    <li><strong>Estados de la EMA lenta:</strong> mínimo, máximo, ascendente y descendente.</li>
                 </ul>
-                
-                <h6 class="text-dark"><strong>Señales Disponibles (Activables independientemente):</strong></h6>
-                
+
+                <h6 class="text-dark"><strong>Lógica real que ejecuta el motor</strong></h6>
                 <div class="ps-3 border-start border-warning">
-                    <p class="mb-2"><strong class="text-success">🟢 COMPRA - Lógica OR (cualquiera activa la compra):</strong></p>
+                    <p class="mb-2"><strong class="text-success">🟢 Compra</strong></p>
                     <ul class="small mb-3">
-                        <li><strong>Cruce Ascendente:</strong> EMA Rápida cruza por encima de EMA Lenta → Cambio de tendencia al alza.</li>
-                        <li><strong>Mínimo:</strong> EMA Lenta detecta un mínimo local → Rebote después de caída (reversal).</li>
-                        <li><strong>Ascendente:</strong> EMA Lenta está subiendo confirmado → Tendencia alcista continua.</li>
+                        <li><strong>Cruce alcista:</strong> si <code>ema_cruce_signal</code> está activo y la EMA rápida cruza por encima de la lenta.</li>
+                        <li><strong>Mínimo local:</strong> si <code>ema_slow_minimo</code> está activo y la EMA lenta está en estado mínimo.</li>
+                        <li><strong>Tendencia alcista:</strong> si <code>ema_slow_ascendente</code> está activo y la EMA lenta está ascendente.</li>
                     </ul>
-                    
-                    <p class="mb-2"><strong class="text-danger">🔴 VENTA / BLOQUEO - Lógica AND:</strong></p>
+
+                    <p class="mb-2"><strong class="text-danger">🔴 Cierre / bloqueo</strong></p>
                     <ul class="small mb-3">
-                        <li><strong>Cruce Descendente:</strong> EMA Rápida cruza por debajo de EMA Lenta → Cambio de tendencia a la baja.</li>
-                        <li>
-                            <strong>Máximo Local + Descendente (Casi Lo Mismo):</strong><br>
-                            <span class="text-danger">⚠️ Nota importante:</span> Cuando la EMA Lenta toca un pico (máximo), por definición la siguiente vela estará más baja, lo que ya constituye "descendente". Ambos casi siempre ocurren juntos.<br>
-                            <span class="text-danger">↳ VENTA:</span> Cierra posiciones abiertas en ambos casos<br>
-                            <span class="text-danger">↳ BLOQUEO:</span> Evita nuevas compras mientras esté bajando después del pico.
-                        </li>
+                        <li><strong>Descendente:</strong> si <code>ema_slow_descendente</code> está activo y la EMA lenta está descendiendo, se cierra la posición y se bloquean compras.</li>
+                        <li><strong>Máximo local:</strong> si <code>ema_slow_maximo</code> está activo y la EMA lenta toca máximo local, se cierra la posición y se bloquean compras.</li>
+                        <li><strong>Crossdown:</strong> si <code>ema_cruce_signal</code> está activo y la EMA rápida cruza por debajo de la lenta, también se interpreta como venta.</li>
                     </ul>
                 </div>
-                
+
                 <div class="alert alert-warning alert-sm mt-3 mb-3">
-                    <strong>💡 Reflexión sobre redundancia:</strong><br>
-                    <small>Técnicamente, "Máximo" y "Descendente" son casi idénticos a nivel de bloqueo de compras, ya que un máximo detectado implica que ya estamos bajando. Si encuentras que ambos se activan juntos en tus backtests, considera usar solo uno para simplificar tu estrategia.</small>
+                    <strong>⚠️ Veto real de compra:</strong> cuando <code>ema_slow_descendente</code> está activo y la EMA lenta está descendiendo, <strong>se bloquea la entrada</strong> con un filtro duro. Esto no es una señal de compra ni un valor puramente visual: es un bloqueo de veto implementado en el motor.
                 </div>
-                
-                <div class="alert alert-danger alert-sm mb-3">
-                    <strong>⚠️ PROTECCIÓN EMA DESCENDENTE (según switch):</strong><br>
-                    <small>
-                        <strong>IMPORTANTE:</strong> Si activas el switch <strong>"Tendencia Bajista (Venta + Veto)"</strong>:<br>
-                        • Si <code>ema_slow_descendente_STATE = True</code> (EMA está bajando) → <strong>BLOQUEA TODAS LAS COMPRAS</strong><br>
-                        • El bloqueo se aplica solo cuando el switch "Tendencia Bajista" está activo<br>
-                        • Útil para evitar compras en tramos claramente bajistas<br>
-                        • <strong>Diferencia con RSI:</strong> RSI NO tiene vetos hardcoded, solo respeta los switches que actives
-                    </small>
-                </div>
-                
-                <hr class="my-3">
-                
+
                 <div class="alert alert-info alert-sm mb-3">
-                    <strong>💡 Comportamiento SIN Switches Activados:</strong><br>
+                    <strong>💡 Filtros adicionales de porcentaje</strong><br>
                     <small>
-                        Si NO activas ningún switch de EMA (Cruce, Mínimo, Ascendente, Máximo, Descendente):<br>
-                        • <strong>Modo:</strong> Sistema entra en <strong>Buy & Hold</strong><br>
-                        • <strong>COMPRA:</strong> ✅ En mínimos automáticos (<code>ema_slow_minimo_STATE</code> o <code>ema_slow_ascendente_STATE</code>)<br>
-                        • <strong>VENTA:</strong> ❌ Solo por Stop Loss (sin ventas técnicas)<br>
-                        • <strong>VETO EMA DESCENDENTE:</strong> ⚠️ Se aplica solo si activas el switch "Tendencia Bajista"<br>
-                        <strong>Resultado:</strong> Estrategia pasiva con protección contra bajadas fuertes.
+                        Además de los estados de tendencia, el motor puede bloquear compras si se configura alguno de estos porcentajes:
+                        <ul class="mb-0 mt-2">
+                            <li><code>ema_price_above_slow_pct</code>: bloquea si el precio está más de X% por encima de la EMA lenta.</li>
+                            <li><code>ema_price_above_fast_pct</code>: bloquea si el precio está más de X% por encima de la EMA rápida.</li>
+                            <li><code>ema_fast_above_slow_pct</code>: bloquea si la EMA rápida está más de X% por encima de la lenta.</li>
+                        </ul>
+                        Si todos valen 0, esos bloqueos quedan desactivados.
                     </small>
                 </div>
-                
-                <p class="small text-muted mb-0"><strong>Diferencia clave con RSI:</strong> EMA sin switches = B&H con veto | RSI sin switches = Fuerza Pura agresiva (>55)</p>
-                
-                <hr class="my-3">
-                
-                <div class="alert alert-success alert-sm mb-3">
-                    <strong>✅ Filtros de Precio Adicionales (Nuevo):</strong><br>
+
+                <div class="alert alert-success alert-sm mb-0">
+                    <strong>✅ Modo sin switches activos</strong><br>
                     <small>
-                        Tres nuevos filtros de porcentaje que actúan como <strong>bloqueos (AND)</strong> adicionales para evitar compras en condiciones de sobrecalentamiento:<br>
-                        <br>
-                        <strong>1. Precio por encima de EMA Lenta (%):</strong> Bloquea si el precio está más de X% por encima de la EMA lenta<br>
-                        <strong>2. Precio por encima de EMA Rápida (%):</strong> Bloquea si el precio está más de X% por encima de la EMA rápida<br>
-                        <strong>3. EMA Rápida por encima de Lenta (%):</strong> Bloquea si la EMA rápida está más de X% por encima de la EMA lenta<br>
-                        <br>
-                        💡 <strong>Ejemplo de uso:</strong><br>
-                        • Si estableces "Precio por encima de EMA Lenta (%)" = 2.5 → La compra se bloqueará cuando el precio esté más del 2.5% por encima de la EMA lenta<br>
-                        • Si estableces "EMA Rápida por encima de Lenta (%)" = 1.5 → La compra se bloqueará cuando la EMA rápida esté más del 1.5% por encima de la EMA lenta<br>
-                        • Si dejas todos en 0 → Los filtros no se aplican (comportamiento estándar)<br>
-                        <br>
-                        ⚠️ <strong>Importante - Retrocompatibilidad:</strong> Los valores por defecto son 0 (desactivados), por lo que si no estableces valores específicos, el sistema funciona exactamente como antes. Los nuevos filtros son completamente opcionales.
+                        Si no hay ningún switch de EMA habilitado, el sistema puede seguir en <strong>Buy &amp; Hold</strong> cuando la EMA lenta está en mínimo o ascendente, siempre que no haya indicadores técnicos activos. La estrategia no genera ventas técnicas por EMA sin esos switches activos; el cierre se hace por stop loss o por otras señales si las hay.
                     </small>
                 </div>
             </div>

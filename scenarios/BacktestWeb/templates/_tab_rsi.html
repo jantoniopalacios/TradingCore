@@ -14,102 +14,52 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p><strong>¿Qué es el RSI?</strong> Es un oscilador de momentum que mide la velocidad y magnitud de los cambios de precio en una escala de 0 a 100. Identifica condiciones de sobrecompra (overbought) y sobreventa (oversold).</p>
+                <p><strong>¿Qué hace el RSI aquí?</strong> El motor usa RSI como indicador de fuerza y como detector de giros. Cuando <code>rsi</code> está activo, la compra puede venir de señales OR y se le aplica además un filtro global de fuerza.</p>
 
                 <div class="alert alert-secondary mt-4 mb-4">
-                    <strong>⚡ Trailing Stop Loss Dinámico por RSI</strong><br>
+                    <strong>⚡ Trailing por RSI</strong><br>
                     <ul class="mb-1">
-                        <li>Permite definir dos porcentajes de trailing stop loss dinámico según el valor del RSI.</li>
-                        <li>Configura un <strong>límite de RSI</strong> (por ejemplo, 40).</li>
-                        <li>Si el RSI es <strong>menor o igual</strong> al límite, se aplica el <strong>primer %</strong> de trailing stop loss.</li>
-                        <li>Si el RSI es <strong>mayor</strong> que el límite, se aplica el <strong>segundo %</strong> de trailing stop loss.</li>
-                        <li>El stop loss se recalcula automáticamente en cada vela según el valor actual del RSI y los parámetros configurados.</li>
-                        <li>Ejemplo: Si el límite es 40, el %1 es 2% y el %2 es 0.8%, entonces:<br>
-                            &nbsp;&nbsp;• Si RSI ≤ 40, el trailing SL será 2% bajo el máximo.<br>
-                            &nbsp;&nbsp;• Si RSI &gt; 40, el trailing SL será 0.8% bajo el máximo.</li>
-                        <li>Esto permite proteger más agresivamente cuando el RSI está débil y dejar correr la posición cuando el momentum es fuerte.</li>
+                        <li>Si <code>rsi_trailing_limit</code> está definido y <code>rsi</code> está activo, el trailing stop cambia según el valor actual del RSI.</li>
+                        <li>Si <code>rsi_val &lt;= rsi_trailing_limit</code>, usa <code>trailing_pct_below</code>.</li>
+                        <li>Si <code>rsi_val &gt; rsi_trailing_limit</code>, usa <code>trailing_pct_above</code>.</li>
+                        <li>Los valores se convierten en porcentaje cuando superan 1 (por ejemplo, 2.0 = 2%).</li>
                     </ul>
-                    <span class="text-muted small">El trailing stop loss por RSI es totalmente automático y sustituye al trailing global solo si los parámetros están configurados.</span>
+                    <span class="text-muted small">Esto modifica el stop dinámico de la posición antes del cierre por stop loss, no crea señales de compra por sí solo.</span>
                 </div>
-                
-                <h6 class="mt-4 text-dark"><strong>Parámetros Configurables:</strong></h6>
+
+                <h6 class="mt-4 text-dark"><strong>Parámetros reales</strong></h6>
                 <ul class="mb-3">
-                    <li><strong>Período de Cálculo:</strong> Por defecto 14. Ventana para calcular ganancias/pérdidas promedio.</li>
-                    <li><strong>Nivel Máximo (Sobrecompra):</strong> Por defecto 70. RSI por encima indica activo "caro" o sobrecalentado.</li>
-                    <li><strong>Nivel Mínimo (Sobreventa):</strong> Por defecto 30. RSI por debajo indica activo "barato" o sobrecastigado.</li>
-                    <li><strong>Umbral de Fuerza:</strong> Por defecto 55. Nivel intermedio para detectar continuación alcista sin llegar a sobrecompra.</li>
+                    <li><strong>Período:</strong> <code>rsi_period</code>, default 14.</li>
+                    <li><strong>Sobrecompra:</strong> <code>rsi_high_level</code>, default 70.</li>
+                    <li><strong>Sobreventa:</strong> <code>rsi_low_level</code>, default 30.</li>
+                    <li><strong>Umbral de fuerza:</strong> <code>rsi_strength_threshold</code>, default 50.</li>
                 </ul>
-                
-                <h6 class="text-dark"><strong>Señales Disponibles (Activables independientemente):</strong></h6>
-                
+
+                <h6 class="text-dark"><strong>Señales de compra que el motor ejecuta</strong></h6>
                 <div class="ps-3 border-start border-info">
-                    <p class="mb-2"><strong class="text-success">🟢 COMPRA - Lógica OR (cualquiera activa la compra):</strong></p>
                     <ul class="small mb-3">
-                        <li><strong>Mínimo (Giro desde Sobreventa):</strong> RSI toca valle local (< nivel mínimo) y cruza hacia arriba → Rebote después de sobrecorrección.</li>
-                        <li><strong>Ascendente:</strong> RSI está subiendo → Recuperación de momentum, entrada en recuperación.</li>
-                    </ul>
-                    
-                    <p class="mb-2"><strong class="text-danger">🔴 VENTA / BLOQUEO - Lógica AND:</strong></p>
-                    <ul class="small mb-3">
-                        <li><strong>Máximo (Sobrecompra):</strong> RSI toca pico local (> nivel máximo) → Realización de ganancias + bloquea nuevas compras.</li>
-                        <li><strong>Descendente:</strong> RSI está bajando → Pérdida de momentum + bloquea nuevas compras.</li>
+                        <li><strong>Giro desde sobreventa:</strong> si <code>rsi_minimo</code> está activo, el RSI está en mínimo local y el valor actual está por encima del nivel mínimo.</li>
+                        <li><strong>Ascendente:</strong> si <code>rsi_ascendente</code> está activo y el RSI está en estado ascendente.</li>
                     </ul>
                 </div>
-                
+
                 <div class="alert alert-primary alert-sm mt-3 mb-3">
-                    <strong>🛑 Filtro Global de Fuerza Pura (SIEMPRE ACTIVO):</strong><br>
+                    <strong>🛑 Filtro global de fuerza</strong><br>
                     <small>
-                        <strong>El filtro se aplica SIEMPRE cuando RSI está activado:</strong><br>
-                        <strong>RSI < Umbral de Fuerza → BLOQUEA todas las compras</strong> (incluidas las de B&H, EMA, MACD y otros indicadores)<br>
-                        Este filtro funciona como guardabarrera de calidad: solo permite entrar cuando el mercado tiene suficiente fuerza alcista. 
-                        Similar al veto hardcoded de EMA descendente, pero basado en nivel absoluto de RSI y configurable.<br>
-                        <strong>✅ El umbral funciona INCLUSO SIN SWITCHES activados</strong> → Es un filtro de calidad global.
-                    </small>
-                    <hr class="my-2">
-                    <small>
-                        <strong>🎯 Estrategias por Umbral:</strong><br>
-                        • <strong>Umbral 0</strong>: Desactiva el filtro completamente. Permite compras sin restricción de fuerza.<br>
-                        • <strong>Umbral 20-25</strong> (por debajo del nivel mínimo 30): Agresivo, bloquea solo extremos. Permite <strong>reversión desde sobreventa</strong>.<br>
-                        • <strong>Umbral 50-55</strong> (por encima del nivel mínimo): Conservador, solo <strong>momentum alcista fuerte</strong>.<br>
-                        <strong>💡 Tip:</strong> Ajusta el umbral según tu perfil: agresivo (bajo) vs conservador (alto). El umbral NO requiere switches para funcionar.
+                        Cuando <code>rsi</code> está activo, la compra queda bloqueada si <code>RSI &lt; rsi_strength_threshold</code>.
+                        Este filtro no depende de que el usuario active los switches de compra; se aplica sobre la entrada si el RSI está por debajo del umbral configurado.
+                        Si el umbral se deja en 0 o no es válido, el filtro queda desactivado.
                     </small>
                 </div>
-                
-                <div class="alert alert-warning alert-sm mt-3 mb-3">
-                    <strong>💡 Reflexión sobre Máximo + Descendente:</strong><br>
-                    <small>Similar a EMA, cuando RSI toca un pico (máximo), la siguiente vela suele estar más baja (descendente). Ambos casi siempre ocurren juntos. Considera usar solo uno para simplificar tu estrategia.</small>
-                </div>
-                
-                <div class="alert alert-success alert-sm mb-3">
-                    <strong>✅ Diferencia con EMA (Protección Hardcoded):</strong><br>
-                    <small>
-                        • <strong>EMA:</strong> Tiene un <strong>veto hardcoded permanente</strong> → Si EMA Lenta está descendiendo, BLOQUEA todas las compras sin importar configuración.<br>
-                        • <strong>RSI:</strong> Tiene un <strong>filtro global de Fuerza Pura (siempre activo pero configurable)</strong> → Si RSI está activado Y RSI < Umbral de Fuerza, BLOQUEA todas las compras. <strong>Diferencia clave:</strong> (1) B&H funciona si NO hay switches de compra (Mínimo/Ascendente), (2) Puedes ajustar el umbral (incluso ponerlo en 0 para desactivarlo), (3) EMA es un veto fijo, RSI es configurable.
-                    </small>
-                </div>
-                
-                <h6 class="text-dark"><strong>Ejemplos de Combinaciones:</strong></h6>
+
+                <h6 class="text-dark"><strong>Señales de venta / cierre</strong></h6>
                 <ul class="small mb-3">
-                    <li><strong>Umbral 50 + Sin switches:</strong> Filtro puro → B&H funciona normalmente, pero bloquea compras si RSI < 50.<br/></li>
-                    <li><strong>Umbral 25 + Mínimo ON:</strong> Señal + filtro → Compra en valles (si RSI > 25), B&H desactivado (hay switch de compra).<br/></li>
-                    <li><strong>Umbral 0 + Ascendente ON:</strong> Sin filtro + señal → Compra cuando RSI sube, sin restricción de fuerza. B&H desactivado.<br/></li>
-                    <li><strong>Umbral 55 + Máximo ON + Descendente ON:</strong> Filtro + ventas → B&H funciona, Máximo/Descendente generan ventas Y bloqueos de entrada. Estrategia conservadora.<br/></li>
+                    <li><strong>Máximo:</strong> si <code>rsi_maximo</code> está activo y el RSI ha alcanzado un máximo local con el valor previo por encima del nivel de sobrecompra.</li>
+                    <li><strong>Descendente:</strong> si <code>rsi_descendente</code> está activo, el RSI está descendiendo y el valor previo estaba en zona de sobrecompra mientras el actual baja por debajo de ese nivel.</li>
                 </ul>
-                
-                <div class="alert alert-info alert-sm mb-0">
-                    <strong>💡 Comportamiento CON/SIN Switches de Compra:</strong><br>
-                    <small>
-                        <strong>🟢 SIN switches de compra (Mínimo, Ascendente OFF):</strong><br>
-                        • <strong>COMPRA:</strong> ❌ NO genera señales de entrada propias → Solo usa B&H (EMA Lenta mínimo).<br>
-                        • <strong>BLOQUEOS:</strong> ⚠️ SÍ bloquea por UMBRAL → Si RSI < Umbral, bloquea las compras de B&H.• <strong>Resultado:</strong> B&H funciona con filtro RSI de calidad. Filtro global configurable.
-                    </small>
-                    <hr class="my-2">
-                    <small>
-                        <strong>🔴 CON switches de compra (Mínimo O Ascendente ON):</strong><br>
-                        • <strong>COMPRA:</strong> ✅ SÍ genera señales → Mínimo o Ascendente generan compras propias.<br>
-                        • <strong>BLOQUEOS:</strong> ⚠️ SÍ bloquea por UMBRAL → Si RSI < Umbral, bloquea TODAS las compras (incluidas las de los switches).<br>
-                        • <strong>B&H desactivado:</strong> Al tener switches de compra, B&H no se usa. Solo operan los switches.• <strong>Resultado:</strong> RSI genera operaciones propias con filtro de calidad.
-                    </small>
+
+                <div class="alert alert-warning alert-sm mb-0">
+                    <strong>Importante:</strong> el comportamiento real del RSI no es un sistema de "compra por sobreventa siempre" ni un cierre automático por cualquier valor extremo. La compra solo se dispara cuando los flags adecuados están activados y, además, el filtro global de fuerza lo permite.
                 </div>
             </div>
             <div class="modal-footer">

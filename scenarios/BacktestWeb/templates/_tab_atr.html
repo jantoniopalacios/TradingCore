@@ -14,87 +14,37 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <h6 class="mt-4 text-dark"><strong>¿Qué es el ATR?</strong></h6>
+                <h6 class="mt-4 text-dark"><strong>¿Qué hace el ATR aquí?</strong></h6>
                 <p>
-                    El <strong>Average True Range (ATR)</strong> mide la volatilidad del activo calculando el promedio de los 
-                    <strong>"rangos verdaderos"</strong> de los últimos N períodos. Es un indicador que muestra cuánto se está moviendo 
-                    el precio en promedio, independientemente de la dirección.
+                    El <strong>ATR (Average True Range)</strong> se usa como filtro de rango de volatilidad para entrar. En la implementación actual no genera señales de compra ni venta por sí mismo; solo decide si la compra está permitida según el nivel de volatilidad actual.
                 </p>
-                
+
                 <div class="alert alert-info alert-sm mb-3">
-                    <strong>⚡ True Range (TR) = max(</strong><br/>
-                    • High - Low (rango del día)<br/>
-                    • |High - Close anterior| (gap alcista)<br/>
-                    • |Low - Close anterior| (gap bajista)<br/>
-                    <strong>)</strong>
+                    <strong>⚡ Fórmula que calcula el motor</strong><br/>
+                    ATR = EMA del True Range, donde<br/>
+                    True Range = max(High - Low, |High - Close anterior|, |Low - Close anterior|)
                 </div>
 
-                <h6 class="text-dark"><strong>¿Por qué usar ATR como filtro?</strong></h6>
+                <h6 class="text-dark"><strong>Regla real del filtro</strong></h6>
                 <ul class="small mb-3">
-                    <li><strong>ATR bajo (< mínimo)</strong>: Mercado estancado sin movimiento. Evita trades en consolidaciones donde no hay oportunidad.</li>
-                    <li><strong>ATR en rango óptimo</strong>: Volatilidad saludable. Equilibrio entre movimiento y estabilidad.</li>
-                    <li><strong>ATR alto (> máximo)</strong>: Mercado caótico o en pánico. Demasiado ruido: fácil saltarse stops.</li>
+                    <li>Si <code>atr_enabled</code> está en <code>False</code>: el filtro no se aplica.</li>
+                    <li>Si está activo, se exige que el ATR actual esté dentro de <code>[atr_min, atr_max]</code>.</li>
+                    <li>Si <code>ATR &lt; atr_min</code>: compra bloqueada por baja volatilidad.</li>
+                    <li>Si <code>ATR &gt; atr_max</code>: compra bloqueada por exceso de volatilidad.</li>
                 </ul>
 
-                <h6 class="text-dark"><strong>Parámetros Configurables:</strong></h6>
+                <h6 class="text-dark"><strong>Valores por defecto observados en código</strong></h6>
                 <ul class="small mb-3">
-                    <li><strong>Período ATR:</strong> Número de velas para calcular el promedio (típicamente 14). Valores bajos → más sensible, valores altos → más suave.</li>
-                    <li><strong>ATR Mínimo:</strong> Umbral inferior. Si ATR actual < mínimo, BLOQUEA compra (mercado muy plano).</li>
-                    <li><strong>ATR Máximo:</strong> Umbral superior. Si ATR actual > máximo, BLOQUEA compra (mercado muy volátil).</li>
+                    <li><code>atr_period</code>: 14</li>
+                    <li><code>atr_min</code>: 2.0</li>
+                    <li><code>atr_max</code>: 5.0</li>
+                    <li><code>atr_enabled</code>: False</li>
                 </ul>
 
-                <h6 class="text-dark"><strong>Estrategias Recomendadas por Activo:</strong></h6>
-                <table class="table table-sm table-bordered mb-3">
-                    <tr>
-                        <th>Activo</th>
-                        <th>Volatilidad Típica</th>
-                        <th>ATR Min - Max Recomendado</th>
-                        <th>Lógica</th>
-                    </tr>
-                    <tr>
-                        <td><strong>AAPL, JNJ</strong></td>
-                        <td>Baja</td>
-                        <td>1.0 - 3.0</td>
-                        <td>Rango ajustado, mercados más tranquilos</td>
-                    </tr>
-                    <tr>
-                        <td><strong>NKE, COST</strong></td>
-                        <td>Media</td>
-                        <td>2.0 - 5.0</td>
-                        <td><strong>Default (recomendado)</strong>: Balance ideal</td>
-                    </tr>
-                    <tr>
-                        <td><strong>NVDA, TSLA</strong></td>
-                        <td>Alta</td>
-                        <td>3.0 - 7.0</td>
-                        <td>Rango amplio, tolerancia mayor volatilidad</td>
-                    </tr>
-                    <tr>
-                        <td><strong>BTC, Cripto</strong></td>
-                        <td>Muy Alta</td>
-                        <td>5.0 - 15.0</td>
-                        <td>Rango muy amplio, espacio para movimientos</td>
-                    </tr>
-                </table>
-
-                <h6 class="text-dark"><strong>Ejemplos Prácticos:</strong></h6>
-                <div class="ps-3 border-start border-warning">
-                    <p class="mb-2"><strong>Escenario 1: NKE con ATR=1.5, Mín=2.0</strong></p>
-                    <small>❌ Compra BLOQUEADA: "ATR 1.5 < Mínimo 2.0 (poca volatilidad)"<br/>Interpretación: El mercado está muy plano, es mejor esperar movimiento.</small>
-                    
-                    <p class="mb-2 mt-3"><strong>Escenario 2: NKE con ATR=3.0, Mín=2.0, Máx=5.0</strong></p>
-                    <small>✅ Compra PERMITIDA: "ATR en rango [2.0-5.0]"<br/>Interpretación: Volatilidad óptima, condiciones adecuadas.</small>
-                    
-                    <p class="mb-2 mt-3"><strong>Escenario 3: NKE con ATR=6.0, Máx=5.0</strong></p>
-                    <small>❌ Compra BLOQUEADA: "ATR 6.0 > Máximo 5.0 (exceso volatilidad)"<br/>Interpretación: Mercado muy volátil/caótico, esperar normalización.</small>
-                </div>
-
-                <div class="alert alert-success alert-sm mt-4 mb-0">
-                    <strong>💡 Consejo de Uso:</strong><br/>
+                <div class="alert alert-success alert-sm mb-0">
+                    <strong>✅ Resumen</strong><br/>
                     <small>
-                        Mantén el ATR activado como filtro de CALIDAD, similar a cómo el RSI filtra por fuerza. Primero ajusta Min/Max según el activo, 
-                        luego realiza backtests comparando CON filtro vs SIN filtro. Típicamente verás: menos trades, menos pérdidas por ruido, 
-                        pero también menos oportunidades. Balance es clave.
+                        El ATR aquí funciona como filtro de calidad de entrada, no como señal de tendencia. Si está fuera de rango, la compra se aborta. Si está dentro, la estrategia puede continuar con el flujo normal de señales de EMA/RSI/MACD y demás filtros.
                     </small>
                 </div>
             </div>
