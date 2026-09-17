@@ -1,6 +1,6 @@
 # TradingCore: Motor Central y Arquitectura Modular
 
-Última actualización: 14/09/2026
+Última actualización: 17/09/2026
 
 Este repositorio contiene la arquitectura central (Motor) para múltiples escenarios de trading (Backtesting, Live Trading, Web Apps).
 
@@ -98,10 +98,12 @@ scenarios/BacktestWeb/
 ├── configuracion.py             🟡 Carga y validación de configuración
 ├── database.py                  🟡 Modelos SQLAlchemy de la aplicación
 ├── DBStore.py                   🟡 Persistencia de resultados y snapshots
-├── file_handler.py              🟡 Gestión de configuración y caché
+├── file_handler.py              🟡  Gestión de ficheros y control de acceso a docs
 ├── routes/
 │   ├── main_bp.py               🔴 Blueprint principal
+│   ├── backtest_status.py       🟡 Estado en memoria de ejecuciones de backtest
 │   ├── config_helpers.py        🟡 Helpers de configuración
+│   ├── graph_cache.py           🟡 Caché de artefactos de gráficos
 │   ├── graph_data.py            🟡 Carga y ejecución para gráficos
 │   ├── graph_render.py          🟡 Renderizado y fallback de gráficos
 │   └── scheduler_helpers.py     🟡 Estado y PID del scheduler
@@ -300,18 +302,20 @@ Laboratorio/
 
 ```text
 docs/
-├── README.md                   Este fichero
-├── ARCHITECTURE.md             Arquitectura canónica del sistema
-├── Architecture/               Diagramas y flujos detallados
-├── Index/                      Índice general de documentación
-├── Guides/                     Guías de uso y configuración
-├── Guia/                       Guías operacionales
-├── Plans/                      Planes de desarrollo y mejoras
-├── Summaries/                  Resúmenes y decisiones técnicas
-├── Fixes/                      Registro de correcciones
-├── Diagnosis/                  Diagnósticos de problemas resueltos
-└── api/                        Documentación de la API interna
+├── README.md                                              Este fichero
+├── ARCHITECTURE.md                                        Arquitectura canónica del sistema
+├── Manual_operativo_TradingCore_PowerShell_Git_Copilot.docx  Manual operativo
+├── api/                                                   Documentación de la API interna (MkDocs)
+├── Guides/                                                Guías de uso y configuración
+├── Index/                                                 Índice general y convenciones de documentación
+└── Summaries/                                             Resúmenes y decisiones técnicas
 ```
+
+El acceso a `docs/` desde el explorador web está filtrado por rol:
+
+- **Usuario normal:** solo puede ver y abrir la documentación funcional permitida (README.md y las guías funcionales permitidas).
+- **Admin:** puede ver y abrir todo el contenido válido situado bajo docs/.
+- La autorización se valida también en backend (no depende únicamente de que el árbol oculte elementos en la interfaz).
 
 ---
 
@@ -333,5 +337,4 @@ docs/
 ## Documentación Detallada
 
 - Arquitectura canónica: **[ARCHITECTURE.md](ARCHITECTURE.md)**
-- Flujo web de ejecución: **[Architecture/FLUJO_ARQUITECTURA_MEJORADO.md](Architecture/FLUJO_ARQUITECTURA_MEJORADO.md)**
 - Índice general: **[Index/00_INDEX_DOCUMENTACION.md](Index/00_INDEX_DOCUMENTACION.md)**
