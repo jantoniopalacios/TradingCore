@@ -22,7 +22,7 @@ VERIFICACION COMPLETA - Sistema listo para backtest desde web
 
 ## Paso 2: Monitorear logs en tiempo real
 ```powershell
-Get-Content -Path ".\logs\trading_app.log" -Wait
+Get-Content -Path ".\Backtesting\logs\trading_app.log" -Wait
 ```
 
 ## Paso 3: Iniciar servidor web
