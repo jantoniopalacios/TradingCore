@@ -18,7 +18,6 @@ Este índice lista la documentación activa dentro de `docs/`.
 - [motor_core.md](../api/motor_core.md) — API del núcleo de trading
 - [motor_indicators.md](../api/motor_indicators.md) — API de indicadores técnicos
 - [motor_utils.md](../api/motor_utils.md) — API de utilidades del motor
-- [OPTIMIZACIONES_IMPLEMENTADAS.md](../Summaries/OPTIMIZACIONES_IMPLEMENTADAS.md) — Registro de optimizaciones implementadas
 - [Manual_operativo_TradingCore_PowerShell_Git_Copilot.docx](../Manual_operativo_TradingCore_PowerShell_Git_Copilot.docx) — Manual operativo
 
 ## Meta-documentación
