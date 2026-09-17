@@ -1,5 +1,7 @@
 # Guia de combinacion de indicadores
 
+Ultima actualizacion: 17/09/2026
+
 ## Objetivo
 Definir combinaciones de indicadores que reduzcan falsos positivos y mejoren la calidad de entrada en backtest.
 
@@ -8,16 +10,16 @@ Usar un unico indicador (por ejemplo, solo cruce EMA) puede producir sobre-tradi
 
 ## Combinaciones recomendadas
 - `EMA + RSI`: confirmacion de tendencia y momentum.
-- `EMA + MACD`: confirmacion de tendencia con sesgo mas fuerte.
+- `EMA + MACD`: confirmacion de tendencia con sesgo mas fuerte. La integracion de las opciones MACD de UI (`macd_buy_logic`/`macd_sell_logic`) con la logica interna del indicador tiene una revision funcional pendiente; no la trates como comportamiento completamente validado.
 - `EMA + RSI + ATR`: añade control de volatilidad para filtrar extremos.
 
 ## Regla base sugerida
 Entrada si se cumple:
 1. señal tecnica principal (EMA/RSI/MACD, logica OR).
-2. filtros globales (logica AND): tendencia, momentum, volatilidad, volumen, MoS.
+2. filtros globales activos (logica AND): tendencia, momentum, volatilidad, volumen, MoS. Cada filtro solo interviene en la decision si esta activado explicitamente en la configuracion; un filtro inactivo no bloquea ni condiciona la entrada.
 
 ## Filtro ATR por perfil de activo
-El ATR debe calibrarse por tipo de volatilidad.
+El ATR debe calibrarse por tipo de volatilidad. Los siguientes rangos son orientativos, no valores canonicos del motor.
 
 | Perfil | ATR Min | ATR Max | Ejemplos |
 | :--- | ---: | ---: | :--- |
@@ -26,30 +28,13 @@ El ATR debe calibrarse por tipo de volatilidad.
 | Alta volatilidad | 2.0 | 7.0 | NVDA, TSLA, AMD |
 | Especulativo | 3.0 | 15.0 | BTC, MEME |
 
-## Caso NKE
-Diagnostico historico: el rango `2.0-5.0` bloquea exceso de oportunidades para NKE.
-
-Configuracion orientativa:
-```python
-ema_fast_period = 10
-ema_slow_period = 30
-rsi_period = 14
-rsi_strength_threshold = 54
-atr_enabled = True
-atr_period = 14
-atr_min = 0.5
-atr_max = 4.0
-volume_active = True
-volume_avg_multiplier = 1.0
-```
-
 ## Flujo operativo recomendado
 1. Ejecutar baseline sin ATR.
 2. Probar ATR amplio (`0.1-20.0`) para validar logica.
 3. Ajustar ATR por activo.
 4. Comparar `Return`, `Win Rate`, `Max Drawdown` y `Total Trades`.
 
+
 ## Referencias
-- [Diagnóstico Filtro ATR](../Diagnosis/DIAGNOSTICO_FILTRO_ATR_VOLATILIDAD.md)
-- [Guía de prueba NKE](./GUIDE_TEST_NKE.md)
 - [Quick Start Web](./QUICK_START_BACKTEST_WEB.md)
+- [Guia de Stops y Proteccion](./GUIA_STOPS_Y_PROTECCION.md)

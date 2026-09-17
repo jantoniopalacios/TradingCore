@@ -1,5 +1,7 @@
 # Guia: Stops y Proteccion de Capital
 
+Ultima actualizacion: 17/09/2026
+
 ## Objetivo
 
 Definir como configurar los mecanismos de stop loss, trailing stop y filtros de calidad de entrada disponibles en `BacktestWeb` para minimizar drawdown y proteger el capital inicial.
@@ -13,7 +15,7 @@ Definir como configurar los mecanismos de stop loss, trailing stop y filtros de 
 3. Menos trades, mejores trades: filtrar ruido suele proteger mejor el capital.
 4. Regla de comparacion consistente: optimizar con el mismo universo, fechas, comision y capital.
 
-**Limitacion estructural del motor actual:** el stop loss y el trailing se recalculan sobre el maximo de precio y no existe una fase explicita de break-even. Esta tension entre proteccion temprana y captura de beneficio es estructural y no se resuelve solo con ajuste de parametros (ver seccion 5 para propuesta de evolucion).
+El motor combina varias protecciones sobre la misma posicion (stop base, break-even, swing y trailing RSI cuando estan activados). El stop efectivo conserva siempre el nivel mas protector entre las protecciones aplicables y nunca retrocede una vez endurecido (ver seccion 6 para el comportamiento actual de break-even).
 
 ---
 
@@ -23,7 +25,9 @@ Definir como configurar los mecanismos de stop loss, trailing stop y filtros de 
 
 Parametro: `stoploss_percentage_below_close`
 
-| Perfil | Valor recomendado |
+Valores orientativos (no son reglas canonicas del motor, son puntos de partida para calibrar):
+
+| Perfil | Valor orientativo |
 | :--- | :--- |
 | Conservador | `0.03` a `0.05` |
 | Balanceado | `0.05` a `0.07` |
@@ -45,9 +49,11 @@ stoploss_swing_buffer = 1.0
 
 ### 2.3 Trailing stop dinamico por RSI
 
-Permite definir dos porcentajes de trailing segun el estado del RSI:
-- Si RSI <= limite → se aplica trailing mas amplio (mayor proteccion).
-- Si RSI > limite → se aplica trailing mas ajustado (deja correr la posicion).
+Permite definir dos porcentajes de trailing en funcion del valor actual del RSI:
+- Si RSI <= limite, se aplica el primer porcentaje configurado (`trailing_pct_below`).
+- Si RSI > limite, se aplica el segundo porcentaje configurado (`trailing_pct_above`).
+
+El efecto practico de cada porcentaje (mas o menos protector) depende de los valores que el usuario configure en cada caso; esta guia no asume una relacion fija de "mas proteccion" o "menos proteccion" mas alla de la comparacion aritmetica entre ambos porcentajes.
 
 Parametros:
 - `rsi_trailing_limit` (int): nivel de RSI que separa los dos regimenes.
@@ -61,7 +67,6 @@ trailing_pct_below = 2.0    # RSI en 35: trailing 2% bajo el maximo
 trailing_pct_above = 0.8    # RSI en 55: trailing 0.8% bajo el maximo
 ```
 
-**Nota:** el motor acepta el porcentaje en formato decimal o entero; para homogeneidad usar formato porcentaje (ejemplo `2.0`, `0.8`).
 
 ### 2.4 Filtros de calidad de entrada
 
@@ -74,6 +79,8 @@ Activar para reducir entradas de baja calidad:
 ---
 
 ## 3. Configuraciones semilla
+
+Las siguientes semillas son puntos de partida orientativos/experimentales para calibrar, no reglas canonicas del motor.
 
 ### Semilla A — Conservadora
 
@@ -128,7 +135,7 @@ volume_active = True
 
 ## 4. Calibracion ATR por perfil de activo
 
-El ATR debe calibrarse segun la volatilidad historica del activo. Los valores por defecto (2.0-5.0) son inadecuados para activos de baja volatilidad como NKE, ya que bloquean la mayoria de entradas.
+El ATR debe calibrarse segun la volatilidad historica del activo. Los rangos siguientes son orientativos, no valores canonicos del motor; los valores por defecto de la aplicacion (`atr_min=2.0`, `atr_max=5.0`) pueden ser inadecuados para activos de baja volatilidad y requerir ajuste.
 
 | Perfil | ATR Min | ATR Max | Ejemplos |
 | :--- | ---: | ---: | :--- |
@@ -161,28 +168,25 @@ Usar el mismo universo de simbolos, rango temporal, comision y capital para todo
 
 ---
 
-## 6. Propuesta de evolucion: Break-Even
+## 6. Comportamiento actual: Break-Even
 
-**Objetivo:** separar la gestion de riesgo en dos fases:
-1. Proteccion del capital hasta blindar la entrada.
-2. Captura de beneficio con trailing.
+El break-even es una proteccion ya implementada en el motor, activable por configuracion.
 
-**Parametros propuestos:**
-- `breakeven_enabled` (bool): activa la logica break-even.
-- `breakeven_trigger_pct` (float): ganancia minima para activar break-even (ejemplo `0.02` = 2%).
+**Parametros:**
+- `breakeven_enabled` (bool): activa esta proteccion.
+- `breakeven_trigger_pct` (float): NO es una ganancia minima que deba alcanzarse para activar el break-even. Es el porcentaje usado para calcular el suelo de proteccion respecto al precio de entrada.
 
-**Comportamiento esperado:**
-1. Al abrir posicion, se mantiene el stop inicial.
-2. Si el precio alcanza `entry_price * (1 + breakeven_trigger_pct)`, el stop sube al precio de entrada.
-3. El trailing continua normalmente, pero nunca baja del umbral de entrada.
+**Calculo del suelo:**
+```
+be_floor = entry_price * (1 - breakeven_trigger_pct)
+```
 
-**Puntos de integracion:**
-- `scenarios/BacktestWeb/configuracion.py`
-- `scenarios/BacktestWeb/estrategia_system.py`
-- `trading_engine/core/Logica_Trading.py`
-- `scenarios/BacktestWeb/templates/_tab_global.html`
+**Comportamiento:**
+1. Si `breakeven_enabled=True`, el suelo se calcula en cada vela a partir del precio de entrada y `breakeven_trigger_pct`.
+2. El stop efectivo aplicado a la posicion conserva siempre el nivel mas protector entre las protecciones activas (stop base/trailing, break-even y swing).
+3. El stop no retrocede una vez endurecido: solo puede mantenerse o subir.
 
-Esta evolucion es acotada y no rompe la estrategia actual cuando `breakeven_enabled=False`.
+Esta proteccion no rompe el comportamiento existente cuando `breakeven_enabled=False`.
 
 ---
 
