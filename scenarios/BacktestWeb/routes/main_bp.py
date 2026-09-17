@@ -18,7 +18,7 @@ from datetime import date, timedelta, datetime, timezone
 import logging
 import traceback
 # --- IMPORTACIONES ORIGINALES ---
-from ..file_handler import read_symbols_raw, write_symbols_raw, get_directory_tree
+from ..file_handler import read_symbols_raw, write_symbols_raw, get_directory_tree, is_docs_path_allowed
 from ..configuracion import (
     inicializar_configuracion_usuario,
     cargar_y_asignar_configuracion, System, BACKTESTING_BASE_DIR, PROJECT_ROOT
@@ -432,13 +432,17 @@ def index():
 
     arbol_ficheros = []
 
-    # docs visible para todos los usuarios autenticados
+    # docs visible para todos los usuarios autenticados; usuario normal solo ve documentos permitidos
     docs_dir = PROJECT_ROOT / "docs"
     if docs_dir.exists():
         arbol_ficheros.append({
             "name": "docs",
             "is_dir": True,
-            "children": get_directory_tree(docs_dir, is_admin=(user_mode == 'admin')),
+            "children": get_directory_tree(
+                docs_dir,
+                is_admin=(user_mode == 'admin'),
+                path_filter=is_docs_path_allowed,
+            ),
             "type": "Folder",
             "path": "docs"
         })
@@ -1044,7 +1048,7 @@ def view_file(path):
     if root_path is None:
         return "Ruta no permitida.", 403
 
-    # Permisos por raíz: docs para todos, logs solo admin.
+    # Permisos por raíz: docs restringido por rol, logs solo admin.
     if root_key == 'logs' and user_mode != 'admin':
         return "No autorizado para acceder a logs.", 403
 
@@ -1056,6 +1060,10 @@ def view_file(path):
         full_path.relative_to(root_path)
     except ValueError:
         return "Ruta no permitida.", 403
+
+    # No confiar solo en que el fichero esté oculto en el árbol: se valida también aquí.
+    if root_key == 'docs' and not is_docs_path_allowed(relative_path, is_admin=(user_mode == 'admin')):
+        return "No autorizado para acceder a este documento.", 403
 
     if not full_path.exists():
         return f"Archivo no encontrado en: {full_path}", 404

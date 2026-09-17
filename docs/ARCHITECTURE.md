@@ -2,6 +2,8 @@
 
 Documento canónico de arquitectura funcional y técnica de la aplicación.
 
+Última actualización: 17/09/2026
+
 ## 1. Visión General
 
 TradingCore está organizado en tres capas:
@@ -19,7 +21,7 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 `trading_engine/core/Logica_Trading.py`
 - Coordina la lógica de entrada/salida.
 - `check_buy_signal(strategy_self)`: aplica señales OR, filtros AND y ejecuta compra.
-- `manage_existing_position(strategy_self)`: gestiona cierre técnico y trailing stop.
+- `manage_existing_position(strategy_self)`: gestiona cierres técnicos por indicador y, si no aplica ninguno, el stop dinámico (stop base, break-even, swing stop y trailing por RSI cuando está configurado).
 
 `trading_engine/core/Backtest_Runner.py`
 - Ejecuta backtest por símbolo y multi-símbolo sobre `backtesting.py`.
@@ -47,6 +49,24 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 - `launch_strategy()` lanza ejecución asíncrona en hilo.
 - `backtest_status()` devuelve estado en vivo de la ejecución para la UI (fase, mensaje, eventos, estado final).
 - El guardado de configuración soporta modo AJAX para persistir sin redirección completa.
+
+`scenarios/BacktestWeb/routes/backtest_status.py`
+- Estado en memoria de ejecuciones de backtest por usuario (`queued`, `running`, `completed`, `error`).
+
+`scenarios/BacktestWeb/routes/config_helpers.py`
+- Helpers de construcción y normalización de parámetros de configuración desde el formulario web.
+
+`scenarios/BacktestWeb/routes/graph_cache.py`
+- Gestión de caché de artefactos de gráficos (snapshots HTML) y limpieza de expirados.
+
+`scenarios/BacktestWeb/routes/graph_render.py`
+- Renderizado del gráfico nativo del motor y fallback desde snapshot cuando no está disponible.
+
+`scenarios/BacktestWeb/routes/scheduler_helpers.py`
+- Lectura de estado y validación de PID del scheduler.
+
+`scenarios/BacktestWeb/file_handler.py`
+- Lectura/escritura de configuración `.env`, generación del árbol del explorador de ficheros (`get_directory_tree`) y control de acceso a documentación por rol (`is_docs_path_allowed`).
 
 `scenarios/BacktestWeb/Backtest.py`
 - `ejecutar_backtest(config_dict, progress_callback=None)`: orquestador operativo con reporte de progreso por fases.
@@ -101,6 +121,11 @@ Contrato de la capa HTTP (`main_bp.py`):
 - Gestiona estado de ejecución en memoria por usuario (`queued`, `running`, `completed`, `error`).
 - En guardado de configuración, devuelve JSON cuando el request es AJAX (`X-Requested-With: XMLHttpRequest`).
 - El visor web de ficheros restringe lectura a rutas controladas (`logs/`, `docs/`) y evita path traversal fuera de esas raíces.
+- `logs/` solo es accesible para el rol admin.
+- `docs/` se filtra por rol: el árbol mostrado y la apertura de ficheros usan la misma regla de autorización.
+  - Usuario normal: solo puede ver/abrir la documentación funcional permitida.
+  - Admin: puede ver/abrir todo `docs/`.
+  - La autorización se valida también en backend (`view_file`), no solo ocultando elementos en el árbol de la UI.
 
 ## 5. Flujo End-to-End
 
@@ -110,12 +135,12 @@ Contrato de la capa HTTP (`main_bp.py`):
 4. `launch_strategy()` inicializa estado de ejecución en memoria (run_id/tanda/status inicial).
 5. La UI consulta `GET /backtest_status` en polling para mostrar progreso por fases en el modal de lanzamiento.
 6. `ejecutar_backtest()` mezcla configuración guardada y enviada, y reporta hitos con callback.
-5. Obtiene símbolos del usuario (`simbolos`).
-6. Descarga datos de mercado (Yahoo Finance) y opcionalmente fundamentales/ratios.
-7. Ejecuta `run_multi_symbol_backtest(...)` con `System`.
-8. `System.next()` delega en `Logica_Trading` para decidir compra/venta por vela.
-9. Se guardan métricas, trades y gráficos en BD/HTML y se exponen en la UI.
-10. Al finalizar, se marca estado `completed` o `error`; el usuario confirma con `OK` y se recarga la vista para ver historial actualizado.
+7. Obtiene símbolos del usuario (`simbolos`).
+8. Descarga datos de mercado (Yahoo Finance) y opcionalmente fundamentales/ratios.
+9. Ejecuta `run_multi_symbol_backtest(...)` con `System`.
+10. `System.next()` delega en `Logica_Trading` para decidir compra/venta por vela.
+11. Se guardan métricas, trades y gráficos en BD/HTML y se exponen en la UI.
+12. Al finalizar, se marca estado `completed` o `error`; el usuario confirma con `OK` y se recarga la vista para ver historial actualizado.
 
 Notas de UX del formulario:
 
@@ -155,6 +180,7 @@ En cada vela:
 - Motivos técnicos consolidados en los registros de trade (`technical_reasons`).
 - Estado operativo visible en la UI durante la ejecución (fase actual, mensaje y eventos recientes).
 - Estado de pestañas (`activeTabKey` y `activeSubTabKey`) persistido en `localStorage` para mantener contexto visual entre recargas.
+- El estado/PID del scheduler en `logs/` (`backtest_scheduler_status.json`, `backtest_scheduler.pid`) es distinto de su log persistente, guardado en `Backtesting/logs/backtest_scheduler.log`.
 
 ## 9. Reglas de Extensión
 
@@ -166,7 +192,7 @@ Para añadir un nuevo indicador o filtro:
 4. Exponer parámetros en formulario web y persistencia (`main_bp.py`, `config_actual`).
 5. Verificar trazabilidad en `trades` y estabilidad del flujo de backtest.
 
-## 7. Principios de Diseño
+## 10. Principios de Diseño
 
 - El motor central concentra la lógica de decisión.
 - El escenario web orquesta, no duplica reglas de trading.

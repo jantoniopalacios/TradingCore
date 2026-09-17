@@ -1,5 +1,7 @@
 # Quick Start: Backtest Web
 
+Última actualización: 17/09/2026
+
 ## Objetivo
 Validar en pocos minutos que el flujo web de backtest funciona, genera resultados y guarda datos en base de datos.
 
@@ -20,7 +22,7 @@ VERIFICACION COMPLETA - Sistema listo para backtest desde web
 
 ## Paso 2: Monitorear logs en tiempo real
 ```powershell
-Get-Content -Path ".\logs\trading_app.log" -Wait
+Get-Content -Path ".\Backtesting\logs\trading_app.log" -Wait
 ```
 
 ## Paso 3: Iniciar servidor web
@@ -33,7 +35,7 @@ python scenarios/BacktestWeb/app.py
 2. Iniciar sesion con un usuario registrado.
 3. Seleccionar simbolos (por ejemplo, `NKE`).
 4. Revisar parametros globales y usar el boton `Ayuda` de la pestaña Global para consultar ejemplos de stop loss, swing y break-even.
-5. Activar indicadores de prueba (por ejemplo, EMA y MACD).
+5. Activar indicadores de prueba (por ejemplo, EMA y RSI).
 6. Pulsar `Lanzar Backtest`.
 
 ## Paso 5: Seguir el progreso por fases (sin refresco manual)
@@ -82,8 +84,9 @@ Nota tecnica de seguimiento:
 Logs esperados (resumen):
 ```text
 [LAUNCH] Usuario ... lanzando backtest
-[1/9] Cargando configuracion
-[8/9] Ejecutando motor de backtest multi-simbolo
+[1/11] Configuracion
+[7/11] Motor
+[11/11] Notificacion
 Backtest completado
 ```
 
@@ -128,11 +131,16 @@ Si durante la vela el precio perfora el stop y luego recupera al cierre, puede q
 
 ## Paso 8: Revisar documentacion desde el explorador web
 
-En modo Admin, la pestaña `Ficheros` ya incluye tambien la carpeta `docs` (ademas de `logs`).
+La pestaña `Ficheros` incluye tambien la carpeta `docs` (ademas de `logs`), pero el acceso esta filtrado por rol:
+
+- Usuario normal: puede ver y abrir `README.md` y las guias funcionales permitidas.
+- Admin: puede ver y abrir todo el contenido valido situado bajo `docs/`.
+- `logs` sigue restringido solo a admin.
+- La autorizacion se valida tambien en backend, no solo ocultando elementos en el arbol de la interfaz.
 
 Comportamiento esperado:
 
-- Puedes navegar subcarpetas de documentacion (`docs/...`) desde la propia UI.
+- Puedes navegar subcarpetas de documentacion (`docs/...`) desde la propia UI, dentro de lo autorizado para tu rol.
 - Puedes abrir y descargar archivos de documentacion sin salir de la aplicacion.
 - El borrado de archivos se mantiene restringido a `logs` (en `docs` no aparece papelera).
 
@@ -148,6 +156,7 @@ Regla clave para interpretar B&H:
 
 - B&H solo entra cuando no hay posicion abierta, no hay senales tecnicas activas y EMA lenta esta favorable.
 - Si activas una senal tecnica (por ejemplo EMA cruce, RSI compra, MACD, Stoch o BB), B&H deja de ser el camino principal de entrada.
+- Los filtros globales activos (por ejemplo el filtro de fuerza RSI, ATR o volumen) pueden bloquear igualmente la entrada por B&H cuando estan configurados, aunque no exista senal tecnica.
 
 | Grupo | Parametro | Efecto operativo | Impacto sobre B&H / Compra |
 |---|---|---|---|
@@ -157,7 +166,7 @@ Regla clave para interpretar B&H:
 | Global | `stoploss_percentage_below_close` | Trailing stop base | Gestion de salida, no de entrada |
 | Global | `enviar_mail` / `destinatario_email` | Notificacion al finalizar | Sin impacto en logica de trading |
 | Stop | `breakeven_enabled` | Activa suelo de proteccion por entrada | Solo salida (riesgo) |
-| Stop | `breakeven_trigger_pct` | Umbral para break-even | Solo salida (riesgo) |
+| Stop | `breakeven_trigger_pct` | Porcentaje usado para calcular el suelo `entry_price * (1 - breakeven_trigger_pct)`; no es una ganancia minima para activar el break-even | Solo salida (riesgo) |
 | Stop | `stoploss_swing_enabled` | Activa stop por swing low | Solo salida (riesgo) |
 | Stop | `stoploss_swing_lookback` | Ventana para swing low | Solo salida (riesgo) |
 | Stop | `stoploss_swing_buffer` | Buffer bajo swing low | Solo salida (riesgo) |
@@ -181,7 +190,8 @@ Regla clave para interpretar B&H:
 | RSI | `rsi_strength_threshold` | Filtro global de fuerza RSI | Puede bloquear compras, incluso B&H, cuando RSI esta ON |
 | MACD | `macd` | Activa MACD | Si ON, hay via tecnica de compra/venta |
 | MACD | `macd_fast` / `macd_slow` / `macd_signal` | Parametros de calculo MACD | Ajustan sensibilidad |
-| MACD | `macd_maximo` / `macd_descendente` | Cierre tecnico MACD | Salida tecnica |
+| MACD | `macd_buy_logic` (`macd_cruce_up` / `macd_histogram_buy`) | Selecciona la logica de senal de compra en UI | Compra tecnica MACD |
+| MACD | `macd_sell_logic` (`macd_cruce_down` / `macd_histogram_sell`) | Selecciona la logica de senal de venta en UI | Salida tecnica MACD |
 | STOCH | `stoch_fast` / `stoch_mid` / `stoch_slow` | Activa familia estocastica | Si ON, hay via tecnica de compra/venta |
 | STOCH | `*_period` / `*_smooth` | Parametros de calculo Stoch | Ajustan sensibilidad |
 | STOCH | `*_low_level` / `*_high_level` | Umbrales sobreventa/sobrecompra | Definen disparadores |
@@ -204,6 +214,8 @@ Notas rapidas de interpretacion:
 2. Si hay posicion abierta, no se abre una compra nueva hasta que se cierre la posicion actual.
 3. El titulo corto del historial (`ESTRATEGIA`) es un resumen automatico, no reemplaza el detalle completo de configuracion.
 
+**Nota sobre MACD por histograma:** las opciones `macd_histogram_buy` y `macd_histogram_sell` de la UI estan pendientes de revision funcional respecto a su integracion con la logica interna; evita asumir un comportamiento no validado para esas dos opciones.
+
 ## Validacion de exito
 - En logs se completan los pasos del orquestador.
 - En web aparecen resultados y graficos.
@@ -214,153 +226,3 @@ Si aparece `Sin datos historicos descargados`, revisar:
 - existencia de CSV en `Data_files/`.
 - rango de fechas e intervalo configurados.
 - conectividad con la fuente de datos.
-
-## Paso 10: Auditoria de Stops (pruebas realizadas y repeticion)
-
-En esta fase se audito la logica de stops con scripts independientes, sin modificar codigo de produccion.
-
-Scripts usados:
-
-- `scripts/audit_stops_zts.py`: valida coherencia de TrailingBase por trade.
-- `scripts/audit_stops_combinations.py`: valida combinaciones y ausencia de fugas de fuente (`TrailingBase`, `BreakEven`, `Swing`, `TrailingRSI...`).
-
-### Configuracion comun de las pruebas
-
-- Intervalo: `1d`
-- Rango: `2023-01-01` a `2026-03-16`
-- EMA lenta: `200`
-- En escenarios base: indicadores tecnicos desactivados salvo donde se pruebe explicitamente RSI trailing.
-
-### Pruebas realizadas
-
-1. Auditoria TrailingBase por activo (`audit_stops_zts.py`)
-
-- ZTS con stops `0.05`, `0.10`, `0.15`: sin hallazgos de logica de stop.
-- SAN.MC con stops `0.05`, `0.10`, `0.15`: tras ajustar el modelo del auditor para reflejar exactamente el motor (stop inicial en cierre de compra y actualizacion con `High` desde la vela siguiente), sin hallazgos.
-
-2. Auditoria de combinaciones (`audit_stops_combinations.py`) con stop `0.10`
-
-- ZTS: sin fugas de fuente entre escenarios.
-- SAN.MC: resultado reproducible, sin fugas de fuente entre escenarios.
-
-Resumen operativo observado en SAN.MC (0.10):
-
-- `trailing_base`: solo `TrailingBase`.
-- `breakeven_only`: `BreakEven` y `TrailingBase`.
-- `swing_only`: `TrailingBase` en este rango/parametros (Swing no llego a dominar).
-- `breakeven_and_swing`: `BreakEven` y `TrailingBase`.
-- `rsi_trailing_guard_off`: sin fuentes RSI (correcto).
-- `rsi_trailing_on`: aparece `TrailingRSI<=Limite` (correcto).
-
-### Conclusiones
-
-- Validacion funcional satisfactoria para TrailingBase, BreakEven, Swing y trailing RSI en los escenarios auditados.
-- No se detectaron bugs de logica de stop en los casos ejecutados.
-- Queda pendiente solo una regresion de cobertura amplia (mas activos, otros intervalos y casos extremos de datos) si se requiere cierre al 100%.
-
-### Hallazgos practicos adicionales
-
-- Configuracion comun recomendada (perfil equilibrado):
-	- `intervalo=1d`, `ema_slow_period=200`
-	- `stoploss_percentage_below_close=0.10`
-	- `breakeven_enabled=True`, `breakeven_trigger_pct=0.02`
-	- `stoploss_swing_enabled=False` (activar solo en pruebas especificas)
-	- `rsi_trailing` desactivado en baseline.
-- Perfil alternativo defensivo para comparativa: `stoploss_percentage_below_close=0.08` con el resto igual.
-- Buffer Swing conservador orientativo en `1d`: `0.3` a `0.8` (valor inicial sugerido: `0.5`).
-- El modelo de stop usa politica **Close/Close** (decision confirmada mediante comparativa A/B):
-	- El trailing se actualiza con el maximo de cierres (`Close`).
-	- La salida por stop se confirma por cierre (`Close < stop`).
-	- Ventaja principal: semantica homogenea y mas facil de auditar en pruebas EOD.
-
-### Comparativa A/B: Close/Close vs High/Close
-
-Se ejecuto `scripts/compare_trailing_model.py` sobre ZTS y SAN.MC (1d, 2023-01-01 a 2026-03-16) para cuantificar el impacto del cambio. Resultados:
-
-| Simbolo | Stop | Close/Close Return | High/Close Return | Delta |
-|---------|------|--------------------|-------------------|-------|
-| ZTS     | 5%   | -11.88%            | -12.83%           | C/C mejor +0.95pp |
-| ZTS     | 10%  | -14.14%            | -19.90%           | C/C mejor **+5.76pp** |
-| ZTS     | 15%  | -32.01%            | -27.94%           | H/C mejor +4.07pp |
-| SAN.MC  | 5%   | 156.44%            | 172.03%           | H/C mejor +15.59pp |
-| SAN.MC  | 10%  | **199.21%**        | 191.76%           | C/C mejor **+7.45pp** |
-| SAN.MC  | 15%  | 195.35%            | 195.35%           | Identicos |
-
-**Razonamiento de la decision:**
-
-- Con `stop=0.10` (perfil recomendado), Close/Close gana en **ambos simbolos** (+5.76pp en ZTS, +7.45pp en SAN.MC).
-- Con `stop=0.05` el resultado se invierte en SAN.MC; con `stop=0.15` es mixto o identico.
-- No existe un modelo universalmente superior: depende del stop elegido. Para el rango operativo habitual (`0.08`-`0.12`), Close/Close es consistentemente mejor.
-- Decision final: **mantener Close/Close** como politica de produccion.
-
-### Regla unica recomendada: RSI modo minimo
-
-Dado que actualmente no hay configuracion por activo, la regla unica recomendada para compra por RSI es **modo minimo** (mejora en ZTS y neutro en SAN.MC en los tests realizados).
-
-Implementacion en la app actual (campos de configuracion):
-
-- Activar RSI:
-	- `rsi = True`
-	- `rsi_period = 10`
-	- `rsi_low_level = 20` (25 tambien dio resultado equivalente)
-	- `rsi_high_level = 70`
-- Activar solo la logica minima (giro desde sobreventa):
-	- `rsi_minimo = True`
-	- `rsi_ascendente = False`
-	- `rsi_maximo = False`
-	- `rsi_descendente = False`
-- Desactivar el filtro global de fuerza (modo gate):
-	- `rsi_strength_threshold = 0`
-
-Parametros base a mantener junto con esta regla:
-
-- `ema_slow_ascendente = True`
-- `stoploss_percentage_below_close = 0.10`
-- `breakeven_enabled = True`
-- `breakeven_trigger_pct = 0.03`
-
-Nota importante de implementacion:
-
-- Si `rsi_strength_threshold` queda en `50` (valor por defecto), el sistema aplica filtro global RSI y mezcla comportamiento de modo `gate` con `minimo`.
-- Para usar **minimo puro**, dejar `rsi_strength_threshold = 0`.
-
-### Como repetir las pruebas
-
-Desde la raiz del proyecto, con el entorno virtual activo:
-
-```powershell
-c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/audit_stops_zts.py --symbol ZTS --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stops 0.05 0.10 0.15
-
-c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/audit_stops_zts.py --symbol SAN.MC --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stops 0.05 0.10 0.15
-
-c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/audit_stops_combinations.py --symbol ZTS --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10
-
-c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/audit_stops_combinations.py --symbol SAN.MC --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10
-
-# Comparativa A/B Close/Close vs High/Close para cualquier simbolo:
-c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/compare_trailing_model.py --symbols ZTS SAN.MC --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stops 0.05 0.10 0.15
-
-# Barrido manual RSI sobre baseline (EMA ascendente + stop 10% + BE 3%):
-c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/sweep_rsi_filter.py --symbols ZTS SAN.MC --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10 --breakeven 0.03
-
-# Optimizacion RSI con backtesting.Backtest.optimize():
-c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/optimize_rsi.py --symbols ZTS SAN.MC --mode gate --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10 --breakeven 0.03 --topn 10
-
-c:/Users/juant/Proyectos/Python/TradingCore/.venv/Scripts/python.exe scripts/optimize_rsi.py --symbols ZTS SAN.MC --mode minimo --interval 1d --start 2023-01-01 --end 2026-03-16 --ema-slow 200 --stop 0.10 --breakeven 0.03 --topn 10
-```
-
-Resultado esperado de exito:
-
-- `audit_stops_zts.py`: mensaje `No stop logic issues detected in audited scenario.`
-- `audit_stops_combinations.py`: mensaje `No source-leak issues detected in stop combination scenarios.`
-
-### Organizacion de scripts
-
-La carpeta `scripts/` se ha organizado para mantener la raiz limpia:
-
-- `scripts/` (raiz): scripts operativos y de uso frecuente.
-- `scripts/analysis/`: analisis ad-hoc.
-- `scripts/debug/`: utilidades de debug puntual.
-- `scripts/tests/`: pruebas exploratorias y de validacion puntual.
-
-Referencia completa: `scripts/README.txt`.

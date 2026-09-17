@@ -467,3 +467,145 @@ def test_scheduler_pid_helper_removes_orphan_pid_file(tmp_path):
 
     assert result is False
     assert not pid_path.exists()
+
+
+# ----------------------------------------------------------------------
+# --- CONTROL DE ACCESO A DOCUMENTACIÓN (docs/) POR ROL ---
+# ----------------------------------------------------------------------
+
+def test_is_docs_path_allowed_admin_sees_everything():
+    from pathlib import Path
+    from scenarios.BacktestWeb.file_handler import is_docs_path_allowed
+
+    assert is_docs_path_allowed(Path("ARCHITECTURE.md"), is_admin=True) is True
+    assert is_docs_path_allowed(Path("api/motor_core.md"), is_admin=True) is True
+
+
+def test_is_docs_path_allowed_user_only_sees_whitelist():
+    from pathlib import Path
+    from scenarios.BacktestWeb.file_handler import is_docs_path_allowed
+
+    # Documentos permitidos
+    assert is_docs_path_allowed(Path("README.md"), is_admin=False) is True
+    assert is_docs_path_allowed(Path("Guides/GUIA_COMBINACION_INDICADORES.md"), is_admin=False) is True
+    assert is_docs_path_allowed(Path("Guides/GUIA_STOPS_Y_PROTECCION.md"), is_admin=False) is True
+    assert is_docs_path_allowed(Path("Guides/QUICK_START_BACKTEST_WEB.md"), is_admin=False) is True
+
+    # Directorio padre necesario para construir el árbol
+    assert is_docs_path_allowed(Path("Guides"), is_admin=False) is True
+
+    # Documentación técnica no autorizada
+    assert is_docs_path_allowed(Path("ARCHITECTURE.md"), is_admin=False) is False
+    assert is_docs_path_allowed(Path("api/motor_core.md"), is_admin=False) is False
+    assert is_docs_path_allowed(Path("Guides/GUIDE_TEST_NKE.md"), is_admin=False) is False
+    assert is_docs_path_allowed(Path("api"), is_admin=False) is False
+
+
+def test_is_docs_path_allowed_rejects_traversal():
+    from pathlib import Path
+    from scenarios.BacktestWeb.file_handler import is_docs_path_allowed
+
+    assert is_docs_path_allowed(Path("../secrets.env"), is_admin=False) is False
+    assert is_docs_path_allowed(Path("Guides/../../secrets.env"), is_admin=False) is False
+
+    # El veto de traversal se aplica también a admin.
+    assert is_docs_path_allowed(Path("../secrets.env"), is_admin=True) is False
+
+    # Rutas absolutas rechazadas para ambos roles, construidas de forma portable.
+    absolute_path = Path.cwd().anchor + "etc" if Path.cwd().anchor else "/etc"
+    absolute_path = Path(absolute_path) / "secrets.env"
+    assert is_docs_path_allowed(absolute_path, is_admin=False) is False
+    assert is_docs_path_allowed(absolute_path, is_admin=True) is False
+
+
+def test_view_file_user_can_open_readme(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'user'
+
+    response = client.get('/view_file/docs/README.md')
+
+    assert response.status_code == 200
+
+
+def test_view_file_user_can_open_allowed_guide(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'user'
+
+    response = client.get('/view_file/docs/Guides/QUICK_START_BACKTEST_WEB.md')
+
+    assert response.status_code == 200
+
+
+def test_view_file_user_forbidden_for_architecture(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'user'
+
+    response = client.get('/view_file/docs/ARCHITECTURE.md')
+
+    assert response.status_code == 403
+
+
+def test_view_file_user_forbidden_for_api_docs(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'user'
+
+    response = client.get('/view_file/docs/api/motor_core.md')
+
+    assert response.status_code == 403
+
+
+def test_view_file_admin_can_open_architecture(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'admin'
+
+    response = client.get('/view_file/docs/ARCHITECTURE.md')
+
+    assert response.status_code == 200
+
+
+def test_view_file_user_still_forbidden_for_logs(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'user'
+
+    response = client.get('/view_file/logs/trading_app.log')
+
+    assert response.status_code == 403
+
+
+def test_view_file_rejects_path_traversal(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'admin'
+
+    response = client.get('/view_file/docs/../configuracion.py')
+
+    assert response.status_code in (400, 403, 404)
+    assert response.status_code != 200
+
+
+def test_directory_tree_for_user_excludes_technical_docs():
+    from scenarios.BacktestWeb.file_handler import get_directory_tree, is_docs_path_allowed
+    from scenarios.BacktestWeb.configuracion import PROJECT_ROOT
+
+    docs_dir = PROJECT_ROOT / "docs"
+    tree = get_directory_tree(docs_dir, is_admin=False, path_filter=is_docs_path_allowed)
+
+    def collect_names(nodes):
+        names = []
+        for node in nodes:
+            names.append(node['name'])
+            if node['children']:
+                names.extend(collect_names(node['children']))
+        return names
+
+    all_names = collect_names(tree)
+
+    assert 'README.md' in all_names
+    assert 'ARCHITECTURE.md' not in all_names
+    assert 'api' not in all_names

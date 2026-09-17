@@ -1,5 +1,7 @@
 # Convenciones de Documentacion
 
+Ultima actualizacion: 17/09/2026
+
 Este documento define el formato recomendado para mantener uniformidad en todos los archivos `.md` de `docs/`.
 
 ## 1. Estructura base
@@ -99,8 +101,33 @@ Cuando un archivo sea historico (snapshot, plan viejo, resumen cerrado), incluir
 ...
 ```
 
-## 8. Archivo canonico de referencia
+## 8. Clasificacion por audiencia
 
-- Arquitectura vigente: `docs/ARCHITECTURE.md`
-- Flujo web vigente: `docs/Architecture/FLUJO_ARQUITECTURA_MEJORADO.md`
+Cada documento debe poder identificarse como uno de estos dos tipos:
+
+- **Usuario**: documentacion funcional orientada a operar la aplicacion (README, guias de uso). Es la unica documentacion visible para el rol usuario normal en el explorador web de `docs/`.
+- **Admin / tecnica**: documentacion de arquitectura, referencia de API, resumenes tecnicos y meta-documentacion. Visible solo para el rol admin en el explorador web.
+
+Esta clasificacion debe mantenerse alineada con la regla de autorizacion implementada en `scenarios/BacktestWeb/file_handler.py` (`is_docs_path_allowed`) y reflejada en `docs/Index/00_INDEX_DOCUMENTACION.md`.
+
+## 9. Definition of Done documental
+
+Todo cambio funcional debe revisar, antes de darse por cerrado, si requiere actualizar ayuda contextual, documentacion de usuario, documentacion tecnica y/o tests. Checklist de referencia:
+
+```text
+[ ] Codigo implementado
+[ ] Tests añadidos o actualizados
+[ ] Tests existentes superados
+[ ] Ayuda contextual añadida si tiene interfaz
+[ ] Manual de usuario actualizado
+[ ] Documentacion admin/tecnica actualizada si procede
+[ ] README actualizado si cambia arquitectura
+[ ] Verificacion funcional realizada
+[ ] Commit realizado
+[ ] Tag/checkpoint cuando corresponda
+```
+
+## 10. Archivo canonico de referencia
+
+- Arquitectura vigente y referencia canonica: `docs/ARCHITECTURE.md`
 - Navegacion general: `docs/Index/00_INDEX_DOCUMENTACION.md`

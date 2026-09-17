@@ -33,50 +33,44 @@
             </div>
             <div class="modal-body">
                 <p>
-                    Esta pestaña controla el marco general del backtest: rango temporal, capital, costes y gestión de riesgo.
-                    Una buena configuración aquí suele impactar más en drawdown que ajustar un indicador aislado.
+                    Esta pestaña define el marco general del backtest: ventana histórica, capital, costes y protección de la posición.
+                    Los valores aquí afectan a todas las estrategias, aunque el comportamiento real de entrada/salida se decide después en cada indicador.
                 </p>
 
-                <h6 class="mt-4 text-primary"><strong>1. Datos y contexto de ejecución</strong></h6>
+                <h6 class="mt-4 text-primary"><strong>1. Datos y ejecución</strong></h6>
                 <ul class="small mb-3">
-                    <li><strong>Fecha de Inicio / Fecha de Fin:</strong> definen la ventana histórica del test.</li>
-                    <li><strong>Intervalo:</strong> resolución de velas (`1h`, `1d`, `1wk`, etc.).</li>
-                    <li><strong>Capital Inicial (cash):</strong> base sobre la que se calcula rendimiento y drawdown.</li>
-                    <li><strong>Comisión (commission):</strong> coste por operación. Si es demasiado baja en pruebas, los resultados pueden ser irreales.</li>
+                    <li><strong>Fecha de Inicio / Fecha de Fin:</strong> delimitan la ventana histórica del test.</li>
+                    <li><strong>Intervalo:</strong> resolución de velas (`1m`, `1h`, `1d`, `1wk`, etc.).</li>
+                    <li><strong>Capital Inicial (cash):</strong> base sobre la que se ejecutan las operaciones y se calcula el rendimiento.</li>
+                    <li><strong>Comisión (commission):</strong> valor decimal aplicado al coste por operación; el motor usa 0.002 como 0.2%.</li>
                 </ul>
 
-                <h6 class="mt-4 text-primary"><strong>2. Protección de capital (riesgo)</strong></h6>
+                <h6 class="mt-4 text-primary"><strong>2. Stop Loss y protección</strong></h6>
                 <ul class="small mb-3">
-                    <li><strong>Stop Loss (%):</strong> protección base de la posición.</li>
-                    <li><strong>SL por Swing:</strong> usa estructura del precio para colocar un stop más contextual.</li>
-                    <li><strong>Break-Even:</strong> define un suelo de protección desde la entrada según una pérdida máxima tolerada.</li>
+                    <li><strong>Stop Loss (%):</strong> se aplica como stop fijo base de la posición al abrirla: <code>entry * (1 - stoploss_percentage_below_close)</code>.</li>
+                    <li><strong>SL por Swing:</strong> si está habilitado, calcula un swing low sobre los últimos N velas y usa ese nivel como stop más restrictivo, con un buffer absoluto.</li>
+                    <li><strong>Break-Even:</strong> si está activo, define un suelo de protección del precio de entrada, no un disparador por beneficio alcanzado. El suelo se calcula como <code>entry_price * (1 - breakeven_trigger_pct)</code> y sustituye al stop actual solo si ese suelo es superior a él.</li>
                 </ul>
 
                 <div class="alert alert-warning small">
-                    <strong>Regla práctica:</strong> primero bajar drawdown, luego optimizar retorno. Una estrategia que gana mucho pero cae 40%+ suele ser difícil de sostener en real.
+                    <strong>Importante:</strong> estos parámetros no generan señales de compra por sí mismos. Son herramientas de gestión de riesgo que se aplican sobre una posición ya abierta.
+                    En la configuración actual, el valor por defecto de <code>stoploss_percentage_below_close</code> es 0.0 (sin stop base activo salvo que lo configure el usuario), y <code>breakeven_enabled</code> queda en <code>False</code> por defecto.
                 </div>
 
-                <h6 class="mt-4 text-primary"><strong>3. Ejemplos de configuración</strong></h6>
-
-                <p class="mb-1"><strong>Perfil conservador (prioriza proteger capital):</strong></p>
+                <h6 class="mt-4 text-primary"><strong>3. Configuración real observada en el código</strong></h6>
                 <ul class="small mb-3">
-                    <li>`stoploss_percentage_below_close = 0.04`</li>
-                    <li>`stoploss_swing_enabled = True`, `stoploss_swing_lookback = 12`, `stoploss_swing_buffer = 1.0`</li>
-                    <li>`breakeven_enabled = True`, `breakeven_trigger_pct = 0.02`</li>
+                    <li><strong>Stop loss fijo:</strong> <code>stoploss_percentage_below_close</code> (default 0.0).</li>
+                    <li><strong>Stop por swing:</strong> <code>stoploss_swing_enabled</code>, <code>stoploss_swing_lookback</code> (default 10), <code>stoploss_swing_buffer</code> (default 1.0).</li>
+                    <li><strong>Break-even:</strong> <code>breakeven_enabled</code> (default False), <code>breakeven_trigger_pct</code> (default None) representa la pérdida máxima tolerada desde el precio de entrada (ej: 0.03 = 3%). Valores mayores que 1 se normalizan dividiendo entre 100.</li>
+                    <li><strong>ATR global:</strong> <code>atr_enabled</code> (default False), <code>atr_min</code> (default 2.0), <code>atr_max</code> (default 5.0).</li>
+                    <li><strong>Email:</strong> <code>enviar_mail</code> y <code>destinatario_email</code> se usan para notificación/reporting, no para abrir o cerrar posiciones.</li>
                 </ul>
 
-                <p class="mb-1"><strong>Perfil balanceado (dejar correr con control):</strong></p>
-                <ul class="small mb-3">
-                    <li>`stoploss_percentage_below_close = 0.06`</li>
-                    <li>`stoploss_swing_enabled = True`, `stoploss_swing_lookback = 10`, `stoploss_swing_buffer = 0.8`</li>
-                    <li>`breakeven_enabled = True`, `breakeven_trigger_pct = 0.025`</li>
-                </ul>
-
-                <h6 class="mt-4 text-primary"><strong>4. Errores frecuentes</strong></h6>
+                <h6 class="mt-4 text-primary"><strong>4. Errores habituales</strong></h6>
                 <ul class="small mb-0">
-                    <li>Usar stop demasiado amplio y asumir que el indicador lo resolverá después.</li>
-                    <li>No activar break-even cuando hay muchas operaciones que pasan por beneficio y terminan perdiendo.</li>
-                    <li>Comparar resultados con distinto capital/comisión/fechas (comparación no válida).</li>
+                    <li>Dar por hecho que un parámetro de riesgo genera señal; no lo hace.</li>
+                    <li>Usar valores de ejemplo como si fueran defaults reales sin chequear la configuración activa.</li>
+                    <li>Comparar backtests con diferente capital, fechas o comisiones sin normalizar el contexto.</li>
                 </ul>
             </div>
             <div class="modal-footer">
@@ -190,14 +184,7 @@
     </div>
     <div class="col-2"><span class="text-muted small">{% if comments.breakeven_trigger_pct %}<a href="#" title="{{ comments.breakeven_trigger_pct }}" data-bs-toggle="tooltip">?</a>{% endif %}</span></div>
 </div>
-
-<h4 class="mb-3 text-primary border-bottom pb-2">Opciones de Ejecución y Correo</h4>
-
-<div class="row row-control align-items-center mb-2">
-    <div class="col-4"><label for="filtro_fundamental" class="form-check-label fw-bold">Usar Filtro Fundamental:</label></div>
-    <div class="col-6">
-        <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" role="switch" id="filtro_fundamental" name="filtro_fundamental" 
+                <!-- breakeven_trigger_pct: pérdida máxima tolerada desde la entrada, no un trigger de beneficio -->
                    value="True" 
                    {% if config.filtro_fundamental == 'True' %}checked{% endif %}>
         </div>
