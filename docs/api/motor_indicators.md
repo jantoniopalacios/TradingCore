@@ -1,6 +1,8 @@
-# Referencia API: Indicadores Técnicos
+# Referencia API: Indicadores Tecnicos
 
-Este módulo contiene la implementación y la lógica de filtrado específica para cada indicador técnico.
+Ultima actualizacion: 17/09/2026
+
+Este documento resume la implementacion y la logica de filtrado especifica de los indicadores tecnicos. La combinacion funcional de senales y filtros se describe en `docs/ARCHITECTURE.md`.
 
 ## Filtro EMA (Exponential Moving Average)
 
@@ -12,6 +14,8 @@ Este módulo contiene la implementación y la lógica de filtrado específica pa
         - apply_ema_global_filter
         - check_ema_sell_signal
 
+EMA puede participar tanto como senal tecnica como filtro global, segun la configuracion activa.
+
 ## Filtro RSI (Relative Strength Index)
 
 ::: trading_engine.indicators.Filtro_RSI
@@ -20,6 +24,8 @@ Este módulo contiene la implementación y la lógica de filtrado específica pa
         - update_rsi_state
         - check_rsi_buy_signal
         - check_rsi_sell_signal
+
+RSI puede aportar senales tecnicas y tambien intervenir como filtro global de fuerza cuando esa condicion esta configurada. El valor por defecto actual de `rsi_strength_threshold` es `50`.
 
 ## Filtro MACD (Moving Average Convergence Divergence)
 
@@ -30,11 +36,11 @@ Este módulo contiene la implementación y la lógica de filtrado específica pa
         - check_macd_buy_signal
         - check_macd_sell_signal
 
+La interfaz usa `macd_buy_logic` y `macd_sell_logic` para seleccionar la logica de compra y venta. Las opciones basadas en histograma estan pendientes de revision funcional respecto a su integracion con la logica interna; no debe asumirse comportamiento no validado para esas opciones.
+
 ## Filtro Stochastic (Fast, Mid, Slow)
 
-Este módulo contiene las funciones genéricas que se aplican a las diferentes versiones del oscilador Estocástico 
-(Rápido, Medio y Lento) que la estrategia utilice. Se utilizan prefijos dinámicos (e.g., `stoch_fast`) para 
-manejar los múltiples estados y configuraciones del oscilador.
+Este modulo contiene funciones genericas aplicables a las distintas variantes del oscilador estocastico (rapido, medio y lento). Se utilizan prefijos dinamicos, por ejemplo `stoch_fast`, para manejar sus estados y configuraciones.
 
 ::: trading_engine.indicators.Filtro_Stochastic
     options:
@@ -46,8 +52,7 @@ manejar los múltiples estados y configuraciones del oscilador.
 
 ## Filtro Margen de Seguridad (MoS)
 
-Este módulo gestiona la lógica de filtrado basada en el Margen de Seguridad (Margin of Safety),
-que es un filtro fundamental opcional para asegurar que el precio del activo está por debajo de su valor intrínseco.
+MoS es un filtro fundamental opcional que puede condicionar la entrada cuando esta activado.
 
 ::: trading_engine.indicators.Filtro_MoS
     options:
@@ -55,11 +60,9 @@ que es un filtro fundamental opcional para asegurar que el precio del activo est
         - update_mos_state
         - apply_mos_filter
 
-## Filtro de Volumen (V-MA y Overshoot)
+## Filtro de Volumen
 
-Este filtro de Volumen evalúa la actividad de la oferta/demanda no solo en base a la Media Móvil (V-MA), 
-sino también mediante un concepto de **Umbral de Overshoot** que mide la persistencia de la fuerza.
-Actúa como una condición AND para la entrada.
+El filtro de volumen actua como condicion global de entrada cuando esta activado.
 
 ::: trading_engine.indicators.Filtro_Volume
     options:
@@ -69,7 +72,7 @@ Actúa como una condición AND para la entrada.
 
 ## Filtro de Volatilidad ATR
 
-Filtra entradas por rango de volatilidad aceptable (ATR minimo y maximo).
+ATR filtra entradas segun el rango de volatilidad configurado mediante sus limites minimo y maximo cuando el filtro esta activo.
 
 ::: trading_engine.indicators.Filtro_ATR
     options:
@@ -77,16 +80,18 @@ Filtra entradas por rango de volatilidad aceptable (ATR minimo y maximo).
         - apply_atr_range_filter
 
 ## Filtro de Bandas de Bollinger (BB)
-Este filtro identifica condiciones de volatilidad y niveles de sobreventa/sobrecompra. A diferencia de otros indicadores, este módulo admite una lógica flexible definida por el parámetro bb_buy_crossover:
 
-Lógica de Toque (False): Activa la señal si el precio de cierre es inferior a la banda baja (ideal para capturar suelos en desplomes verticales).
+Bollinger Bands puede aportar senales tecnicas de compra y venta. El parametro `bb_buy_crossover` permite distinguir entre la logica configurada de toque y la de cruce.
 
-Lógica de Cruce (True): Requiere que el precio cruce de fuera hacia dentro de la banda para confirmar la reversión.
+::: trading_engine.indicators.Filtro_BollingerBands
+    options:
+      members:
+        - calculate_bollinger_bands
+        - update_bb_state
+        - check_bb_buy_signal
+        - check_bb_sell_signal
 
-::: trading_engine.indicators.Filtro_BollingerBands 
-  options: 
-    members: 
-      - calculate_bollinger_bands 
-      - update_bb_state 
-      - check_bb_buy_signal 
-      - check_bb_sell_signal
+## Referencias
+
+- Arquitectura canonica: `docs/ARCHITECTURE.md`
+- Guia de combinacion: `docs/Guides/GUIA_COMBINACION_INDICADORES.md`
