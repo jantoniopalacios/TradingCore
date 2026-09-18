@@ -7,54 +7,57 @@
 
 <!-- Modal con información de Bollinger -->
 <div class="modal fade" id="bbInfoModal" tabindex="-1" aria-labelledby="bbInfoModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="bbInfoModalLabel">📊 Bandas de Bollinger - Guía de uso</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
-                <h6 class="text-primary"><strong>¿Qué mide?</strong></h6>
-                <p>TradingCore calcula una <strong>SMA central</strong> y dos bandas alrededor de ella. Las bandas se separan según la desviación estándar del cierre; sirven para identificar un precio extremo respecto a su ventana reciente y para observar la pérdida de impulso hacia la SMA.</p>
+    <h6 class="text-primary"><strong>1. Qué es / qué mide</strong></h6>
+    <p>Las <strong>Bandas de Bollinger</strong> sitúan dos bandas alrededor de una media móvil central. Su separación depende de la desviación estándar y permite observar cuándo el precio se aleja de su comportamiento reciente.</p>
 
-                <h6 class="mt-4 text-dark"><strong>Parámetros</strong></h6>
-                <ul class="small">
-                    <li><strong>bb_window:</strong> número de velas de la SMA y del cálculo de las bandas. Una ventana mayor suaviza el cálculo.</li>
-                    <li><strong>bb_num_std:</strong> número de desviaciones estándar que separa las bandas de la SMA.</li>
-                    <li><strong>bb_window_state:</strong> se carga como parámetro de configuración, pero la lógica actual de señales y estados no lo utiliza.</li>
-                    <li><strong>bb_buy_crossover:</strong> selecciona la forma de autorizar la señal de compra cuando Bollinger está activo.</li>
-                    <li><strong>bb_sell_crossover:</strong> activa la comprobación de salida por banda superior o SMA central.</li>
-                </ul>
+    <h6 class="mt-4 text-primary"><strong>2. Cómo lo usa TradingCore</strong></h6>
+    <p>TradingCore calcula una SMA central y las bandas superior e inferior. La lógica configurada puede usar cruces con esas bandas como condición técnica de compra o de salida.</p>
 
-                <div class="ps-3 border-start border-success">
-                    <h6 class="text-success"><strong>🟢 Compra</strong></h6>
-                    <p class="small mb-2">Con Bollinger activo, si <strong>bb_buy_crossover</strong> está activado, la señal es el cruce alcista del cierre sobre la banda inferior. Si está desactivado, el coordinador utiliza la condición de precio actual por debajo de la banda inferior, es decir, una entrada por toque/sobreventa, sin exigir el cruce.</p>
-                </div>
+    <h6 class="mt-4 text-primary"><strong>3. Parámetros de configuración</strong></h6>
+    <ul class="small">
+        <li><strong>bb_window:</strong> número de velas usadas para la SMA y las bandas.</li>
+        <li><strong>bb_num_std:</strong> número de desviaciones estándar que separan las bandas.</li>
+        <li><strong>bb_window_state:</strong> parámetro cargado por configuración; la lógica actual de señales/estados no lo utiliza.</li>
+        <li><strong>bb_buy_crossover:</strong> activa la lógica de compra asociada a la banda inferior.</li>
+        <li><strong>bb_sell_crossover:</strong> activa la lógica de salida asociada a la banda superior.</li>
+    </ul>
 
-                <div class="ps-3 border-start border-danger mt-3">
-                    <h6 class="text-danger"><strong>🔴 Venta</strong></h6>
-                    <p class="small mb-0">Con <strong>bb_sell_crossover</strong> activado y una posición abierta, se genera cierre técnico si el precio cruza a la baja la banda superior o si cruza a la baja la SMA central. Con la opción desactivada, Bollinger no genera ese cierre.</p>
-                </div>
+    <h6 class="mt-4 text-success"><strong>4. Condiciones de compra</strong></h6>
+    <p class="small">Con la lógica de compra activa, TradingCore busca el cruce configurado respecto a la banda inferior como señal técnica de posible reversión.</p>
 
-                <h6 class="mt-4 text-dark"><strong>Interacción con otros filtros</strong></h6>
-                <p class="small">La compra de Bollinger se incorpora a la condición técnica junto con EMA, RSI, MACD y Stochastic mediante OR: cualquiera puede aportar la señal técnica base. Después se aplican ATR, Volumen y MoS como filtros AND; cualquiera de ellos puede bloquear la entrada. La venta de Bollinger se evalúa como una salida técnica más cuando existe una posición.</p>
+    <h6 class="mt-4 text-danger"><strong>5. Condiciones de venta / bloqueo</strong></h6>
+    <p class="small">Con la lógica de venta activa, el cruce respecto a la banda superior puede actuar como condición de salida o toma de beneficios según el flujo de estrategia.</p>
 
-                <h6 class="mt-4 text-dark"><strong>Ejemplos</strong></h6>
-                <ul class="small mb-0">
-                    <li><strong>Reversión confirmada:</strong> activar BB y <code>bb_buy_crossover</code>; se espera el cruce alcista desde la banda inferior.</li>
-                    <li><strong>Entrada por extremo:</strong> activar BB y dejar <code>bb_buy_crossover</code> desactivado; el precio bajo la banda inferior puede aportar la condición técnica.</li>
-                    <li><strong>Salida conservadora:</strong> activar <code>bb_sell_crossover</code>; el cierre puede producirse al perder la banda superior o la SMA central.</li>
-                </ul>
-            </div>
+    <h6 class="mt-4 text-dark"><strong>6. Relación con otros filtros</strong></h6>
+    <p class="small">Bollinger aporta una condición técnica. La entrada puede seguir dependiendo de filtros adicionales como RSI, ATR, Volumen o MoS.</p>
+
+    <h6 class="mt-4 text-info"><strong>7. Ejemplo práctico</strong></h6>
+    <div class="alert alert-info small">
+        Con una ventana de 20 velas y 2 desviaciones estándar, una recuperación del precio tras cruzar la banda inferior puede activar la condición técnica de compra si <code>bb_buy_crossover</code> está habilitado.
+    </div>
+
+    <h6 class="mt-4 text-warning"><strong>8. Advertencias / comportamiento real actual</strong></h6>
+    <div class="alert alert-warning small mb-0">
+        <ul class="mb-0">
+            <li>Tocar una banda no equivale automáticamente a comprar o vender.</li>
+            <li><code>bb_window_state</code> existe en configuración, pero la lógica actual de señales y estados no lo utiliza.</li>
+            <li>La utilidad de las bandas depende del activo y del intervalo analizado.</li>
+        </ul>
+    </div>
+</div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>
     </div>
 </div>
-
-<p class="text-muted">Utilizadas para detectar reversiones desde extremos (bandas) y potencial inicio/fin de tendencia (SMA).</p>
-<hr>
 
 <div class="row row-control align-items-center mb-4">
     <div class="col-7">

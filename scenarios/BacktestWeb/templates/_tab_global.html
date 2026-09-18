@@ -32,47 +32,48 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>
-                    Esta pestaña define el marco general del backtest: ventana histórica, capital, costes y protección de la posición.
-                    Los valores aquí afectan a todas las estrategias, aunque el comportamiento real de entrada/salida se decide después en cada indicador.
-                </p>
+    <h6 class="text-primary"><strong>1. Qué es / qué configura</strong></h6>
+    <p>Esta pestaña reúne los parámetros generales del backtest: periodo histórico, capital, comisiones, protección de la posición, filtro fundamental y opciones de reporte.</p>
 
-                <h6 class="mt-4 text-primary"><strong>1. Datos y ejecución</strong></h6>
-                <ul class="small mb-3">
-                    <li><strong>Fecha de Inicio / Fecha de Fin:</strong> delimitan la ventana histórica del test.</li>
-                    <li><strong>Intervalo:</strong> resolución de velas (`1m`, `1h`, `1d`, `1wk`, etc.).</li>
-                    <li><strong>Capital Inicial (cash):</strong> base sobre la que se ejecutan las operaciones y se calcula el rendimiento.</li>
-                    <li><strong>Comisión (commission):</strong> valor decimal aplicado al coste por operación; el motor usa 0.002 como 0.2%.</li>
-                </ul>
+    <h6 class="mt-4 text-primary"><strong>2. Cómo lo usa TradingCore</strong></h6>
+    <p>Estos parámetros no generan por sí mismos una señal técnica de compra o venta. Definen el contexto de ejecución y las reglas globales que se aplican a todas las estrategias.</p>
 
-                <h6 class="mt-4 text-primary"><strong>2. Stop Loss y protección</strong></h6>
-                <ul class="small mb-3">
-                    <li><strong>Stop Loss (%):</strong> se aplica como stop fijo base de la posición al abrirla: <code>entry * (1 - stoploss_percentage_below_close)</code>.</li>
-                    <li><strong>SL por Swing:</strong> si está habilitado, calcula un swing low sobre los últimos N velas y usa ese nivel como stop más restrictivo, con un buffer absoluto.</li>
-                    <li><strong>Break-Even:</strong> si está activo, define un suelo de protección del precio de entrada, no un disparador por beneficio alcanzado. El suelo se calcula como <code>entry_price * (1 - breakeven_trigger_pct)</code> y sustituye al stop actual solo si ese suelo es superior a él.</li>
-                </ul>
+    <h6 class="mt-4 text-primary"><strong>3. Parámetros de configuración</strong></h6>
+    <ul class="small">
+        <li><strong>start_date / end_date:</strong> delimitan la ventana histórica.</li>
+        <li><strong>intervalo:</strong> frecuencia de las velas utilizadas.</li>
+        <li><strong>cash:</strong> capital inicial del backtest.</li>
+        <li><strong>commission:</strong> coste aplicado a cada operación.</li>
+        <li><strong>stoploss_percentage_below_close:</strong> stop loss fijo base.</li>
+        <li><strong>stoploss_swing_enabled / lookback / buffer:</strong> protección mediante swing low.</li>
+        <li><strong>breakeven_enabled / breakeven_trigger_pct:</strong> suelo de protección respecto al precio de entrada.</li>
+        <li><strong>filtro_fundamental:</strong> activa el filtro fundamental.</li>
+        <li><strong>enviar_mail / destinatario_email:</strong> opciones de reporte.</li>
+    </ul>
 
-                <div class="alert alert-warning small">
-                    <strong>Importante:</strong> estos parámetros no generan señales de compra por sí mismos. Son herramientas de gestión de riesgo que se aplican sobre una posición ya abierta.
-                    En la configuración actual, el valor por defecto de <code>stoploss_percentage_below_close</code> es 0.0 (sin stop base activo salvo que lo configure el usuario), y <code>breakeven_enabled</code> queda en <code>False</code> por defecto.
-                </div>
+    <h6 class="mt-4 text-success"><strong>4. Condiciones de compra</strong></h6>
+    <p class="small">La pestaña Global no crea una compra. Puede permitir o bloquear una operación mediante filtros globales y de riesgo que se aplican después de que exista una señal técnica válida.</p>
 
-                <h6 class="mt-4 text-primary"><strong>3. Configuración real observada en el código</strong></h6>
-                <ul class="small mb-3">
-                    <li><strong>Stop loss fijo:</strong> <code>stoploss_percentage_below_close</code> (default 0.0).</li>
-                    <li><strong>Stop por swing:</strong> <code>stoploss_swing_enabled</code>, <code>stoploss_swing_lookback</code> (default 10), <code>stoploss_swing_buffer</code> (default 1.0).</li>
-                    <li><strong>Break-even:</strong> <code>breakeven_enabled</code> (default False), <code>breakeven_trigger_pct</code> (default None) representa la pérdida máxima tolerada desde el precio de entrada (ej: 0.03 = 3%). Valores mayores que 1 se normalizan dividiendo entre 100.</li>
-                    <li><strong>ATR global:</strong> <code>atr_enabled</code> (default False), <code>atr_min</code> (default 2.0), <code>atr_max</code> (default 5.0).</li>
-                    <li><strong>Email:</strong> <code>enviar_mail</code> y <code>destinatario_email</code> se usan para notificación/reporting, no para abrir o cerrar posiciones.</li>
-                </ul>
+    <h6 class="mt-4 text-danger"><strong>5. Condiciones de venta / bloqueo</strong></h6>
+    <p class="small">Los stops y el break-even pueden provocar o modificar la salida de una posición. El filtro fundamental puede impedir una entrada si está activado y no se cumple su condición.</p>
 
-                <h6 class="mt-4 text-primary"><strong>4. Errores habituales</strong></h6>
-                <ul class="small mb-0">
-                    <li>Dar por hecho que un parámetro de riesgo genera señal; no lo hace.</li>
-                    <li>Usar valores de ejemplo como si fueran defaults reales sin chequear la configuración activa.</li>
-                    <li>Comparar backtests con diferente capital, fechas o comisiones sin normalizar el contexto.</li>
-                </ul>
-            </div>
+    <h6 class="mt-4 text-dark"><strong>6. Relación con otros filtros</strong></h6>
+    <p class="small">Estos parámetros actúan como marco común para EMA, RSI, MACD, ATR, Estocástico, Bollinger y Volumen/MoS. No sustituyen a las reglas específicas de cada indicador.</p>
+
+    <h6 class="mt-4 text-info"><strong>7. Ejemplo práctico</strong></h6>
+    <div class="alert alert-info small">
+        Con un stop loss fijo del 15%, la posición se protege frente a una caída relevante desde la entrada. Si además se activa el stop por swing, TradingCore puede usar un nivel técnico más restrictivo cuando proceda.
+    </div>
+
+    <h6 class="mt-4 text-warning"><strong>8. Advertencias / comportamiento real actual</strong></h6>
+    <div class="alert alert-warning small mb-0">
+        <ul class="mb-0">
+            <li>El break-even actual no funciona como un “trigger de beneficio”; define una pérdida máxima tolerada desde la entrada.</li>
+            <li>Valores de ejemplo no deben confundirse con los defaults reales de la configuración activa.</li>
+            <li>Para comparar backtests, conviene mantener constantes fechas, capital, intervalo y comisiones.</li>
+        </ul>
+    </div>
+</div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
@@ -184,12 +185,29 @@
     </div>
     <div class="col-2"><span class="text-muted small">{% if comments.breakeven_trigger_pct %}<a href="#" title="{{ comments.breakeven_trigger_pct }}" data-bs-toggle="tooltip">?</a>{% endif %}</span></div>
 </div>
-                <!-- breakeven_trigger_pct: pérdida máxima tolerada desde la entrada, no un trigger de beneficio -->
-                   value="True" 
+
+<div class="row row-control align-items-center mb-2">
+    <div class="col-4">
+        <label for="filtro_fundamental" class="form-check-label fw-bold">
+            Filtro Fundamental:
+        </label>
+    </div>
+
+    <div class="col-6">
+        <div class="form-check form-switch">
+            <input class="form-check-input"
+                   type="checkbox"
+                   role="switch"
+                   id="filtro_fundamental"
+                   name="filtro_fundamental"
+                   value="True"
                    {% if config.filtro_fundamental == 'True' %}checked{% endif %}>
         </div>
-        <small class="text-muted d-block">Si está activo, solo se analizarán activos con recomendación "Mantener".</small>
+        <small class="text-muted d-block">
+            Si está activo, solo se analizarán activos con recomendación "Mantener".
+        </small>
     </div>
+
     <div class="col-2"></div>
 </div>
 

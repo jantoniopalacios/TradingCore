@@ -7,47 +7,49 @@
 
 <!-- Modal con información ATR -->
 <div class="modal fade" id="atrInfoModal" tabindex="-1" aria-labelledby="atrInfoModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title" id="atrInfoModalLabel">📊 Average True Range (ATR) - Guía de Volatilidad</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="atrInfoModalLabel">📊 Average True Range (ATR) - Guía de uso</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
-                <h6 class="mt-4 text-dark"><strong>¿Qué hace el ATR aquí?</strong></h6>
-                <p>
-                    El <strong>ATR (Average True Range)</strong> se usa como filtro de rango de volatilidad para entrar. En la implementación actual no genera señales de compra ni venta por sí mismo; solo decide si la compra está permitida según el nivel de volatilidad actual.
-                </p>
+    <h6 class="text-primary"><strong>1. Qué es / qué mide</strong></h6>
+    <p>El <strong>ATR (Average True Range)</strong> mide volatilidad a partir del rango verdadero del precio. TradingCore lo usa para saber si el mercado se está moviendo dentro de un rango de volatilidad aceptable.</p>
 
-                <div class="alert alert-info alert-sm mb-3">
-                    <strong>⚡ Fórmula que calcula el motor</strong><br/>
-                    ATR = EMA del True Range, donde<br/>
-                    True Range = max(High - Low, |High - Close anterior|, |Low - Close anterior|)
-                </div>
+    <h6 class="mt-4 text-primary"><strong>2. Cómo lo usa TradingCore</strong></h6>
+    <p>En la implementación actual, ATR no genera señales de compra ni venta por sí solo. Funciona como un filtro de entrada: si está activo, la compra solo puede continuar cuando el ATR se encuentra dentro del rango configurado.</p>
 
-                <h6 class="text-dark"><strong>Regla real del filtro</strong></h6>
-                <ul class="small mb-3">
-                    <li>Si <code>atr_enabled</code> está en <code>False</code>: el filtro no se aplica.</li>
-                    <li>Si está activo, se exige que el ATR actual esté dentro de <code>[atr_min, atr_max]</code>.</li>
-                    <li>Si <code>ATR &lt; atr_min</code>: compra bloqueada por baja volatilidad.</li>
-                    <li>Si <code>ATR &gt; atr_max</code>: compra bloqueada por exceso de volatilidad.</li>
-                </ul>
+    <h6 class="mt-4 text-primary"><strong>3. Parámetros de configuración</strong></h6>
+    <ul class="small">
+        <li><strong>atr_enabled:</strong> activa o desactiva el filtro.</li>
+        <li><strong>atr_min:</strong> valor mínimo de ATR permitido.</li>
+        <li><strong>atr_max:</strong> valor máximo de ATR permitido.</li>
+    </ul>
 
-                <h6 class="text-dark"><strong>Valores por defecto observados en código</strong></h6>
-                <ul class="small mb-3">
-                    <li><code>atr_period</code>: 14</li>
-                    <li><code>atr_min</code>: 2.0</li>
-                    <li><code>atr_max</code>: 5.0</li>
-                    <li><code>atr_enabled</code>: False</li>
-                </ul>
+    <h6 class="mt-4 text-success"><strong>4. Condiciones de compra</strong></h6>
+    <p class="small">Si ATR está activo, la compra se autoriza únicamente cuando el ATR actual está dentro del intervalo configurado entre mínimo y máximo.</p>
 
-                <div class="alert alert-success alert-sm mb-0">
-                    <strong>✅ Resumen</strong><br/>
-                    <small>
-                        El ATR aquí funciona como filtro de calidad de entrada, no como señal de tendencia. Si está fuera de rango, la compra se aborta. Si está dentro, la estrategia puede continuar con el flujo normal de señales de EMA/RSI/MACD y demás filtros.
-                    </small>
-                </div>
-            </div>
+    <h6 class="mt-4 text-danger"><strong>5. Condiciones de venta / bloqueo</strong></h6>
+    <p class="small">ATR no genera una venta directa. Si el valor está fuera del rango permitido, bloquea la entrada.</p>
+
+    <h6 class="mt-4 text-dark"><strong>6. Relación con otros filtros</strong></h6>
+    <p class="small">ATR actúa como filtro AND dentro del flujo de decisión. Una señal técnica válida puede quedar bloqueada si el nivel de volatilidad no cumple el rango configurado.</p>
+
+    <h6 class="mt-4 text-info"><strong>7. Ejemplo práctico</strong></h6>
+    <div class="alert alert-info small">
+        Si el rango configurado es 2.0–5.0 y el ATR actual vale 3.4, el filtro permite continuar. Si vale 1.2 o 6.1, la entrada queda bloqueada.
+    </div>
+
+    <h6 class="mt-4 text-warning"><strong>8. Advertencias / comportamiento real actual</strong></h6>
+    <div class="alert alert-warning small mb-0">
+        <ul class="mb-0">
+            <li>ATR mide volatilidad, no dirección.</li>
+            <li>Un ATR alto no significa necesariamente señal bajista; solo indica mayor rango de movimiento.</li>
+            <li>Los límites adecuados dependen del activo, intervalo y periodo analizado.</li>
+        </ul>
+    </div>
+</div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
