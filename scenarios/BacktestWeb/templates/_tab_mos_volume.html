@@ -7,55 +7,59 @@
 
 <!-- Modal con información de MoS y Volumen -->
 <div class="modal fade" id="mosVolumeInfoModal" tabindex="-1" aria-labelledby="mosVolumeInfoModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header bg-info text-white">
+            <div class="modal-header bg-info text-dark">
                 <h5 class="modal-title" id="mosVolumeInfoModalLabel">📊 Margen de Seguridad y Volumen - Guía de uso</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
-                <h6 class="text-primary"><strong>Función en la estrategia</strong></h6>
-                <p>MoS y Volumen no crean por sí mismos una señal técnica de compra. Cuando están activos, actúan como filtros AND de entrada: la señal técnica debe existir y estos filtros deben autorizarla. Si un filtro activo no cumple sus condiciones, la compra se bloquea.</p>
+    <h6 class="text-primary"><strong>1. Qué es / qué mide</strong></h6>
+    <p>Esta pestaña agrupa dos filtros de contexto: <strong>Margen de Seguridad (MoS)</strong> y <strong>Volumen</strong>. No son indicadores direccionales clásicos; sirven para confirmar que una señal técnica tiene suficiente respaldo fundamental o de participación.</p>
 
-                <h6 class="mt-4 text-dark"><strong>Margen de Seguridad (MoS)</strong></h6>
-                <p class="small">El MoS se toma de la columna <code>Margen de seguridad</code> de los datos cargados y representa el margen de valoración que la estrategia recibe para ese momento.</p>
-                <ul class="small">
-                    <li><strong>margen_seguridad_active:</strong> activa el filtro. Si está apagado, MoS autoriza por defecto y no bloquea la entrada.</li>
-                    <li><strong>margen_seguridad_threshold:</strong> el MoS actual debe ser estrictamente mayor que este umbral.</li>
-                    <li><strong>margen_seguridad_ascendente:</strong> si está activado, además exige que el estado actual del MoS sea ascendente.</li>
-                    <li><strong>margen_seguridad_minimo:</strong> se muestra como opción de estado y se calcula su estado interno, pero la función de filtrado revisada no lo utiliza para autorizar o bloquear la entrada.</li>
-                </ul>
-                <p class="small">Si MoS está activo pero faltan datos válidos, el filtro no se considera cumplido.</p>
+    <h6 class="mt-4 text-primary"><strong>2. Cómo lo usa TradingCore</strong></h6>
+    <p>Cuando están activos, MoS y Volumen funcionan como filtros AND de entrada. La señal técnica debe existir primero y después estos filtros deben autorizarla.</p>
 
-                <h6 class="mt-4 text-dark"><strong>Volumen</strong></h6>
-                <p class="small">El volumen se compara con una media móvil simple de volumen (VMA), aunque la etiqueta del formulario la denomine EMA.</p>
-                <ul class="small">
-                    <li><strong>volume_active:</strong> activa el filtro. Si está apagado, autoriza por defecto.</li>
-                    <li><strong>volume_period:</strong> ventana usada para calcular la VMA.</li>
-                    <li><strong>volume_avg_multiplier:</strong> el volumen actual debe ser estrictamente mayor que VMA × este multiplicador.</li>
-                    <li><strong>volume_minimo:</strong> si está activado, añade el requisito de estado mínimo de la VMA.</li>
-                    <li><strong>volume_ascendente:</strong> si está activado, añade el requisito de estado ascendente definido por la lógica de overshoots del volumen.</li>
-                </ul>
-                <p class="small">Cuando hay estados de Volumen seleccionados, basta que se cumpla uno de los estados elegidos, pero siempre debe cumplirse primero el umbral VMA × multiplicador. La lógica interna también contempla estados máximo/descendente y un umbral de overshoots que no están expuestos en esta plantilla.</p>
+    <h6 class="mt-4 text-primary"><strong>3. Parámetros de configuración</strong></h6>
+    <ul class="small">
+        <li><strong>margen_seguridad_active:</strong> activa el filtro MoS.</li>
+        <li><strong>margen_seguridad_threshold:</strong> umbral mínimo requerido.</li>
+        <li><strong>margen_seguridad_ascendente:</strong> exige además que el MoS esté ascendiendo.</li>
+        <li><strong>volume_active:</strong> activa los filtros de volumen.</li>
+        <li><strong>volume_period:</strong> periodo de la EMA de volumen.</li>
+        <li><strong>volume_avg_multiplier:</strong> multiplicador mínimo respecto a la EMA de volumen.</li>
+        <li><strong>volume_minimo / volume_ascendente:</strong> filtros de estado adicionales.</li>
+    </ul>
 
-                <h6 class="mt-4 text-dark"><strong>Interacción con el resto de filtros</strong></h6>
-                <p class="small">El flujo reúne primero señales técnicas de EMA, RSI, MACD, Stochastic y Bollinger. Después aplica el filtro ATR, el filtro de Volumen y finalmente MoS. Por tanto, una señal técnica válida puede ser bloqueada por ATR, por Volumen o por MoS; los filtros activos deben autorizar la misma entrada.</p>
+    <h6 class="mt-4 text-success"><strong>4. Condiciones de compra</strong></h6>
+    <p class="small">Si MoS está activo, debe superar su umbral y, si se exige, estar ascendiendo. Si Volumen está activo, debe cumplir sus condiciones de nivel y/o estado. Solo entonces dejan pasar la señal técnica.</p>
 
-                <h6 class="mt-4 text-dark"><strong>Ejemplos</strong></h6>
-                <ul class="small mb-0">
-                    <li><strong>MoS conservador:</strong> activar MoS, fijar un umbral y activar Ascendente; solo pasan entradas con MoS sobre el umbral y tendencia ascendente.</li>
-                    <li><strong>Confirmación de actividad:</strong> activar Volumen con multiplicador 1.0; una señal técnica se bloquea si el volumen actual no supera la VMA.</li>
-                    <li><strong>Confirmación combinada:</strong> activar Volumen y MoS; además de una señal técnica, deben cumplirse el umbral de volumen y la valoración MoS.</li>
-                </ul>
-            </div>
+    <h6 class="mt-4 text-danger"><strong>5. Condiciones de venta / bloqueo</strong></h6>
+    <p class="small">En la implementación actual estos filtros se utilizan principalmente para bloquear entradas. No generan por sí solos una señal de venta independiente.</p>
+
+    <h6 class="mt-4 text-dark"><strong>6. Relación con otros filtros</strong></h6>
+    <p class="small">MoS y Volumen se aplican después de la señal técnica y se combinan con el resto de filtros globales. Una señal de EMA, RSI, MACD, Estocástico o Bollinger puede quedar bloqueada si alguno de estos filtros activos no se cumple.</p>
+
+    <h6 class="mt-4 text-info"><strong>7. Ejemplo práctico</strong></h6>
+    <div class="alert alert-info small">
+        Si existe una señal técnica de compra, el filtro de volumen puede exigir que el volumen actual sea superior a la EMA de volumen multiplicada por el factor configurado. Si no se cumple, la compra se descarta.
+    </div>
+
+    <h6 class="mt-4 text-warning"><strong>8. Advertencias / comportamiento real actual</strong></h6>
+    <div class="alert alert-warning small mb-0">
+        <ul class="mb-0">
+            <li>MoS y Volumen no crean una señal técnica por sí mismos.</li>
+            <li>El MoS depende de que la columna <code>Margen de seguridad</code> esté disponible en los datos utilizados.</li>
+            <li>Un filtro activo que no se cumpla bloquea la entrada aunque otro indicador técnico sí dé señal.</li>
+        </ul>
+    </div>
+</div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>
     </div>
 </div>
-
-<p class="alert alert-info">Configura filtros de Margen de Seguridad (MoS) y Volumen para la gestión de riesgos y confirmación de contexto.</p>
 
 <div class="row">
     <div class="col-6 border-end">

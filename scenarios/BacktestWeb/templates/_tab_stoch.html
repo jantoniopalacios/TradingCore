@@ -7,62 +7,50 @@
 
 <!-- Modal con información del Estocástico -->
 <div class="modal fade" id="stochInfoModal" tabindex="-1" aria-labelledby="stochInfoModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="stochInfoModalLabel">📊 Estocástico (STOCH) - Guía de uso</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
-                <h6 class="text-primary"><strong>¿Qué mide?</strong></h6>
-                <p>El Estocástico compara el cierre con el rango reciente de máximos y mínimos. TradingCore calcula una línea <strong>%K</strong> y una línea <strong>%D</strong>, que es la media móvil de 3 periodos de %K. La señal base de compra es el cruce alcista de %K sobre %D.</p>
+    <h6 class="text-primary"><strong>1. Qué es / qué mide</strong></h6>
+    <p>El <strong>Estocástico</strong> compara el cierre actual con el rango reciente de máximos y mínimos. TradingCore trabaja con las líneas %K y %D para detectar cruces y estados de momentum.</p>
 
-                <h6 class="mt-4 text-dark"><strong>FAST, MID y SLOW</strong></h6>
-                <ul class="small">
-                    <li><strong>FAST:</strong> primera variante evaluada. Usa sus propios períodos, niveles y lógica.</li>
-                    <li><strong>MID:</strong> variante independiente evaluada después de FAST si FAST no ha dado señal.</li>
-                    <li><strong>SLOW:</strong> variante independiente evaluada después de MID si ninguna anterior ha dado señal.</li>
-                </ul>
-                <p class="small mb-3">Activar varias variantes no las promedia: cada una calcula su propio %K/%D. Para compras se conserva la primera señal válida en el orden FAST → MID → SLOW.</p>
+    <h6 class="mt-4 text-primary"><strong>2. Cómo lo usa TradingCore</strong></h6>
+    <p>TradingCore evalúa tres variantes independientes: <strong>FAST</strong>, <strong>MID</strong> y <strong>SLOW</strong>. Cada una puede aportar una condición de compra o de bloqueo/venta según la lógica seleccionada.</p>
 
-                <h6 class="text-dark"><strong>Parámetros disponibles para cada variante</strong></h6>
-                <ul class="small">
-                    <li><strong>Activación:</strong> crea y evalúa esa variante.</li>
-                    <li><strong>Período %K:</strong> ventana usada para calcular el oscilador.</li>
-                    <li><strong>Período Suavizado:</strong> suavizado aplicado al cálculo de %K.</li>
-                    <li><strong>Nivel Bajo:</strong> el cruce de compra solo es válido si %K está por debajo de este nivel.</li>
-                    <li><strong>Nivel Alto:</strong> está disponible en el formulario, pero las funciones revisadas no lo consultan directamente para generar señales.</li>
-                </ul>
+    <h6 class="mt-4 text-primary"><strong>3. Parámetros de configuración</strong></h6>
+    <ul class="small">
+        <li><strong>FAST / MID / SLOW:</strong> variantes del indicador con sus propios periodos y niveles.</li>
+        <li><strong>buy_logic:</strong> selecciona la condición de compra para cada variante.</li>
+        <li><strong>sell_logic:</strong> selecciona la condición de bloqueo/venta para cada variante.</li>
+        <li><strong>None / N/A:</strong> desactiva esa condición concreta.</li>
+    </ul>
 
-                <div class="ps-3 border-start border-success">
-                    <h6 class="text-success"><strong>🟢 Compra</strong></h6>
-                    <p class="small">La compra requiere el cruce alcista %K/%D y el filtro de Nivel Bajo. Si se selecciona <strong>Min</strong> o <strong>Asc</strong>, también debe cumplirse el estado correspondiente; esas opciones actúan como condiciones AND, no como alternativas OR.</p>
-                    <ul class="small mb-3">
-                        <li><strong>Min:</strong> exige que el estado dinámico de %K sea mínimo local.</li>
-                        <li><strong>Asc:</strong> exige que el estado dinámico de %K sea ascendente.</li>
-                        <li><strong>N/A:</strong> no añade ese filtro de estado, pero el cruce y el Nivel Bajo siguen formando parte de la señal.</li>
-                    </ul>
-                </div>
+    <h6 class="mt-4 text-success"><strong>4. Condiciones de compra</strong></h6>
+    <p class="small">Según la opción seleccionada, cada variante puede autorizar compra por cruce o por estado ascendente. Las variantes se evalúan de forma independiente siguiendo la lógica configurada.</p>
 
-                <div class="ps-3 border-start border-danger">
-                    <h6 class="text-danger"><strong>🔴 Venta y bloqueo</strong></h6>
-                    <p class="small">Con una posición abierta, <strong>Max</strong> o <strong>Desc</strong> pueden generar el cierre técnico, según la opción elegida. La lógica revisada no aplica estos estados como veto independiente de nuevas compras; las entradas deben seguir cumpliendo la señal técnica y los filtros globales.</p>
-                    <ul class="small">
-                        <li><strong>Max:</strong> exige estado máximo local de %K.</li>
-                        <li><strong>Desc:</strong> exige estado descendente de %K.</li>
-                    </ul>
-                </div>
+    <h6 class="mt-4 text-danger"><strong>5. Condiciones de venta / bloqueo</strong></h6>
+    <p class="small">Las opciones de máximo o descendente pueden actuar como condición de bloqueo o salida, según la lógica activa de cada variante.</p>
 
-                <h6 class="mt-4 text-dark"><strong>Interacción con otros filtros</strong></h6>
-                <p class="small">Las señales técnicas de EMA, RSI, MACD, Stochastic y Bollinger se agregan como alternativas OR para formar la condición técnica base. Después, ATR, Volumen y MoS pueden bloquear la entrada como filtros AND. Si no hay señales técnicas activas, el flujo puede usar el modo Buy &amp; Hold basado en la EMA lenta.</p>
+    <h6 class="mt-4 text-dark"><strong>6. Relación con otros filtros</strong></h6>
+    <p class="small">El Estocástico forma parte de la señal técnica. Aunque dé una señal válida, otros filtros globales como RSI, ATR, Volumen o MoS pueden impedir finalmente la entrada.</p>
 
-                <h6 class="mt-4 text-dark"><strong>Ejemplos</strong></h6>
-                <ul class="small mb-0">
-                    <li><strong>Reversión rápida:</strong> activar FAST, seleccionar Min y usar un Nivel Bajo de 20; compra solo si el cruce alcista ocurre bajo ese nivel y el estado es mínimo.</li>
-                    <li><strong>Confirmación lenta:</strong> activar SLOW, seleccionar Asc y dejar que Volumen y MoS confirmen la entrada.</li>
-                    <li><strong>Varias variantes:</strong> activar FAST y MID; si FAST produce señal se usa esa razón, y MID solo se considera si FAST no la produce.</li>
-                </ul>
-            </div>
+    <h6 class="mt-4 text-info"><strong>7. Ejemplo práctico</strong></h6>
+    <div class="alert alert-info small">
+        Si FAST está configurado para comprar cuando el Estocástico pasa a estado ascendente y esa condición se cumple, puede generar una señal técnica. La operación solo se abrirá si los demás filtros activos también la autorizan.
+    </div>
+
+    <h6 class="mt-4 text-warning"><strong>8. Advertencias / comportamiento real actual</strong></h6>
+    <div class="alert alert-warning small mb-0">
+        <ul class="mb-0">
+            <li>FAST, MID y SLOW no son simples etiquetas visuales: se evalúan como variantes independientes.</li>
+            <li>Una lectura de sobrecompra o sobreventa no implica por sí sola una orden.</li>
+            <li>Conviene revisar los periodos y niveles junto con el intervalo del backtest.</li>
+        </ul>
+    </div>
+</div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
