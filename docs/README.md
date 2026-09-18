@@ -1,6 +1,6 @@
 # TradingCore: Motor Central y Arquitectura Modular
 
-Última actualización: 17/09/2026
+Última actualización: 18/09/2026
 
 Este repositorio contiene la arquitectura central (Motor) para múltiples escenarios de trading (Backtesting, Live Trading, Web Apps).
 
@@ -307,15 +307,18 @@ docs/
 ├── Manual_operativo_TradingCore_PowerShell_Git_Copilot.docx  Manual operativo
 ├── api/                                                   Documentación de la API interna (MkDocs)
 ├── Guides/                                                Guías de uso y configuración
-├── Index/                                                 Índice general y convenciones de documentación
-└── Summaries/                                             Resúmenes y decisiones técnicas
+└── Index/                                                 Índice general y convenciones de documentación
 ```
 
 El acceso a `docs/` desde el explorador web está filtrado por rol:
 
-- **Usuario normal:** solo puede ver y abrir la documentación funcional permitida (README.md y las guías funcionales permitidas).
-- **Admin:** puede ver y abrir todo el contenido válido situado bajo docs/.
-- La autorización se valida también en backend (no depende únicamente de que el árbol oculte elementos en la interfaz).
+- **Usuario normal:** solo puede ver y abrir la documentación funcional permitida (`README.md` y las guías de uso indicadas en el índice de documentación).
+- **Admin:** puede ver y abrir todo `docs/` sin restricciones.
+- La autorización se valida también en backend; no depende únicamente de que el árbol oculte elementos en la interfaz.
+
+### Ayuda contextual en configuración
+
+Las pestañas de configuración incorporan ayuda contextual mediante el botón **Ayuda**. Está disponible en Global, EMA, RSI, MACD, ATR, Estocástico, Bollinger y Volumen/MoS. Las ayudas describen el uso real de TradingCore, parámetros, condiciones de compra y venta/bloqueo, relación con otros filtros, ejemplos y advertencias de comportamiento actual.
 
 ---
 
@@ -328,7 +331,6 @@ El acceso a `docs/` desde el explorador web está filtrado por rol:
 | `start_web.bat` / `stop_web.bat` | Arranque y parada rápida de la aplicación web |
 | `backup_trading_db_20260227.dump` | Backup puntual de la BD PostgreSQL |
 | `mkdocs.yml` | Configuración de MkDocs |
-| `docs/Summaries/OPTIMIZACIONES_IMPLEMENTADAS.md` | Registro de optimizaciones implementadas |
 
 `start_web.bat` comprueba previamente si el puerto web ya está ocupado para evitar lanzar instancias duplicadas.
 

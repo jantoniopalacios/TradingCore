@@ -1,6 +1,6 @@
 # Quick Start: Backtest Web
 
-Última actualización: 17/09/2026
+Última actualización: 18/09/2026
 
 ## Objetivo
 Validar en pocos minutos que el flujo web de backtest funciona, genera resultados y guarda datos en base de datos.
@@ -148,6 +148,23 @@ Nota de seguridad:
 
 - El visor solo permite lectura dentro de rutas controladas del explorador (`logs` y `docs`).
 - No se permite navegar fuera de esas raices mediante rutas manuales.
+
+### Comprobación visual de configuración y ayudas
+
+Antes de validar cambios de plantillas, comprueba que solo exista una instancia web escuchando en el puerto 5000:
+
+```powershell
+netstat -ano | findstr :5000
+```
+
+Debe existir una sola línea `LISTENING`. Si hay varias instancias, identifica sus PID, detén las antiguas y arranca de nuevo con `start_web.bat`. Una instancia antigua puede seguir sirviendo HTML previo y producir falsos diagnósticos.
+
+Después de reiniciar, realiza `Ctrl+F5` en el navegador y valida:
+
+- Las subpestañas Global, EMA, RSI, MACD, ATR, Estocástico, Bollinger y Volumen muestran solo su panel correspondiente.
+- Todas las pestañas disponen de botón **Ayuda** y cada modal abre/cierra correctamente.
+- Global, ATR, Estocástico, Bollinger y Volumen/MoS muestran la estructura homogénea de ayuda: qué es/qué mide, uso en TradingCore, parámetros, compra, venta/bloqueo, relación con otros filtros, ejemplo práctico y advertencias.
+- Tildes, eñes, símbolos e iconos se renderizan correctamente.
 
 ## Paso 9: Tabla de parametros y efecto operativo
 
