@@ -24,6 +24,7 @@
     <ul class="small">
         <li><strong>margen_seguridad_active:</strong> activa el filtro MoS.</li>
         <li><strong>margen_seguridad_threshold:</strong> umbral mínimo requerido.</li>
+        <li><strong>margen_seguridad_minimo:</strong> exige además que el MoS esté en estado mínimo.</li>
         <li><strong>margen_seguridad_ascendente:</strong> exige además que el MoS esté ascendiendo.</li>
         <li><strong>volume_active:</strong> activa los filtros de volumen.</li>
         <li><strong>volume_period:</strong> periodo de la EMA de volumen.</li>
@@ -32,7 +33,7 @@
     </ul>
 
     <h6 class="mt-4 text-success"><strong>4. Condiciones de compra</strong></h6>
-    <p class="small">Si MoS está activo, debe superar su umbral y, si se exige, estar ascendiendo. Si Volumen está activo, debe cumplir sus condiciones de nivel y/o estado. Solo entonces dejan pasar la señal técnica.</p>
+    <p class="small">Si MoS está activo, debe superar su umbral y, si se exige, confirmar estado mínimo y/o estar ascendiendo. Las confirmaciones activadas se combinan con AND. Si Volumen está activo, debe cumplir sus condiciones de nivel y/o estado. Solo entonces dejan pasar la señal técnica.</p>
 
     <h6 class="mt-4 text-danger"><strong>5. Condiciones de venta / bloqueo</strong></h6>
     <p class="small">En la implementación actual estos filtros se utilizan principalmente para bloquear entradas. No generan por sí solos una señal de venta independiente.</p>

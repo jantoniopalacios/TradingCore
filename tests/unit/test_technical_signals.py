@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from trading_engine.indicators import Filtro_ATR, Filtro_EMA, Filtro_MACD, Filtro_RSI
-from trading_engine.indicators import Filtro_Stochastic, Filtro_Volume, Filtro_BollingerBands
+from trading_engine.indicators import Filtro_Stochastic, Filtro_Volume, Filtro_BollingerBands, Filtro_MoS
 from trading_engine.core import Logica_Trading
 from scenarios.BacktestWeb import estrategia_system
 
@@ -536,3 +536,67 @@ def test_volume_filter_blocks_invalid_volume():
         False,
         "Volumen Bajo (110 < 120)",
     )
+
+def test_mos_filter_disabled_allows_entry():
+    strategy = SimpleNamespace(margen_seguridad_active=False)
+
+    assert Filtro_MoS.apply_mos_filter(strategy) == (True, None)
+
+
+def test_mos_filter_requires_value_above_threshold():
+    strategy = SimpleNamespace(
+        margen_seguridad_active=True,
+        margen_seguridad_ind=np.array([40.0]),
+        margen_seguridad_threshold=50.0,
+        margen_seguridad_minimo=False,
+        margen_seguridad_ascendente=False,
+    )
+
+    assert Filtro_MoS.apply_mos_filter(strategy) == (False, None)
+
+
+def test_mos_filter_minimum_setting_requires_minimum_state():
+    strategy = SimpleNamespace(
+        margen_seguridad_active=True,
+        margen_seguridad_ind=np.array([60.0]),
+        margen_seguridad_threshold=50.0,
+        margen_seguridad_minimo=True,
+        margen_seguridad_minimo_STATE=False,
+        margen_seguridad_ascendente=False,
+    )
+
+    assert Filtro_MoS.apply_mos_filter(strategy) == (False, None)
+
+    strategy.margen_seguridad_minimo_STATE = True
+
+    assert Filtro_MoS.apply_mos_filter(strategy) == (True, "MOS:60.0 Mínimo")
+
+
+def test_mos_filter_combines_minimum_and_ascending_with_and():
+    strategy = SimpleNamespace(
+        margen_seguridad_active=True,
+        margen_seguridad_ind=np.array([60.0]),
+        margen_seguridad_threshold=50.0,
+        margen_seguridad_minimo=True,
+        margen_seguridad_minimo_STATE=True,
+        margen_seguridad_ascendente=True,
+        margen_seguridad_ascendente_STATE=False,
+    )
+
+    assert Filtro_MoS.apply_mos_filter(strategy) == (False, None)
+
+    strategy.margen_seguridad_ascendente_STATE = True
+
+    assert Filtro_MoS.apply_mos_filter(strategy) == (
+        True,
+        "MOS:60.0 Mínimo Ascendente",
+    )
+
+
+def test_mos_filter_active_without_data_blocks_entry():
+    strategy = SimpleNamespace(
+        margen_seguridad_active=True,
+        margen_seguridad_ind=None,
+    )
+
+    assert Filtro_MoS.apply_mos_filter(strategy) == (False, "MOS Faltan Datos")
