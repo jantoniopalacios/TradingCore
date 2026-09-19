@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from trading_engine.indicators import Filtro_ATR, Filtro_EMA, Filtro_MACD, Filtro_RSI
-from trading_engine.indicators import Filtro_Stochastic, Filtro_Volume
+from trading_engine.indicators import Filtro_Stochastic, Filtro_Volume, Filtro_BollingerBands
 from trading_engine.core import Logica_Trading
 from scenarios.BacktestWeb import estrategia_system
 
@@ -405,6 +405,64 @@ def test_stochastic_sell_helper_requires_enabled_variant():
         )
         is False
     )
+
+def test_bollinger_without_buy_crossover_is_not_technical_buy_signal():
+    strategy = SimpleNamespace(
+        ema_cruce_signal=False,
+        rsi=False,
+        macd=False,
+        stoch_fast=False,
+        stoch_mid=False,
+        stoch_slow=False,
+        bb_active=True,
+        bb_buy_crossover=False,
+    )
+
+    assert Logica_Trading._has_technical_buy_signals_enabled(strategy) is False
+
+def test_bollinger_with_buy_crossover_is_technical_buy_signal():
+    strategy = SimpleNamespace(
+        ema_cruce_signal=False,
+        rsi=False,
+        macd=False,
+        stoch_fast=False,
+        stoch_mid=False,
+        stoch_slow=False,
+        bb_active=True,
+        bb_buy_crossover=True,
+    )
+
+    assert Logica_Trading._has_technical_buy_signals_enabled(strategy) is True
+
+def test_bollinger_buy_disabled_does_not_generate_signal(monkeypatch):
+    strategy = SimpleNamespace(
+        bb_active=True,
+        bb_buy_crossover=False,
+        data=SimpleNamespace(Close=np.array([90.0])),
+        bb_lower_band_series=np.array([100.0]),
+    )
+
+    monkeypatch.setattr(Filtro_BollingerBands, "crossover", lambda a, b: True)
+
+    assert Filtro_BollingerBands.check_bb_buy_signal(
+        strategy,
+        False,
+    ) == (False, None)
+
+def test_bollinger_buy_crossover_generates_signal(monkeypatch):
+    strategy = SimpleNamespace(
+        bb_active=True,
+        bb_buy_crossover=True,
+        data=SimpleNamespace(Close=np.array([90.0])),
+        bb_lower_band_series=np.array([100.0]),
+    )
+
+    monkeypatch.setattr(Filtro_BollingerBands, "crossover", lambda a, b: True)
+
+    assert Filtro_BollingerBands.check_bb_buy_signal(
+        strategy,
+        False,
+    ) == (True, "BB Reversión desde Banda Inferior")
 
 def test_atr_filter_disabled_allows_entry():
     strategy = SimpleNamespace(atr_enabled=False)

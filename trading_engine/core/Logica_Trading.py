@@ -130,7 +130,10 @@ def _has_technical_buy_signals_enabled(strategy_self: 'StrategySelf') -> bool:
         _stoch_has_buy_signal_enabled(strategy_self, 'stoch_fast') or
         _stoch_has_buy_signal_enabled(strategy_self, 'stoch_mid') or
         _stoch_has_buy_signal_enabled(strategy_self, 'stoch_slow') or
-        getattr(strategy_self, 'bb_active', False)
+        (
+            _as_bool(getattr(strategy_self, 'bb_active', False))
+            and _as_bool(getattr(strategy_self, 'bb_buy_crossover', False))
+        )
     )
 
 def _build_signal_context(strategy_self: 'StrategySelf', trigger_indicators: dict, precio_close: float, stop_loss=None) -> str:
@@ -422,23 +425,14 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
             
     if log_reason_stoch: technical_reasons['Stoch'] = log_reason_stoch
 
-    # 🟢 BOLLINGER BANDS (BB) - Lógica Flexible (Cruce o Toque)
+    # BOLLINGER BANDS (BB)
     if getattr(strategy_self, 'bb_active', False):
-        # CASO 1: Si bb_buy_crossover es False, compramos por simple "Toque" (Precio < Banda)
-        if not getattr(strategy_self, 'bb_buy_crossover', True):
-            precio_actual = strategy_self.data.Close[-1]
-            banda_inf = strategy_self.bb_lower_band_series[-1]
-            
-            if precio_actual < banda_inf:
-                condicion_base_tecnica = True
-                # Usamos el formato detallado para que el log sea útil
-                technical_reasons['BB'] = f"Sobreventa (Precio {precio_actual:.2f} < {banda_inf:.2f})"
-        
-        # CASO 2: Si bb_buy_crossover es True, usamos la lógica de cruce (original)
-        else:
-            condicion_base_tecnica, log_reason_bb = check_bb_buy_signal(strategy_self, condicion_base_tecnica)
-            if log_reason_bb:
-                technical_reasons['BB'] = log_reason_bb
+        condicion_base_tecnica, log_reason_bb = check_bb_buy_signal(
+            strategy_self,
+            condicion_base_tecnica,
+        )
+        if log_reason_bb:
+            technical_reasons['BB'] = log_reason_bb
 
 
     # ----------------------------------------------------------------------
