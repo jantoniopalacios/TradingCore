@@ -12,6 +12,9 @@ if str(ROOT_DIR) not in sys.path:
 from scenarios.BacktestWeb.app import create_app
 from scenarios.BacktestWeb.configuracion import DB_URI
 
+from scenarios.BacktestWeb.routes.config_helpers import _build_config_params_from_form_data
+from scenarios.BacktestWeb.routes.main_bp import SAVEABLE_BOOLEAN_FIELDS
+
 @pytest.fixture
 def client(monkeypatch):
     import scenarios.BacktestWeb.app as app_module
@@ -625,3 +628,39 @@ def test_directory_tree_for_user_excludes_technical_docs():
     assert 'api' not in all_names
     assert 'Index' not in all_names
     assert 'Plans' not in all_names
+
+def test_build_config_params_sets_missing_saveable_booleans_to_false():
+    form_data = {
+        "cash": "10000",
+    }
+
+    result = _build_config_params_from_form_data(
+        form_data,
+        SAVEABLE_BOOLEAN_FIELDS,
+        include_dates=False,
+    )
+
+    assert result["atr_enabled"] == "False"
+    assert result["margen_seguridad_minimo"] == "False"
+    assert result["volume_minimo"] == "False"
+    assert result["stoploss_swing_enabled"] == "False"
+
+
+def test_build_config_params_sets_present_saveable_booleans_to_true():
+    form_data = {
+        "atr_enabled": "True",
+        "margen_seguridad_minimo": "True",
+        "volume_minimo": "True",
+        "stoploss_swing_enabled": "1",
+    }
+
+    result = _build_config_params_from_form_data(
+        form_data,
+        SAVEABLE_BOOLEAN_FIELDS,
+        include_dates=False,
+    )
+
+    assert result["atr_enabled"] == "True"
+    assert result["margen_seguridad_minimo"] == "True"
+    assert result["volume_minimo"] == "True"
+    assert result["stoploss_swing_enabled"] == "True"

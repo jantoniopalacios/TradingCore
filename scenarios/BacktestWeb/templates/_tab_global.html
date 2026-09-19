@@ -144,8 +144,15 @@
 <div class="row row-control align-items-center mb-2">
     <div class="col-4"><label for="stoploss_swing_enabled" class="form-check-label">Usar SL por Swing:</label></div>
     <div class="col-6">
-        <input type="checkbox" class="form-check-input" id="stoploss_swing_enabled" name="stoploss_swing_enabled" value="1"
-               {% if config.stoploss_swing_enabled %}checked{% endif %}>
+        <input
+            type="checkbox"
+            class="form-check-input"
+            id="stoploss_swing_enabled"
+            name="stoploss_swing_enabled"
+            value="1"
+            {% if config.get('stoploss_swing_enabled') == 'True'
+            or config.get('stoploss_swing_enabled') == True %}checked{% endif %}
+        >
     </div>
     <div class="col-2"><span class="text-muted small"><a href="#" title="Activar Stop Loss dinámico basado en niveles de swing bajo" data-bs-toggle="tooltip">?</a></span></div>
 </div>

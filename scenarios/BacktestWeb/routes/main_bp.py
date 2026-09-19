@@ -80,8 +80,11 @@ SAVEABLE_BOOLEAN_FIELDS = [
     'macd', 'rsi', 'ema_cruce_signal', 'bb_active', 'bb_buy_crossover', 'bb_sell_crossover',
     'rsi_minimo', 'rsi_ascendente', 'rsi_maximo', 'rsi_descendente',
     'ema_slow_minimo', 'ema_slow_ascendente', 'ema_slow_maximo', 'ema_slow_descendente',
-    'filtro_fundamental', 'enviar_mail', 'margen_seguridad_active', 'margen_seguridad_ascendente',
-    'volume_active', 'volume_ascendente', 'stoch_fast', 'stoch_mid', 'stoch_slow',
+    'filtro_fundamental', 'enviar_mail',
+    'margen_seguridad_active', 'margen_seguridad_minimo', 'margen_seguridad_ascendente',
+    'volume_active', 'volume_minimo', 'volume_ascendente',
+    'atr_enabled',
+    'stoch_fast', 'stoch_mid', 'stoch_slow',
     'breakeven_enabled', 'stoploss_swing_enabled'
 ]
 
