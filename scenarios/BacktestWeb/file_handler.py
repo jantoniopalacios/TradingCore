@@ -20,10 +20,7 @@ BACKTESTING_DIR = BACKTESTING_BASE_DIR
 # Documentos visibles/abribles por un usuario normal (rutas relativas a docs/).
 # Para ampliar el acceso de usuarios normales basta con añadir entradas aquí.
 DOCS_ALLOWED_FOR_USER = frozenset({
-    Path("README.md"),
-    Path("Guides/GUIA_COMBINACION_INDICADORES.md"),
-    Path("Guides/GUIA_STOPS_Y_PROTECCION.md"),
-    Path("Guides/QUICK_START_BACKTEST_WEB.md"),
+    Path("User/MANUAL_USUARIO_TRADINGCORE.md"),
 })
 
 
@@ -34,7 +31,7 @@ def is_docs_path_allowed(relative_path, is_admin=False):
     - admin: True para cualquier ruta válida dentro de docs/.
     - usuario normal: True solo para los documentos en DOCS_ALLOWED_FOR_USER
       y para los directorios padre necesarios para construir el árbol
-      (p.ej. 'Guides' es visible porque contiene documentos permitidos).
+      (p.ej. 'User' es visible porque contiene el Manual de Usuario permitido).
     - cualquier ruta absoluta o con '..' (traversal) se rechaza, incluso para admin.
     """
     # Normalizamos separadores sin tocar el sistema de archivos (no resolvemos symlinks aquí).

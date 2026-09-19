@@ -1,6 +1,6 @@
 # TradingCore: Motor Central y Arquitectura Modular
 
-Última actualización: 18/09/2026
+Última actualización: 19/09/2026
 
 Este repositorio contiene la arquitectura central (Motor) para múltiples escenarios de trading (Backtesting, Live Trading, Web Apps).
 
@@ -302,19 +302,23 @@ Laboratorio/
 
 ```text
 docs/
-├── README.md                                              Este fichero
+├── README.md                                              Este fichero técnico
 ├── ARCHITECTURE.md                                        Arquitectura canónica del sistema
-├── Manual_operativo_TradingCore_PowerShell_Git_Copilot.docx  Manual operativo
+├── Manual_operativo_TradingCore_PowerShell_Git_Copilot.docx  Manual operativo del administrador
+├── User/                                                  Documentación de usuario final
+│   └── MANUAL_USUARIO_TRADINGCORE.md                     Manual completo de la interfaz web
 ├── api/                                                   Documentación de la API interna (MkDocs)
-├── Guides/                                                Guías de uso y configuración
+├── Guides/                                                Guías funcionales y técnicas de referencia
+├── Plans/                                                 Planificación viva y hojas de ruta
 └── Index/                                                 Índice general y convenciones de documentación
 ```
 
 El acceso a `docs/` desde el explorador web está filtrado por rol:
 
-- **Usuario normal:** solo puede ver y abrir la documentación funcional permitida (`README.md` y las guías de uso indicadas en el índice de documentación).
+- **Usuario normal:** solo puede ver y abrir `docs/User/MANUAL_USUARIO_TRADINGCORE.md`.
 - **Admin:** puede ver y abrir todo `docs/` sin restricciones.
 - La autorización se valida también en backend; no depende únicamente de que el árbol oculte elementos en la interfaz.
+- Cualquier ampliación futura de documentación visible para usuarios normales debe añadirse expresamente a `DOCS_ALLOWED_FOR_USER` y quedar cubierta por tests.
 
 ### Ayuda contextual en configuración
 
@@ -338,5 +342,6 @@ Las pestañas de configuración incorporan ayuda contextual mediante el botón *
 
 ## Documentación Detallada
 
+- Manual de Usuario: **[User/MANUAL_USUARIO_TRADINGCORE.md](User/MANUAL_USUARIO_TRADINGCORE.md)**
 - Arquitectura canónica: **[ARCHITECTURE.md](ARCHITECTURE.md)**
 - Índice general: **[Index/00_INDEX_DOCUMENTACION.md](Index/00_INDEX_DOCUMENTACION.md)**

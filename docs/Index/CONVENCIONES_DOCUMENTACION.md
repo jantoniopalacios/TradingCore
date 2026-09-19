@@ -1,6 +1,6 @@
 # Convenciones de Documentacion
 
-Ultima actualizacion: 17/09/2026
+Ultima actualizacion: 19/09/2026
 
 Este documento define el formato recomendado para mantener uniformidad en todos los archivos `.md` de `docs/`.
 
@@ -33,13 +33,14 @@ Cada documento debe seguir, cuando aplique, esta estructura:
 
 ## 4. Tono y redaccion
 
-- Tono tecnico, directo y consistente.
-- Evitar lenguaje ambiguo o excesivamente promocional.
-- Usar terminologia estable del proyecto:
+- Mantener un tono directo, claro y consistente.
+- En documentacion de usuario, priorizar lenguaje funcional y evitar requisitos o detalles de administracion que el usuario web no necesita.
+- En documentacion tecnica, usar la terminologia estable del proyecto:
   - `trading_engine/`
   - `scenarios/BacktestWeb/`
   - `launch_strategy()`
   - `ejecutar_backtest()`
+- Evitar lenguaje ambiguo o excesivamente promocional.
 
 ## 5. Enlaces y rutas
 
@@ -105,10 +106,15 @@ Cuando un archivo sea historico (snapshot, plan viejo, resumen cerrado), incluir
 
 Cada documento debe poder identificarse como uno de estos dos tipos:
 
-- **Usuario**: documentacion funcional orientada a operar la aplicacion (README, guias de uso). Es la unica documentacion visible para el rol usuario normal en el explorador web de `docs/`.
-- **Admin / tecnica**: documentacion de arquitectura, referencia de API, resumenes tecnicos y meta-documentacion. Visible solo para el rol admin en el explorador web.
+- **Usuario**: documentacion destinada a una persona que utiliza exclusivamente la interfaz web. El documento principal es `docs/User/MANUAL_USUARIO_TRADINGCORE.md`. No debe exigir conocimientos de Python, Git, PowerShell, PostgreSQL, codigo fuente, procesos ni administracion del servidor.
+- **Admin / tecnica**: documentacion de arquitectura, operacion, desarrollo, API, guias tecnicas o funcionales de referencia, planificacion y meta-documentacion. El administrador puede consultar todo `docs/`.
 
-Esta clasificacion debe mantenerse alineada con la regla de autorizacion implementada en `scenarios/BacktestWeb/file_handler.py` (`is_docs_path_allowed`) y reflejada en `docs/Index/00_INDEX_DOCUMENTACION.md`.
+El usuario normal solo tiene acceso desde el explorador web al Manual de Usuario y a los documentos que se incorporen expresamente a `DOCS_ALLOWED_FOR_USER`.
+
+Esta clasificacion debe mantenerse alineada con:
+- `scenarios/BacktestWeb/file_handler.py` (`DOCS_ALLOWED_FOR_USER` e `is_docs_path_allowed`);
+- `docs/Index/00_INDEX_DOCUMENTACION.md`;
+- los tests de autorizacion documental por rol.
 
 ## 9. Definition of Done documental
 
@@ -127,7 +133,8 @@ Todo cambio funcional debe revisar, antes de darse por cerrado, si requiere actu
 [ ] Tag/checkpoint cuando corresponda
 ```
 
-## 10. Archivo canonico de referencia
+## 10. Archivos canonicos de referencia
 
-- Arquitectura vigente y referencia canonica: `docs/ARCHITECTURE.md`
+- Manual de usuario vigente: `docs/User/MANUAL_USUARIO_TRADINGCORE.md`
+- Arquitectura vigente y referencia canonica tecnica: `docs/ARCHITECTURE.md`
 - Navegacion general: `docs/Index/00_INDEX_DOCUMENTACION.md`

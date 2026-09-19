@@ -481,23 +481,24 @@ def test_is_docs_path_allowed_admin_sees_everything():
     assert is_docs_path_allowed(Path("api/motor_core.md"), is_admin=True) is True
 
 
-def test_is_docs_path_allowed_user_only_sees_whitelist():
+def test_is_docs_path_allowed_user_only_sees_manual():
     from pathlib import Path
     from scenarios.BacktestWeb.file_handler import is_docs_path_allowed
 
-    # Documentos permitidos
-    assert is_docs_path_allowed(Path("README.md"), is_admin=False) is True
-    assert is_docs_path_allowed(Path("Guides/GUIA_COMBINACION_INDICADORES.md"), is_admin=False) is True
-    assert is_docs_path_allowed(Path("Guides/GUIA_STOPS_Y_PROTECCION.md"), is_admin=False) is True
-    assert is_docs_path_allowed(Path("Guides/QUICK_START_BACKTEST_WEB.md"), is_admin=False) is True
+    # Manual permitido
+    assert is_docs_path_allowed(Path("User/MANUAL_USUARIO_TRADINGCORE.md"), is_admin=False) is True
 
     # Directorio padre necesario para construir el árbol
-    assert is_docs_path_allowed(Path("Guides"), is_admin=False) is True
+    assert is_docs_path_allowed(Path("User"), is_admin=False) is True
 
-    # Documentación técnica no autorizada
+    # Resto de documentación no autorizada
+    assert is_docs_path_allowed(Path("README.md"), is_admin=False) is False
+    assert is_docs_path_allowed(Path("Guides/QUICK_START_BACKTEST_WEB.md"), is_admin=False) is False
+    assert is_docs_path_allowed(Path("Guides/GUIA_COMBINACION_INDICADORES.md"), is_admin=False) is False
+    assert is_docs_path_allowed(Path("Guides/GUIA_STOPS_Y_PROTECCION.md"), is_admin=False) is False
+    assert is_docs_path_allowed(Path("Guides"), is_admin=False) is False
     assert is_docs_path_allowed(Path("ARCHITECTURE.md"), is_admin=False) is False
     assert is_docs_path_allowed(Path("api/motor_core.md"), is_admin=False) is False
-    assert is_docs_path_allowed(Path("Guides/GUIDE_TEST_NKE.md"), is_admin=False) is False
     assert is_docs_path_allowed(Path("api"), is_admin=False) is False
 
 
@@ -518,24 +519,34 @@ def test_is_docs_path_allowed_rejects_traversal():
     assert is_docs_path_allowed(absolute_path, is_admin=True) is False
 
 
-def test_view_file_user_can_open_readme(client):
+def test_view_file_user_can_open_user_manual(client):
+    with client.session_transaction() as sess:
+        sess['logged_in'] = True
+        sess['user_mode'] = 'user'
+
+    response = client.get('/view_file/docs/User/MANUAL_USUARIO_TRADINGCORE.md')
+
+    assert response.status_code == 200
+
+
+def test_view_file_user_forbidden_for_readme(client):
     with client.session_transaction() as sess:
         sess['logged_in'] = True
         sess['user_mode'] = 'user'
 
     response = client.get('/view_file/docs/README.md')
 
-    assert response.status_code == 200
+    assert response.status_code == 403
 
 
-def test_view_file_user_can_open_allowed_guide(client):
+def test_view_file_user_forbidden_for_quick_start(client):
     with client.session_transaction() as sess:
         sess['logged_in'] = True
         sess['user_mode'] = 'user'
 
     response = client.get('/view_file/docs/Guides/QUICK_START_BACKTEST_WEB.md')
 
-    assert response.status_code == 200
+    assert response.status_code == 403
 
 
 def test_view_file_user_forbidden_for_architecture(client):
@@ -606,6 +617,11 @@ def test_directory_tree_for_user_excludes_technical_docs():
 
     all_names = collect_names(tree)
 
-    assert 'README.md' in all_names
+    assert 'User' in all_names
+    assert 'MANUAL_USUARIO_TRADINGCORE.md' in all_names
+    assert 'README.md' not in all_names
+    assert 'Guides' not in all_names
     assert 'ARCHITECTURE.md' not in all_names
     assert 'api' not in all_names
+    assert 'Index' not in all_names
+    assert 'Plans' not in all_names
