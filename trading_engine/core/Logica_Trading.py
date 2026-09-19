@@ -66,6 +66,45 @@ def _as_bool(value):
         return value.strip().lower() in {'1', 'true', 'on', 'yes', 'si', 'sí'}
     return bool(value)
 
+
+def _macd_has_buy_signal_enabled(strategy_self: 'StrategySelf') -> bool:
+    """Indica si MACD aporta una vía técnica de compra configurada."""
+    return (
+        _as_bool(getattr(strategy_self, 'macd', False)) and
+        str(getattr(strategy_self, 'macd_buy_logic', 'None')).strip().lower() in {
+            'macd_cruce_up', 'macd_histogram_buy'
+        }
+    )
+
+
+def _macd_has_sell_signal_enabled(strategy_self: 'StrategySelf') -> bool:
+    """Indica si MACD aporta una vía técnica de venta configurada."""
+    return (
+        _as_bool(getattr(strategy_self, 'macd', False)) and
+        str(getattr(strategy_self, 'macd_sell_logic', 'None')).strip().lower() in {
+            'macd_cruce_down', 'macd_histogram_sell'
+        }
+    )
+
+
+def _has_technical_buy_signals_enabled(strategy_self: 'StrategySelf') -> bool:
+    """Determina si existe alguna vía técnica de compra que desplace el fallback B&H."""
+    rsi_tiene_switches_compra = (
+        getattr(strategy_self, 'rsi', False) and (
+            getattr(strategy_self, 'rsi_minimo', False) or
+            getattr(strategy_self, 'rsi_ascendente', False)
+        )
+    )
+    return bool(
+        getattr(strategy_self, 'ema_cruce_signal', False) or
+        rsi_tiene_switches_compra or
+        _macd_has_buy_signal_enabled(strategy_self) or
+        getattr(strategy_self, 'stoch_fast', False) or
+        getattr(strategy_self, 'stoch_mid', False) or
+        getattr(strategy_self, 'stoch_slow', False) or
+        getattr(strategy_self, 'bb_active', False)
+    )
+
 def _build_signal_context(strategy_self: 'StrategySelf', trigger_indicators: dict, precio_close: float, stop_loss=None) -> str:
     """
     Construye un snapshot JSON con los valores actuales de todos los indicadores activos
@@ -384,24 +423,9 @@ def check_buy_signal(strategy_self: 'StrategySelf') -> None:
     # ----------------------------------------------------------------------
     # --- 3. VERIFICACIÓN DE MODO BUY & HOLD (Compra sin filtros técnicos) ---
     # ----------------------------------------------------------------------
-    # Verificar si RSI tiene switches de SEÑAL activos (solo estos cuentan como indicador "activo")
-    # Los switches de VENTA (máximo, descendente) NO bloquean B&H, solo cierran posiciones
-    rsi_tiene_switches_compra = (
-        getattr(strategy_self, 'rsi', False) and (
-            getattr(strategy_self, 'rsi_minimo', False) or
-            getattr(strategy_self, 'rsi_ascendente', False)
-        )
-    )
-    
-    indicadores_tecnicos_activos = (
-        strategy_self.ema_cruce_signal or
-        rsi_tiene_switches_compra or  # RSI solo cuenta si tiene switches de COMPRA
-        strategy_self.macd or 
-        strategy_self.stoch_fast or 
-        strategy_self.stoch_mid or 
-        strategy_self.stoch_slow or
-        strategy_self.bb_active # 🟢 Añadido BB
-    )
+    # Solo las vías técnicas de COMPRA activas desplazan el fallback B&H.
+    # Un MACD habilitado para cálculo, pero con Compra = Ninguna, no lo bloquea.
+    indicadores_tecnicos_activos = _has_technical_buy_signals_enabled(strategy_self)
     if not condicion_base_tecnica:
         # Lógica Buy & Hold: Compra si no hay señales activas PERO la tendencia de la EMA Lenta es favorable.
         if not indicadores_tecnicos_activos:
@@ -556,11 +580,12 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
 
     
     # Lógica de Control: Solo ejecuta cierre técnico si hay indicadores activos.
+    macd_tiene_senal_venta = _macd_has_sell_signal_enabled(strategy_self)
     indicadores_tecnicos_activos = (
         strategy_self.ema_cruce_signal or
         (getattr(strategy_self, 'ema_slow_minimo', False) or getattr(strategy_self, 'ema_slow_maximo', False) or getattr(strategy_self, 'ema_slow_ascendente', False) or getattr(strategy_self, 'ema_slow_descendente', False)) or
         strategy_self.rsi or
-        strategy_self.macd or
+        macd_tiene_senal_venta or
         strategy_self.stoch_fast or
         strategy_self.stoch_mid or
         strategy_self.stoch_slow or

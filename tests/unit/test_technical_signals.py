@@ -5,6 +5,8 @@ import pandas as pd
 
 from trading_engine.indicators import Filtro_ATR, Filtro_EMA, Filtro_MACD, Filtro_RSI
 from trading_engine.indicators import Filtro_Stochastic, Filtro_Volume
+from trading_engine.core import Logica_Trading
+from scenarios.BacktestWeb import estrategia_system
 
 
 def test_ema_buy_signal_active_returns_true_and_reason(monkeypatch):
@@ -117,46 +119,141 @@ def test_rsi_global_filter_blocks_value_below_threshold():
     assert Filtro_RSI.apply_rsi_global_filter(strategy) is False
 
 
-def test_macd_buy_signal_active_returns_true_and_reason(monkeypatch):
+def test_macd_buy_cruce_up_returns_true_and_reason(monkeypatch):
     strategy = SimpleNamespace(
         macd=True,
-        macd_hist=pd.Series([0.1, 0.2]),
+        macd_buy_logic="macd_cruce_up",
         macd_line=pd.Series([0.0, 1.0]),
         macd_signal_line=pd.Series([1.0, 0.0]),
-        macd_ascendente=True,
-        macd_ascendente_STATE=True,
+        macd_hist=pd.Series([-0.1, 0.2]),
     )
     monkeypatch.setattr(Filtro_MACD, "crossover", lambda line, signal: True)
 
-    assert Filtro_MACD.check_macd_buy_signal(strategy, False) == (True, "MACD Fuerte")
+    assert Filtro_MACD.check_macd_buy_signal(strategy, False) == (True, "MACD Cruce Up")
 
 
-def test_macd_sell_signal_active_returns_true_and_reason():
+def test_macd_buy_histogram_crosses_from_negative_to_positive():
     strategy = SimpleNamespace(
-        macd_maximo=True,
-        macd_maximo_STATE=True,
-        macd_descendente=False,
-        macd_descendente_STATE=False,
+        macd=True,
+        macd_buy_logic="macd_histogram_buy",
+        macd_hist=pd.Series([-0.2, 0.1]),
     )
 
-    assert Filtro_MACD.check_macd_sell_signal(strategy) == (
+    assert Filtro_MACD.check_macd_buy_signal(strategy, False) == (
         True,
-        "MACD Máximo/Descendente",
+        "MACD Histograma Buy",
     )
 
 
-def test_macd_buy_signal_without_active_conditions_returns_false(monkeypatch):
+def test_macd_buy_histogram_requires_zero_crossing():
     strategy = SimpleNamespace(
-        macd=False,
-        macd_hist=None,
-        macd_line=None,
-        macd_signal_line=None,
-        macd_ascendente=False,
-        macd_ascendente_STATE=False,
+        macd=True,
+        macd_buy_logic="macd_histogram_buy",
+        macd_hist=np.array([0.1, 0.2]),
+    )
+
+    assert Filtro_MACD.check_macd_buy_signal(strategy, False) == (False, None)
+
+
+def test_macd_buy_none_disables_signal_even_if_crossover(monkeypatch):
+    strategy = SimpleNamespace(
+        macd=True,
+        macd_buy_logic="None",
+        macd_line=pd.Series([0.0, 1.0]),
+        macd_signal_line=pd.Series([1.0, 0.0]),
+        macd_hist=np.array([-0.2, 0.1]),
     )
     monkeypatch.setattr(Filtro_MACD, "crossover", lambda line, signal: True)
 
     assert Filtro_MACD.check_macd_buy_signal(strategy, False) == (False, None)
+
+
+def test_macd_buy_none_preserves_existing_true_condition():
+    strategy = SimpleNamespace(macd=True, macd_buy_logic="None")
+
+    assert Filtro_MACD.check_macd_buy_signal(strategy, True) == (True, None)
+
+
+def test_macd_sell_cruce_down_returns_true_and_reason(monkeypatch):
+    strategy = SimpleNamespace(
+        macd=True,
+        macd_sell_logic="macd_cruce_down",
+        macd_line=pd.Series([1.0, 0.0]),
+        macd_signal_line=pd.Series([0.0, 1.0]),
+    )
+    monkeypatch.setattr(Filtro_MACD, "crossover", lambda signal, line: True)
+
+    assert Filtro_MACD.check_macd_sell_signal(strategy) == (True, "MACD Cruce Down")
+
+
+def test_macd_sell_histogram_crosses_from_positive_to_negative():
+    strategy = SimpleNamespace(
+        macd=True,
+        macd_sell_logic="macd_histogram_sell",
+        macd_hist=np.array([0.2, -0.1]),
+    )
+
+    assert Filtro_MACD.check_macd_sell_signal(strategy) == (
+        True,
+        "MACD Histograma Sell",
+    )
+
+
+def test_macd_sell_histogram_requires_zero_crossing():
+    strategy = SimpleNamespace(
+        macd=True,
+        macd_sell_logic="macd_histogram_sell",
+        macd_hist=np.array([-0.1, -0.2]),
+    )
+
+    assert Filtro_MACD.check_macd_sell_signal(strategy) == (False, None)
+
+
+def test_macd_sell_none_disables_signal():
+    strategy = SimpleNamespace(
+        macd=True,
+        macd_sell_logic="None",
+        macd_hist=np.array([0.2, -0.1]),
+    )
+
+    assert Filtro_MACD.check_macd_sell_signal(strategy) == (False, None)
+
+
+def test_macd_inactive_does_not_generate_buy_or_sell(monkeypatch):
+    strategy = SimpleNamespace(
+        macd=False,
+        macd_buy_logic="macd_cruce_up",
+        macd_sell_logic="macd_cruce_down",
+        macd_line=pd.Series([0.0, 1.0]),
+        macd_signal_line=pd.Series([1.0, 0.0]),
+        macd_hist=np.array([-0.2, 0.1]),
+    )
+    monkeypatch.setattr(Filtro_MACD, "crossover", lambda a, b: True)
+
+    assert Filtro_MACD.check_macd_buy_signal(strategy, False) == (False, None)
+    assert Filtro_MACD.check_macd_sell_signal(strategy) == (False, None)
+
+
+def test_macd_enabled_with_buy_none_keeps_buy_hold_fallback_available():
+    strategy = SimpleNamespace(
+        ema_cruce_signal=False,
+        rsi=False,
+        macd=True,
+        macd_buy_logic="None",
+        stoch_fast=False,
+        stoch_mid=False,
+        stoch_slow=False,
+        bb_active=False,
+    )
+
+    assert Logica_Trading._has_technical_buy_signals_enabled(strategy) is False
+
+
+def test_macd_window_kwargs_preserve_slow_fast_order():
+    assert estrategia_system._macd_window_kwargs(12, 26) == {
+        "window_slow": 26,
+        "window_fast": 12,
+    }
 
 
 def test_stochastic_buy_crossover_returns_true(monkeypatch):

@@ -32,6 +32,14 @@ def _calculate_vma_sma( data, period, **kwargs):
     # Pandas rolling() es el método más robusto aquí.
     return pd.Series(data).rolling(period).mean() 
 
+
+def _macd_window_kwargs(fast_period, slow_period):
+    """Devuelve los periodos MACD con los nombres esperados por ``ta.trend``."""
+    return {
+        'window_slow': int(slow_period),
+        'window_fast': int(fast_period),
+    }
+
 # ----------------------------------------------------------------------
 # --- CLASE DE LA ESTRATEGIA: System ---
 # ----------------------------------------------------------------------
@@ -102,11 +110,8 @@ class System(Strategy):
 
     # MACD
     macd = None; macd_fast = None; macd_slow = None; macd_signal = None
-    # Estados MACD
-    macd_minimo = False # Placeholder
-    macd_maximo = False # Placeholder
-    macd_ascendente = False # Placeholder
-    macd_descendente = False # Placeholder
+    macd_buy_logic = 'None'
+    macd_sell_logic = 'None'
 
     # ------------------------------------------------------------------
     # 🌟 BANDAS DE BOLLINGER (BB) - NUEVOS ATRIBUTOS DE CLASE 🌟
@@ -231,7 +236,9 @@ class System(Strategy):
         self.stoch_slow_ascendente_STATE = False
         self.stoch_slow_descendente_STATE = False
         
-        # Estados para MACD
+        # Estados dinámicos del histograma MACD (diagnóstico/visualización)
+        self.macd_minimo_STATE = False
+        self.macd_maximo_STATE = False
         self.macd_ascendente_STATE = False
         self.macd_descendente_STATE = False
         
@@ -306,9 +313,29 @@ class System(Strategy):
         self.macd = str(getattr(self, 'macd', 'False')).lower() == 'true'
         if self.macd:
             try:
-                self.macd_line = self.I(ta.trend.macd, self.data.Close.s, int(self.macd_fast), int(self.macd_slow), name='MACD_Line')
-                self.macd_signal_line = self.I(ta.trend.macd_signal, self.data.Close.s, int(self.macd_fast), int(self.macd_slow), int(self.macd_signal), name='MACD_Signal')
-                self.macd_hist = self.I(ta.trend.macd_diff, self.data.Close.s, int(self.macd_fast), int(self.macd_slow), int(self.macd_signal), name='MACD_Hist')
+                # La API de ``ta`` recibe window_slow antes que window_fast; usamos
+                # argumentos con nombre para evitar invertir los periodos 12/26.
+                macd_windows = _macd_window_kwargs(self.macd_fast, self.macd_slow)
+                self.macd_line = self.I(
+                    ta.trend.macd,
+                    self.data.Close.s,
+                    **macd_windows,
+                    name='MACD_Line',
+                )
+                self.macd_signal_line = self.I(
+                    ta.trend.macd_signal,
+                    self.data.Close.s,
+                    **macd_windows,
+                    window_sign=int(self.macd_signal),
+                    name='MACD_Signal',
+                )
+                self.macd_hist = self.I(
+                    ta.trend.macd_diff,
+                    self.data.Close.s,
+                    **macd_windows,
+                    window_sign=int(self.macd_signal),
+                    name='MACD_Hist',
+                )
             except Exception as e:
                 print(f"⚠️ MACD Error: {e}")
                 self.macd = False

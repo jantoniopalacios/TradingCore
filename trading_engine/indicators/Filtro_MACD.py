@@ -42,84 +42,106 @@ def update_macd_state(strategy_self, verificar_estado_indicador_func: Callable):
         strategy_self.macd_descendente_STATE = estado_macd['descendente']
 
 # ----------------------------------------------------------------------
+# --- Utilidades de señal ---
+# ----------------------------------------------------------------------
+def _logic_value(strategy_self, attr_name: str) -> str:
+    """Devuelve la opción de lógica MACD normalizada."""
+    value = getattr(strategy_self, attr_name, 'None')
+    if value is None:
+        return 'none'
+    return str(value).strip().lower()
+
+
+def _histogram_crosses_up(macd_hist) -> bool:
+    """True cuando el histograma cruza de cero/negativo a positivo."""
+    try:
+        previous = float(macd_hist[-2])
+        current = float(macd_hist[-1])
+    except Exception:
+        try:
+            previous = float(macd_hist.iloc[-2])
+            current = float(macd_hist.iloc[-1])
+        except Exception:
+            return False
+    return previous <= 0 < current
+
+
+def _histogram_crosses_down(macd_hist) -> bool:
+    """True cuando el histograma cruza de cero/positivo a negativo."""
+    try:
+        previous = float(macd_hist[-2])
+        current = float(macd_hist[-1])
+    except Exception:
+        try:
+            previous = float(macd_hist.iloc[-2])
+            current = float(macd_hist.iloc[-1])
+        except Exception:
+            return False
+    return previous >= 0 > current
+
+
+# ----------------------------------------------------------------------
 # --- Lógica de Compra (Señales OR) ---
 # ----------------------------------------------------------------------
 def check_macd_buy_signal(strategy_self, condicion_base_tecnica: bool) -> Tuple[bool, Optional[str]]:
+    """Evalúa la señal de compra MACD seleccionada en ``macd_buy_logic``.
+
+    Opciones admitidas:
+    - ``macd_cruce_up``: MACD Line cruza al alza Signal Line.
+    - ``macd_histogram_buy``: el histograma cruza de cero/negativo a positivo.
+    - ``None``: MACD no genera señal de compra.
     """
-    Evalúa las señales de compra generadas por el indicador MACD.
+    if not getattr(strategy_self, 'macd', False):
+        return condicion_base_tecnica, None
 
-    Esta función combina el cruce alcista (MACD Line cruza por encima de Signal Line) con una 
-    condición opcional de **Impulso Creciente** (Histograma Ascendente) si esta es requerida 
-    por la configuración de la estrategia (strategy_self.macd_ascendente=True). 
-    La condición de compra resultante se agrega mediante una operación OR a la condición base técnica.
+    logic = _logic_value(strategy_self, 'macd_buy_logic')
+    signal = False
+    reason = None
 
-    Parameters
-    ----------
-    strategy_self : strategy_system.System
-        Instancia de la estrategia que contiene los datos del indicador 
-        (self.macd_line, self.macd_signal_line) y la configuración de impulso.
-    condicion_base_tecnica : bool
-        El estado actual de la condición de entrada de compra técnica global.
+    if logic == 'macd_cruce_up':
+        macd_line = getattr(strategy_self, 'macd_line', None)
+        signal_line = getattr(strategy_self, 'macd_signal_line', None)
+        if macd_line is not None and signal_line is not None:
+            signal = bool(crossover(macd_line, signal_line))
+            if signal:
+                reason = 'MACD Cruce Up'
 
-    Returns
-    -------
-    tuple[bool, str | None]
-        - bool: La nueva condición base técnica después de aplicar la lógica OR del MACD.
-        - str | None: Razón de la señal de compra para fines de logging (e.g., "MACD Fuerte") o None si no hay señal.
-    """
-    log_reason = None
+    elif logic == 'macd_histogram_buy':
+        macd_hist = getattr(strategy_self, 'macd_hist', None)
+        if macd_hist is not None:
+            signal = _histogram_crosses_up(macd_hist)
+            if signal:
+                reason = 'MACD Histograma Buy'
 
-    if strategy_self.macd and strategy_self.macd_hist is not None:
-        
-        # 1. Señal de Cruce (MACD Line sobre Signal Line)
-        macd_buy = crossover(strategy_self.macd_line, strategy_self.macd_signal_line)
-        
-        # 2. Condición de Impulso (Histograma Creciente)
-        # Lógica: Si el usuario requiere MACD ascendente (strategy_self.macd_ascendente=True), 
-        # debe cumplirse el estado REAL (strategy_self.macd_ascendente_STATE).
-        cond_impulso_ok = True
-        if strategy_self.macd_ascendente: 
-            cond_impulso_ok = strategy_self.macd_ascendente_STATE
-        
-        # MACD Fuerte: Cruce AND (Impulso Requerido Check)
-        cond_macd_fuerte = macd_buy and cond_impulso_ok
-        
-        if cond_macd_fuerte:
-            log_reason = "MACD Fuerte"
+    # ``None`` o cualquier valor no reconocido se trata de forma segura como sin señal.
+    return condicion_base_tecnica or signal, reason
 
-        condicion_base_tecnica |= cond_macd_fuerte 
-
-    return condicion_base_tecnica, log_reason
 
 # ----------------------------------------------------------------------
 # --- Lógica de Venta (Cierre Técnico) ---
 # ----------------------------------------------------------------------
 def check_macd_sell_signal(strategy_self) -> Tuple[bool, Optional[str]]:
+    """Evalúa la señal de venta MACD seleccionada en ``macd_sell_logic``.
+
+    Opciones admitidas:
+    - ``macd_cruce_down``: MACD Line cruza a la baja Signal Line.
+    - ``macd_histogram_sell``: el histograma cruza de cero/positivo a negativo.
+    - ``None``: MACD no genera señal de venta.
     """
-    Evalúa las señales de salida o cierre de posición generadas por el indicador MACD.
+    if not getattr(strategy_self, 'macd', False):
+        return False, None
 
-    La señal de venta se activa si se cumple alguna de las siguientes condiciones, basada
-    en el estado dinámico del Histograma MACD:
+    logic = _logic_value(strategy_self, 'macd_sell_logic')
 
-    1.  El Histograma ha alcanzado un **Máximo** (si strategy_self.macd_maximo es True).
-    2.  El Histograma es **Descendente** (si strategy_self.macd_descendente es True).
+    if logic == 'macd_cruce_down':
+        macd_line = getattr(strategy_self, 'macd_line', None)
+        signal_line = getattr(strategy_self, 'macd_signal_line', None)
+        if macd_line is not None and signal_line is not None and crossover(signal_line, macd_line):
+            return True, 'MACD Cruce Down'
 
-    Parameters
-    ----------
-    strategy_self : strategy_system.System
-        Instancia de la estrategia que contiene las variables de configuración y estado del MACD
-        (e.g., self.macd_maximo, self.macd_maximo_STATE).
+    elif logic == 'macd_histogram_sell':
+        macd_hist = getattr(strategy_self, 'macd_hist', None)
+        if macd_hist is not None and _histogram_crosses_down(macd_hist):
+            return True, 'MACD Histograma Sell'
 
-    Returns
-    -------
-    tuple[bool, str | None]
-        - bool: True si se detecta una señal de venta activa, False en caso contrario.
-        - str | None: Descripción de la razón del cierre (e.g., "VENTA MACD Máximo/Descendente") o None.
-    """
-    # Cierre si el Histograma MACD indica un Máximo o se vuelve Descendente
-    if (strategy_self.macd_maximo and strategy_self.macd_maximo_STATE) or \
-       (strategy_self.macd_descendente and strategy_self.macd_descendente_STATE):
-        
-        return True, "MACD Máximo/Descendente"
-    
     return False, None

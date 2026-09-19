@@ -1,6 +1,6 @@
 # Guia de combinacion de indicadores
 
-Ultima actualizacion: 17/09/2026
+Ultima actualizacion: 19/09/2026
 
 ## Objetivo
 Definir combinaciones de indicadores que reduzcan falsos positivos y mejoren la calidad de entrada en backtest.
@@ -10,7 +10,7 @@ Usar un unico indicador (por ejemplo, solo cruce EMA) puede producir sobre-tradi
 
 ## Combinaciones recomendadas
 - `EMA + RSI`: confirmacion de tendencia y momentum.
-- `EMA + MACD`: confirmacion de tendencia con sesgo mas fuerte. La integracion de las opciones MACD de UI (`macd_buy_logic`/`macd_sell_logic`) con la logica interna del indicador tiene una revision funcional pendiente; no la trates como comportamiento completamente validado.
+- `EMA + MACD`: confirmacion de tendencia con sesgo mas fuerte. MACD consume directamente `macd_buy_logic` (`macd_cruce_up`, `macd_histogram_buy`, `None`) y `macd_sell_logic` (`macd_cruce_down`, `macd_histogram_sell`, `None`). Las opciones de histograma disparan al cruzar el nivel cero y `None` desactiva la señal MACD de ese lado.
 - `EMA + RSI + ATR`: añade control de volatilidad para filtrar extremos.
 
 ## Regla base sugerida
@@ -34,7 +34,9 @@ El ATR debe calibrarse por tipo de volatilidad. Los siguientes rangos son orient
 3. Ajustar ATR por activo.
 4. Comparar `Return`, `Win Rate`, `Max Drawdown` y `Total Trades`.
 
+Para un caso concreto de calibracion sobre un activo especifico, ver la guia tecnica [GUIDE_TEST_NKE.md](./GUIDE_TEST_NKE.md).
 
 ## Referencias
+- [Guía de prueba NKE](./GUIDE_TEST_NKE.md)
 - [Quick Start Web](./QUICK_START_BACKTEST_WEB.md)
 - [Guia de Stops y Proteccion](./GUIA_STOPS_Y_PROTECCION.md)

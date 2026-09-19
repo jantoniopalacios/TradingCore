@@ -51,7 +51,7 @@
 
                 <div class="alert alert-secondary mt-3 mb-0">
                     <small>
-                        ⚠️ <strong>Nota de estado interno (pendiente de revisión funcional):</strong> el formulario web guarda la selección en <code>macd_buy_logic</code> y <code>macd_sell_logic</code>, pero el motor de señales (<code>Filtro_MACD.py</code>) consume internamente los flags <code>macd_ascendente</code>, <code>macd_maximo</code> y <code>macd_descendente</code>, que en <code>estrategia_system.py</code> permanecen como <code>False</code> (placeholder). No se ha localizado la traducción explícita entre las opciones de histograma de la interfaz y esos flags internos, por lo que el comportamiento real de <strong>Histograma Buy</strong> / <strong>Histograma Sell</strong> debe considerarse pendiente de verificar.
+                        <strong>Comportamiento del motor:</strong> las opciones de compra y venta son exclusivas y el motor consume directamente <code>macd_buy_logic</code> y <code>macd_sell_logic</code>. Seleccionar <strong>Ninguna</strong> desactiva las señales MACD de ese lado aunque el indicador siga activo para cálculo y visualización.
                     </small>
                 </div>
             </div>
@@ -107,7 +107,7 @@
 
     <div class="col-6">
         <h4 class="mb-3 text-dark">Lógica de Señal (Exclusividad)</h4>
-        <p class="text-muted small">Define si la señal de compra/venta se basa en el **Cruce** (MACD vs. Signal) o en el **Histograma** (cambio de signo).</p>
+        <p class="text-muted small">Define si la señal de compra/venta se basa en el <strong>Cruce</strong> (MACD vs. Signal) o en el <strong>Histograma</strong> (cambio de signo).</p>
 
         <h5 class="mt-4 text-success">Lógica de Compra (Buy Logic)</h5>
         <div class="row row-control align-items-center mb-4">

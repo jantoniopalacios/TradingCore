@@ -1,4 +1,4 @@
-﻿# Manual de Usuario de TradingCore
+# Manual de Usuario de TradingCore
 
 **Última actualización:** 19/09/2026
 **Audiencia:** usuarios de la interfaz web de TradingCore
@@ -190,19 +190,31 @@ El RSI también puede intervenir en configuraciones de trailing dinámico cuando
 
 ## 11. MACD
 
-El **MACD (Moving Average Convergence Divergence)** compara medias exponenciales y una línea de señal para identificar cambios de impulso y tendencia.
+El **MACD (Moving Average Convergence Divergence)** compara una media exponencial rápida con una lenta y utiliza una línea de señal para identificar cambios de impulso. TradingCore permite elegir de forma independiente la lógica de compra y la de venta.
 
 ### Parámetros principales
 
-- periodo rápido;
-- periodo lento;
-- periodo de señal;
-- lógica de compra seleccionada;
-- lógica de venta seleccionada.
+- **Periodo rápido**: periodo de la EMA rápida.
+- **Periodo lento**: periodo de la EMA lenta.
+- **Periodo de señal**: periodo utilizado para calcular la línea Signal.
+- **Lógica de compra**: `Cruce Up`, `Histograma Buy` o `Ninguna`.
+- **Lógica de venta**: `Cruce Down`, `Histograma Sell` o `Ninguna`.
 
-La interfaz permite seleccionar lógicas basadas en cruce y, según la configuración disponible, opciones asociadas al histograma.
+### Lógicas de compra
 
-> **Nota de versión:** la correspondencia completa entre todas las opciones visibles de MACD y la lógica interna del motor está incluida en la siguiente revisión funcional planificada. Hasta cerrar esa revisión, utilice la ayuda contextual de MACD como referencia de la interfaz y evite asumir comportamientos no expresamente descritos o validados.
+- **Cruce Up**: genera señal cuando la línea MACD cruza al alza la línea Signal.
+- **Histograma Buy**: genera señal cuando el histograma pasa de cero o negativo a positivo.
+- **Ninguna**: MACD no genera señales de compra. El indicador puede seguir activo para cálculo y visualización.
+
+### Lógicas de venta
+
+- **Cruce Down**: genera señal cuando la línea MACD cruza a la baja la línea Signal.
+- **Histograma Sell**: genera señal cuando el histograma pasa de cero o positivo a negativo.
+- **Ninguna**: MACD no genera señales de venta.
+
+Las opciones de compra y venta son independientes. Por ejemplo, puede utilizarse `Cruce Up` para entrar y `Histograma Sell` para salir. Si la lógica de compra está en **Ninguna**, tener MACD activado no se considera por sí solo una vía técnica de compra y no desplaza el comportamiento de respaldo Buy & Hold.
+
+Use el botón **Ayuda** de la pestaña MACD para consultar estas condiciones mientras configura la estrategia.
 
 ---
 
