@@ -256,16 +256,43 @@ def test_macd_window_kwargs_preserve_slow_fast_order():
     }
 
 
-def test_stochastic_buy_crossover_returns_true(monkeypatch):
-    strategy = SimpleNamespace(stoch_fast_ascendente=False, stoch_fast_minimo=False)
+def test_stochastic_buy_minimum_logic_returns_true(monkeypatch):
+    strategy = SimpleNamespace(
+        stoch_fast_buy_logic="stoch_fast_minimo",
+        stoch_fast_minimo_STATE=True,
+        stoch_fast_ascendente_STATE=False,
+    )
+
     monkeypatch.setattr(Filtro_Stochastic, "crossover", lambda k, d: True)
 
     result = Filtro_Stochastic.check_oscillator_buy_signal(
-        strategy, "stoch_fast", np.array([10.0]), np.array([15.0]), 20.0
+        strategy,
+        "stoch_fast",
+        np.array([10.0]),
+        np.array([15.0]),
+        20.0,
     )
 
-    assert result == (True, "Stoch Fast Cruce")
+    assert result == (True, "Stoch Fast Cruce & Mínimo")
 
+def test_stochastic_buy_none_disables_signal(monkeypatch):
+    strategy = SimpleNamespace(
+        stoch_fast_buy_logic="None",
+        stoch_fast_minimo_STATE=True,
+        stoch_fast_ascendente_STATE=True,
+    )
+
+    monkeypatch.setattr(Filtro_Stochastic, "crossover", lambda k, d: True)
+
+    result = Filtro_Stochastic.check_oscillator_buy_signal(
+        strategy,
+        "stoch_fast",
+        np.array([10.0]),
+        np.array([15.0]),
+        20.0,
+    )
+
+    assert result == (False, None)
 
 def test_stochastic_ascending_filter_blocks_when_state_is_false(monkeypatch):
     strategy = SimpleNamespace(
@@ -296,43 +323,88 @@ def test_stochastic_minimum_filter_blocks_when_state_is_false(monkeypatch):
 
     assert result == (False, None)
 
+def test_stochastic_sell_none_disables_signal():
+    strategy = SimpleNamespace(
+        stoch_fast_sell_logic="None",
+        stoch_fast_maximo_STATE=True,
+        stoch_fast_descendente_STATE=True,
+    )
+
+    assert Filtro_Stochastic.check_oscillator_sell_signal(
+        strategy,
+        "stoch_fast",
+    ) == (False, None)
 
 def test_stochastic_sell_signal_by_maximum_returns_true():
     strategy = SimpleNamespace(
-        stoch_fast_maximo=True,
+        stoch_fast_sell_logic="stoch_fast_maximo",
         stoch_fast_maximo_STATE=True,
-        stoch_fast_descendente=False,
         stoch_fast_descendente_STATE=False,
     )
 
-    assert Filtro_Stochastic.check_oscillator_sell_signal(strategy, "stoch_fast") == (
+    assert Filtro_Stochastic.check_oscillator_sell_signal(
+        strategy,
+        "stoch_fast",
+    ) == (
         True,
-        "Stoch Fast Máximo/Descendente",
+        "Stoch Fast Máximo",
     )
 
 
 def test_stochastic_sell_signal_by_descending_returns_true():
     strategy = SimpleNamespace(
-        stoch_fast_maximo=False,
+        stoch_fast_sell_logic="stoch_fast_descendente",
         stoch_fast_maximo_STATE=False,
-        stoch_fast_descendente=True,
         stoch_fast_descendente_STATE=True,
     )
 
-    assert Filtro_Stochastic.check_oscillator_sell_signal(strategy, "stoch_fast") == (
+    assert Filtro_Stochastic.check_oscillator_sell_signal(
+        strategy,
+        "stoch_fast",
+    ) == (
         True,
-        "Stoch Fast Máximo/Descendente",
+        "Stoch Fast Descendente",
     )
-
 
 def test_stochastic_sell_signal_without_settings_returns_false():
-    strategy = SimpleNamespace()
-
-    assert Filtro_Stochastic.check_oscillator_sell_signal(strategy, "stoch_fast") == (
-        False,
-        None,
+    strategy = SimpleNamespace(
+        stoch_fast_sell_logic="None",
+        stoch_fast_maximo_STATE=True,
+        stoch_fast_descendente_STATE=True,
     )
 
+    assert Filtro_Stochastic.check_oscillator_sell_signal(
+        strategy,
+        "stoch_fast",
+    ) == (False, None)
+
+def test_stochastic_buy_none_is_not_technical_buy_signal():
+    strategy = SimpleNamespace(
+        stoch_fast=True,
+        stoch_fast_buy_logic="None",
+        stoch_mid=False,
+        stoch_slow=False,
+        ema_cruce_signal=False,
+        rsi=False,
+        macd=False,
+        bb_active=False,
+    )
+
+    assert Logica_Trading._has_technical_buy_signals_enabled(strategy) is False
+
+def test_stochastic_sell_helper_requires_enabled_variant():
+    strategy = SimpleNamespace(
+        stoch_fast=False,
+        stoch_fast_sell_logic="stoch_fast_maximo",
+    )
+
+    assert (
+        Logica_Trading._stoch_has_sell_signal_enabled(
+            strategy,
+            "stoch_fast",
+        )
+        is False
+    )
 
 def test_atr_filter_disabled_allows_entry():
     strategy = SimpleNamespace(atr_enabled=False)

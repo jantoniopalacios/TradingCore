@@ -104,129 +104,105 @@ def update_oscillator_state(strategy_self, prefix: str, k_series: pd.Series, ver
 # ----------------------------------------------------------------------
 # --- Lógica de Compra Genérica (Señales OR) ---
 # ----------------------------------------------------------------------
-def check_oscillator_buy_signal(strategy_self, prefix: str, k_series: pd.Series, d_series: pd.Series, low_level: Optional[float]) -> Tuple[bool, Optional[str]]:
-    """
-    Revisa la señal de compra para un Oscilador genérico.
-
-    La señal de compra base es un **Cruce alcista** (Línea %K sobre Línea %D), 
-    que puede ser filtrada por los siguientes criterios (operaciones AND):
-    
-    1.  **Filtro de Sobreventa:** Ocurre solo si la última vela está por debajo del ``low_level`` (ej. 20).
-    2.  **Filtros de Estado Dinámico:** Se consideran si los settings ``_ascendente`` o ``_minimo`` están activados.
-
-    Parameters
-    ----------
-    strategy_self : strategy_system.System
-        Instancia de la estrategia.
-    prefix : str
-        Prefijo del indicador (e.g., 'stoch_fast').
-    k_series : pd.Series
-        Serie de datos de la Línea %K (principal).
-    d_series : pd.Series
-        Serie de datos de la Línea %D (señal).
-    low_level : float | None
-        Nivel de sobreventa (e.g., 20). Si es ``None``, no se aplica el filtro de sobreventa.
-
-    Returns
-    -------
-    tuple[bool, str | None]
-        - bool: True si se detecta una señal de compra.
-        - str | None: Razón de la señal de compra para fines de logging (e.g., "Stoch Fast Cruce & Ascendente").
-    """
+def check_oscillator_buy_signal(
+    strategy_self,
+    prefix: str,
+    k_series: pd.Series,
+    d_series: pd.Series,
+    low_level: Optional[float],
+) -> Tuple[bool, Optional[str]]:
     if k_series is None or d_series is None:
         return False, None
-    
-    # 🟢 1. RECUPERAR SETTINGS DEL USUARIO (si activó el filtro)
-    ascendente_setting = getattr(strategy_self, f"{prefix}_ascendente", False)
-    minimo_setting = getattr(strategy_self, f"{prefix}_minimo", False)
-    
-    # 2. CONDICIÓN BASE: Cruce
+
+    buy_logic = getattr(strategy_self, f"{prefix}_buy_logic", "None")
+
+    if buy_logic in (None, "", "None"):
+        return False, None
+
+    ascendente_setting = buy_logic == f"{prefix}_ascendente"
+    minimo_setting = buy_logic == f"{prefix}_minimo"
+
+    if not ascendente_setting and not minimo_setting:
+        return False, None
+
     buy_signal = crossover(k_series, d_series)
-    
-    # 3. FILTRO DE SOBREVENTA (Condición AND)
+
+    k_actual = k_series.iloc[-1] if hasattr(k_series, "iloc") else k_series[-1]
+
     if low_level is not None:
-        # La señal de cruce solo se aplica si está en zona de sobreventa
-        buy_signal &= (k_series[-1] < low_level)
-    
-    # ----------------------------------------------------------
-    # 🟢 4. FILTROS DE ESTADO (Condiciones AND)
-    # ----------------------------------------------------------
+        buy_signal &= (k_actual < low_level)
+
     log_parts = []
-    
-    # A. Filtro Ascendente
+
     if ascendente_setting:
-        # Recuperar el estado calculado (e.g., stoch_fast_ascendente_STATE)
-        ascendente_state = getattr(strategy_self, f"{prefix}_ascendente_STATE", False)
-        
-        # Aplicar el filtro: solo comprar si la señal es True Y el estado es ascendente
-        buy_signal &= ascendente_state # ¡CORRECCIÓN de lógica! Si es un filtro AND, debe ser &=
+        ascendente_state = getattr(
+            strategy_self,
+            f"{prefix}_ascendente_STATE",
+            False,
+        )
+        buy_signal &= ascendente_state
         if ascendente_state:
             log_parts.append("Ascendente")
 
-    # B. Filtro Mínimo (Local)
     if minimo_setting:
-        # Recuperar el estado calculado (e.g., stoch_fast_minimo_STATE)
-        minimo_state = getattr(strategy_self, f"{prefix}_minimo_STATE", False)
-        
-        # Aplicar el filtro: solo comprar si la señal es True Y el estado es mínimo
-        buy_signal &= minimo_state # ¡CORRECCIÓN de lógica! Si es un filtro AND, debe ser &=
+        minimo_state = getattr(
+            strategy_self,
+            f"{prefix}_minimo_STATE",
+            False,
+        )
+        buy_signal &= minimo_state
         if minimo_state:
             log_parts.append("Mínimo")
 
-
-    # 5. RETORNO FINAL
     if buy_signal:
-        # Formato del log: Stoch Fast Cruce & Ascendente & Mínimo
-        log_name = prefix.replace('_', ' ').title().replace('Stoch', 'Stoch') 
-        
-        # Añadir los filtros activados a la razón del log
+        log_name = prefix.replace("_", " ").title()
+
         if log_parts:
             reason = f"{log_name} Cruce & {' & '.join(log_parts)}"
         else:
             reason = f"{log_name} Cruce"
 
         return True, reason
-    
+
     return False, None
+
 # ----------------------------------------------------------------------
 # --- Lógica de Venta Genérica (Cierre Técnico) ---
 # ----------------------------------------------------------------------
-def check_oscillator_sell_signal(strategy_self, prefix: str) -> Tuple[bool, Optional[str]]:
-    """
-    Revisa la señal de venta genérica para un Oscilador (%K).
+def check_oscillator_sell_signal(
+    strategy_self,
+    prefix: str,
+) -> Tuple[bool, Optional[str]]:
+    sell_logic = getattr(strategy_self, f"{prefix}_sell_logic", "None")
 
-    La señal de venta se activa si se cumple alguna de las siguientes condiciones, basada
-    en la configuración de la estrategia y el estado dinámico del oscilador:
+    if sell_logic in (None, "", "None"):
+        return False, None
 
-    1.  El %K ha alcanzado un **Máximo** (si ``_maximo`` está activado).
-    2.  El %K es **Descendente** (si ``_descendente`` está activado).
+    maximo_setting = sell_logic == f"{prefix}_maximo"
+    descendente_setting = sell_logic == f"{prefix}_descendente"
 
-    Parameters
-    ----------
-    strategy_self : strategy_system.System
-        Instancia de la estrategia.
-    prefix : str
-        Prefijo del indicador (e.g., 'stoch_fast', 'stoch_mid').
+    if not maximo_setting and not descendente_setting:
+        return False, None
 
-    Returns
-    -------
-    tuple[bool, str | None]
-        - bool: True si se detecta una señal de venta activa, False en caso contrario.
-        - str | None: Descripción de la razón del cierre (e.g., "VENTA Stoch Fast Máximo/Descendente") o None.
-    """
-    # Accede a los estados y settings de forma dinámica
-    maximo_state = getattr(strategy_self, f"{prefix}_maximo_STATE", False)
-    descendente_state = getattr(strategy_self, f"{prefix}_descendente_STATE", False)
-    maximo_setting = getattr(strategy_self, f"{prefix}_maximo", False)
-    descendente_setting = getattr(strategy_self, f"{prefix}_descendente", False)
-    
-    # Cierre si el oscilador indica Máximo OR se vuelve Descendente
-    if (maximo_setting and maximo_state) or \
-       (descendente_setting and descendente_state):
-        
-        log_name = prefix.replace('_', ' ').title().replace('Stoch', 'Stoch')
-        return True, f"{log_name} Máximo/Descendente"
-    
+    maximo_state = getattr(
+        strategy_self,
+        f"{prefix}_maximo_STATE",
+        False,
+    )
+    descendente_state = getattr(
+        strategy_self,
+        f"{prefix}_descendente_STATE",
+        False,
+    )
+
+    log_name = prefix.replace("_", " ").title()
+
+    if maximo_setting and maximo_state:
+        return True, f"{log_name} Máximo"
+
+    if descendente_setting and descendente_state:
+        return True, f"{log_name} Descendente"
+
     return False, None
 
 # NOTA: Se ha corregido la lógica de AND en check_oscillator_buy_signal (Líneas 149 y 159) para asegurar

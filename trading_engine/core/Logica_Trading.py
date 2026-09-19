@@ -86,6 +86,34 @@ def _macd_has_sell_signal_enabled(strategy_self: 'StrategySelf') -> bool:
         }
     )
 
+def _stoch_has_buy_signal_enabled(strategy_self: 'StrategySelf', prefix: str) -> bool:
+    """Indica si una variante Stochastic aporta una vía técnica de compra configurada."""
+    if not _as_bool(getattr(strategy_self, prefix, False)):
+        return False
+
+    buy_logic = str(
+        getattr(strategy_self, f"{prefix}_buy_logic", "None")
+    ).strip().lower()
+
+    return buy_logic in {
+        f"{prefix}_minimo",
+        f"{prefix}_ascendente",
+    }
+
+
+def _stoch_has_sell_signal_enabled(strategy_self: 'StrategySelf', prefix: str) -> bool:
+    """Indica si una variante Stochastic aporta una vía técnica de venta configurada."""
+    if not _as_bool(getattr(strategy_self, prefix, False)):
+        return False
+
+    sell_logic = str(
+        getattr(strategy_self, f"{prefix}_sell_logic", "None")
+    ).strip().lower()
+
+    return sell_logic in {
+        f"{prefix}_maximo",
+        f"{prefix}_descendente",
+    }
 
 def _has_technical_buy_signals_enabled(strategy_self: 'StrategySelf') -> bool:
     """Determina si existe alguna vía técnica de compra que desplace el fallback B&H."""
@@ -99,9 +127,9 @@ def _has_technical_buy_signals_enabled(strategy_self: 'StrategySelf') -> bool:
         getattr(strategy_self, 'ema_cruce_signal', False) or
         rsi_tiene_switches_compra or
         _macd_has_buy_signal_enabled(strategy_self) or
-        getattr(strategy_self, 'stoch_fast', False) or
-        getattr(strategy_self, 'stoch_mid', False) or
-        getattr(strategy_self, 'stoch_slow', False) or
+        _stoch_has_buy_signal_enabled(strategy_self, 'stoch_fast') or
+        _stoch_has_buy_signal_enabled(strategy_self, 'stoch_mid') or
+        _stoch_has_buy_signal_enabled(strategy_self, 'stoch_slow') or
         getattr(strategy_self, 'bb_active', False)
     )
 
@@ -586,9 +614,9 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
         (getattr(strategy_self, 'ema_slow_minimo', False) or getattr(strategy_self, 'ema_slow_maximo', False) or getattr(strategy_self, 'ema_slow_ascendente', False) or getattr(strategy_self, 'ema_slow_descendente', False)) or
         strategy_self.rsi or
         macd_tiene_senal_venta or
-        strategy_self.stoch_fast or
-        strategy_self.stoch_mid or
-        strategy_self.stoch_slow or
+        _stoch_has_sell_signal_enabled(strategy_self, 'stoch_fast') or
+        _stoch_has_sell_signal_enabled(strategy_self, 'stoch_mid') or
+        _stoch_has_sell_signal_enabled(strategy_self, 'stoch_slow') or
         strategy_self.bb_active # 🟢 Añadido BB
     )
 
@@ -617,27 +645,35 @@ def manage_existing_position(strategy_self: 'StrategySelf') -> None:
                 close_position = True
                 descripcion_cierre = desc_macd
 
-        # 4. ESTOCÁSTICOS (Solo si no hay señal anterior - Prioridad: Fast > Mid > Slow)
-        if not close_position:
-            # Fast
-            close_position_stoch_fast, desc_stoch_fast = check_oscillator_sell_signal(strategy_self, 'stoch_fast')
+        # 4. ESTOCÁSTICOS
+        # Prioridad de evaluación: Fast > Mid > Slow.
+        if not close_position and _stoch_has_sell_signal_enabled(strategy_self, 'stoch_fast'):
+            close_position_stoch_fast, desc_stoch_fast = check_oscillator_sell_signal(
+                strategy_self,
+                'stoch_fast',
+            )
             if close_position_stoch_fast:
                 close_position = True
                 descripcion_cierre = desc_stoch_fast
 
-            # Mid
-            elif strategy_self.stoch_mid:
-                close_position_stoch_mid, desc_stoch_mid = check_oscillator_sell_signal(strategy_self, 'stoch_mid')
-                if close_position_stoch_mid:
-                    close_position = True
-                    descripcion_cierre = desc_stoch_mid
-            
-            # Slow
-            elif strategy_self.stoch_slow:
-                close_position_stoch_slow, desc_stoch_slow = check_oscillator_sell_signal(strategy_self, 'stoch_slow')
-                if close_position_stoch_slow:
-                    close_position = True
-                    descripcion_cierre = desc_stoch_slow
+        if not close_position and _stoch_has_sell_signal_enabled(strategy_self, 'stoch_mid'):
+            close_position_stoch_mid, desc_stoch_mid = check_oscillator_sell_signal(
+                strategy_self,
+                'stoch_mid',
+            )
+            if close_position_stoch_mid:
+                close_position = True
+                descripcion_cierre = desc_stoch_mid
+
+        if not close_position and _stoch_has_sell_signal_enabled(strategy_self, 'stoch_slow'):
+            close_position_stoch_slow, desc_stoch_slow = check_oscillator_sell_signal(
+                strategy_self,
+                'stoch_slow',
+            )
+            if close_position_stoch_slow:
+                close_position = True
+                descripcion_cierre = desc_stoch_slow
+
             
         # 🟢 5. BOLLINGER BANDS (BB) (Solo si no hay señal anterior)
         if not close_position:
