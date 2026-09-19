@@ -6,7 +6,9 @@
 
 Definir una secuencia de trabajo corta, verificable y documentada para continuar la evolución de TradingCore después del cierre de la fase de documentación y ayudas contextuales.
 
-La prioridad es reducir deuda funcional antes de añadir nuevas capacidades: primero validar contratos entre UI, configuración y motor; después reforzar tests y operación; por último abordar mejoras de datos, rendimiento o nuevas estrategias.
+Este documento es un **plan vivo**. Debe actualizarse cuando se identifiquen nuevas tareas relevantes, nuevas funcionalidades o cambios de prioridad, de forma que refleje siempre el trabajo pendiente real y el orden acordado.
+
+La prioridad general es reducir deuda funcional y documental antes de añadir nuevas capacidades: primero asegurar que cada tipo de usuario dispone de la documentación adecuada; después validar contratos entre UI, configuración y motor; reforzar tests y operación; y finalmente abordar mejoras de datos, rendimiento o nuevas estrategias.
 
 ## 2. Punto de partida
 
@@ -14,13 +16,95 @@ Estado consolidado al cierre de la fase anterior:
 
 - `main` limpio y actualizado.
 - Ayudas contextuales disponibles en Global, EMA, RSI, MACD, ATR, Estocástico, Bollinger y Volumen/MoS.
-- Documentación de usuario y técnica revisada.
-- Manual operativo actualizado.
+- Documentación técnica revisada.
+- Manual operativo del administrador actualizado.
 - Acceso a documentación filtrado por rol.
 - Validación web superada (`39 passed`) y prueba visual correcta.
-- Último commit documental: `1dc2c44 docs: actualizar ayudas y manual operativo`.
+- Plan de trabajo versionado en `docs/Plans/`.
+- Último commit del plan: `d8ecb13 docs: añadir plan de siguientes pasos`.
 
-## 3. Prioridad 1 - Revisar integración funcional de MACD
+Se ha detectado una nueva necesidad documental: la documentación visible para usuarios normales sigue siendo demasiado técnica y no constituye todavía un manual de usuario completo orientado exclusivamente a la interfaz web.
+
+## 3. Prioridad 1 - Crear un verdadero Manual de Usuario
+
+### Motivo
+
+Los usuarios normales de TradingCore:
+
+- acceden únicamente a la interfaz web;
+- no tienen acceso al código fuente;
+- no arrancan ni detienen la aplicación;
+- no administran PostgreSQL, Git, PowerShell, scheduler, ramas ni despliegues;
+- necesitan instrucciones completas para usar la aplicación desde la UI.
+
+El administrador, en cambio, tiene acceso al código y a la operación del sistema y debe poder consultar toda la documentación técnica y operativa.
+
+### Trabajo
+
+1. Crear `docs/User/MANUAL_USUARIO_TRADINGCORE.md`.
+2. Redactarlo desde el punto de vista exclusivo de un usuario de la web, sin requisitos técnicos de administración.
+3. Incluir, como mínimo:
+   - acceso e inicio de sesión;
+   - recorrido completo por la interfaz;
+   - configuración global;
+   - explicación de EMA, RSI, MACD, ATR, Estocástico, Bollinger, Volumen y MoS;
+   - combinación de indicadores, señales y filtros;
+   - guardado y recuperación de configuraciones;
+   - selección de símbolos;
+   - lanzamiento y seguimiento de un backtest;
+   - interpretación de resultados, operaciones y gráficos;
+   - historial;
+   - notificaciones;
+   - documentación y ayudas contextuales;
+   - problemas frecuentes;
+   - glosario.
+4. Reutilizar como fuente las ayudas contextuales y guías funcionales ya validadas, evitando duplicar explicaciones contradictorias.
+5. Separar claramente la documentación de usuario de la documentación técnica/administrativa.
+
+### Criterio de cierre
+
+Un usuario sin conocimientos de Python, Git, PostgreSQL ni administración de servidores puede utilizar TradingCore únicamente con el manual y la ayuda contextual de la UI.
+
+## 4. Prioridad 2 - Reorganizar el acceso documental por rol
+
+### Objetivo
+
+Alinear la documentación visible con el modelo real de usuarios.
+
+### Modelo objetivo
+
+**Usuario normal:**
+
+- `docs/User/MANUAL_USUARIO_TRADINGCORE.md`;
+- ayuda contextual integrada en la UI;
+- otros documentos funcionales solo si se decide expresamente que aportan valor al usuario final.
+
+**Administrador:**
+
+- acceso completo a `docs/`;
+- README técnico;
+- manual operativo;
+- arquitectura;
+- guías técnicas y funcionales;
+- API;
+- planes;
+- índices;
+- cualquier otra documentación de desarrollo, mantenimiento u operación.
+
+### Trabajo
+
+1. Revisar la allowlist de documentación para usuarios normales en `scenarios/BacktestWeb/file_handler.py`.
+2. Priorizar el nuevo Manual de Usuario como documento principal.
+3. Retirar del acceso normal documentos claramente técnicos, especialmente `QUICK_START_BACKTEST_WEB.md` y `README.md`, salvo decisión posterior en sentido contrario.
+4. Mantener acceso total para `admin`.
+5. Actualizar `docs/Index/00_INDEX_DOCUMENTACION.md`, `docs/README.md` y las convenciones documentales para reflejar esta separación.
+6. Añadir/ajustar tests web de autorización documental por rol.
+
+### Criterio de cierre
+
+El usuario normal solo ve documentación útil para operar la UI y el administrador conserva acceso completo a toda la documentación.
+
+## 5. Prioridad 3 - Revisar integración funcional de MACD
 
 ### Motivo
 
@@ -40,13 +124,13 @@ La lógica interna de `Filtro_MACD.py` trabaja con estados y condiciones que no 
 3. Determinar si las opciones de histograma están implementadas, parcialmente implementadas o solo expuestas en UI.
 4. Corregir únicamente la integración necesaria, sin rediseñar MACD.
 5. Añadir tests unitarios para cada opción de compra y venta.
-6. Actualizar ayuda contextual y guía de indicadores si cambia el comportamiento validado.
+6. Actualizar ayuda contextual y Manual de Usuario si cambia el comportamiento validado.
 
 ### Criterio de cierre
 
 Cada opción MACD visible en UI tiene un comportamiento inequívoco, probado y documentado.
 
-## 4. Prioridad 2 - Auditoría de contratos UI -> configuración -> motor
+## 6. Prioridad 4 - Auditoría de contratos UI -> configuración -> motor
 
 ### Objetivo
 
@@ -86,7 +170,7 @@ Una tabla técnica única con:
 
 No existen controles visibles sin consumidor conocido ni parámetros de motor importantes sin correspondencia clara en configuración.
 
-## 5. Prioridad 3 - Consolidar tests de lógica combinada
+## 7. Prioridad 5 - Consolidar tests de lógica combinada
 
 ### Objetivo
 
@@ -115,7 +199,7 @@ No tratarlo como un disparador de beneficio salvo que el motor se rediseñe expl
 
 Las combinaciones críticas tienen tests de regresión y los resultados esperados no dependen de interpretación manual.
 
-## 6. Prioridad 4 - Endurecer operación de la aplicación web
+## 8. Prioridad 6 - Endurecer operación de la aplicación web
 
 ### Problema observado
 
@@ -133,7 +217,7 @@ Durante la validación se detectó que una instancia antigua de Flask podía seg
 
 El operador puede saber de forma inequívoca qué proceso web está activo y reiniciarlo sin dejar instancias antiguas.
 
-## 7. Prioridad 5 - Revisar datos fundamentales y proveedores
+## 9. Prioridad 7 - Revisar datos fundamentales y proveedores
 
 ### Objetivo
 
@@ -152,7 +236,7 @@ Retomar esta parte solo después de cerrar contratos y tests de indicadores.
 
 El motor solicita métricas normalizadas y la capa de datos decide proveedor, caché y actualización.
 
-## 8. Prioridad 6 - Observabilidad, rendimiento y mantenimiento
+## 10. Prioridad 8 - Observabilidad, rendimiento y mantenimiento
 
 Solo después de estabilizar la lógica funcional:
 
@@ -162,34 +246,62 @@ Solo después de estabilizar la lógica funcional:
 - eliminar código legacy únicamente cuando exista cobertura suficiente;
 - mantener separados scripts de producción, diagnóstico, mantenimiento y experimentación.
 
-## 9. Orden de ejecución recomendado
+## 11. Orden de ejecución recomendado
 
-1. Crear checkpoint del estado actual si se desea una referencia adicional al cierre documental.
-2. Abrir rama específica para revisión MACD.
-3. Resolver y testear MACD.
-4. Ejecutar auditoría UI -> configuración -> motor.
-5. Corregir discrepancias encontradas en commits pequeños e independientes.
-6. Ampliar tests de combinaciones.
-7. Endurecer arranque/parada web.
-8. Revisar datos fundamentales.
-9. Abordar rendimiento, scheduler y limpieza legacy.
+1. Crear el Manual de Usuario completo.
+2. Ajustar el acceso documental por rol.
+3. Actualizar índice, README y convenciones documentales.
+4. Añadir/ajustar tests de acceso documental.
+5. Abrir rama específica para revisión MACD.
+6. Resolver y testear MACD.
+7. Ejecutar auditoría UI -> configuración -> motor.
+8. Corregir discrepancias encontradas en commits pequeños e independientes.
+9. Ampliar tests de combinaciones.
+10. Endurecer arranque/parada web.
+11. Revisar datos fundamentales.
+12. Abordar rendimiento, scheduler y limpieza legacy.
 
-## 10. Forma de trabajo
+## 12. Gestión continua del plan
+
+Este fichero debe mantenerse actualizado durante el desarrollo.
+
+### Regla de mantenimiento
+
+Cada vez que se incorpore una nueva tarea, mejora o funcionalidad relevante:
+
+1. evaluar si modifica prioridades existentes;
+2. añadirla al plan en la sección correspondiente o crear una nueva prioridad;
+3. indicar motivo, alcance, trabajo y criterio de cierre;
+4. actualizar el orden de ejecución si procede;
+5. revisar el impacto en documentación de usuario, documentación técnica, tests y ayudas contextuales;
+6. actualizar la fecha del plan;
+7. versionar el cambio documental en Git.
+
+### Al cerrar una tarea
+
+- marcarla como completada o trasladarla a una sección de hitos cerrados si conviene conservar trazabilidad;
+- registrar el commit o hito relevante;
+- actualizar el siguiente bloque concreto.
+
+El plan no debe convertirse en un histórico exhaustivo de commits. Su función es mostrar el estado actual, las prioridades y el trabajo pendiente.
+
+## 13. Forma de trabajo
 
 Para cada bloque:
 
 1. Analizar primero el comportamiento actual.
 2. Definir alcance exacto antes de modificar código.
-3. Trabajar en rama específica cuando el cambio no sea trivial.
-4. Cambios pequeños y commits temáticos.
-5. Ejecutar tests relevantes antes del commit.
-6. Ejecutar `git diff --check`.
-7. Hacer prueba visual si cambia interfaz o plantillas.
-8. Revisar ayuda contextual y documentación antes de cerrar.
-9. Merge a `main` solo con rama limpia y validada.
-10. No hacer `push` salvo decisión explícita.
+3. Actualizar este plan si aparece una nueva tarea o cambia la prioridad.
+4. Trabajar en rama específica cuando el cambio no sea trivial.
+5. Cambios pequeños y commits temáticos.
+6. Ejecutar tests relevantes antes del commit.
+7. Ejecutar `git diff --check`.
+8. Hacer prueba visual si cambia interfaz o plantillas.
+9. Revisar ayuda contextual y documentación antes de cerrar.
+10. Merge a `main` solo con rama limpia y validada.
+11. No hacer `push` salvo decisión explícita.
 
-## 11. Uso de Copilot
+## 14. Uso de Copilot
 
 Para controlar consumo de cuota:
 
@@ -199,19 +311,20 @@ Para controlar consumo de cuota:
 - realizar directamente cambios pequeños de documentación, textos, tests simples o correcciones mecánicas cuando resulte más eficiente;
 - revisar siempre el diff generado antes de aceptar cambios.
 
-## 12. Definition of Done por bloque
+## 15. Definition of Done por bloque
 
 Antes de cerrar cualquier bloque:
 
 ```text
 [ ] Alcance definido
+[ ] Plan actualizado si aplica
 [ ] Código implementado
 [ ] Tests añadidos o actualizados
 [ ] Tests relevantes superados
 [ ] git diff --check sin errores
 [ ] Prueba visual realizada si aplica
 [ ] Ayuda contextual revisada si aplica
-[ ] Documentación de usuario revisada
+[ ] Manual de Usuario revisado si aplica
 [ ] Documentación técnica revisada
 [ ] Commit temático realizado
 [ ] Rama limpia
@@ -219,8 +332,8 @@ Antes de cerrar cualquier bloque:
 [ ] Tag/checkpoint creado si el hito lo justifica
 ```
 
-## 13. Próximo bloque concreto
+## 16. Próximo bloque concreto
 
-El siguiente trabajo recomendado es **Revisión funcional de MACD**, porque es la discrepancia funcional conocida más clara que quedó explícitamente pendiente durante la fase de documentación.
+El siguiente trabajo recomendado es **crear el Manual de Usuario de TradingCore y reorganizar el acceso documental por rol**.
 
-No conviene iniciar nuevas funcionalidades de indicadores antes de resolver este contrato entre UI y motor.
+La revisión funcional de MACD pasa a ser el siguiente bloque técnico una vez resuelta esta separación documental.
