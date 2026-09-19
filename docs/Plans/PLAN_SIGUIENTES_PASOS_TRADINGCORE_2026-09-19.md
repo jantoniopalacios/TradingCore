@@ -12,20 +12,28 @@ La prioridad general es reducir deuda funcional y documental antes de añadir nu
 
 ## 2. Punto de partida
 
-Estado consolidado al cierre de la fase anterior:
+Estado consolidado a 19/09/2026:
 
-- `main` limpio y actualizado.
+- `main` limpio y actualizado tras cerrar el bloque MACD.
 - Ayudas contextuales disponibles en Global, EMA, RSI, MACD, ATR, Estocástico, Bollinger y Volumen/MoS.
-- Documentación técnica revisada.
-- Manual operativo del administrador actualizado.
-- Acceso a documentación filtrado por rol.
-- Validación web superada (`39 passed`) y prueba visual correcta.
+- Manual de Usuario creado en `docs/User/MANUAL_USUARIO_TRADINGCORE.md`.
+- Acceso documental reorganizado por rol: el usuario normal accede al Manual de Usuario y el administrador conserva acceso completo a `docs/`.
+- Índice, README y convenciones documentales actualizados para reflejar la separación por audiencia.
+- Tests web de autorización documental actualizados y validados (`40 passed`).
+- Revisión funcional de MACD completada:
+  - `macd_buy_logic` y `macd_sell_logic` se consumen directamente en el motor;
+  - `Cruce Up`, `Histograma Buy`, `Cruce Down`, `Histograma Sell` y `None` tienen comportamiento explícito;
+  - `MACD activo + Compra=None` ya no desplaza indebidamente el fallback B&H;
+  - corregido el orden de parámetros `window_slow` / `window_fast` al inicializar MACD con `ta`;
+  - tests unitarios de señales técnicas validados (`32 passed`);
+  - ayuda contextual, Manual de Usuario y guía de combinación de indicadores actualizados.
+- Commit de documentación y acceso por rol: `f9b8dc5 docs: crear manual de usuario y restringir acceso por rol`.
+- Commit de cierre MACD: `6ad2d9e fix: alinear MACD entre interfaz y motor`.
 - Plan de trabajo versionado en `docs/Plans/`.
-- Último commit del plan: `d8ecb13 docs: añadir plan de siguientes pasos`.
 
-Se ha detectado una nueva necesidad documental: la documentación visible para usuarios normales sigue siendo demasiado técnica y no constituye todavía un manual de usuario completo orientado exclusivamente a la interfaz web.
+El siguiente bloque técnico es la **auditoría completa de contratos UI -> configuración -> motor** para detectar discrepancias similares a las corregidas en MACD.
 
-## 3. Prioridad 1 - Crear un verdadero Manual de Usuario
+## 3. Prioridad 1 - Crear un verdadero Manual de Usuario [COMPLETADA]
 
 ### Motivo
 
@@ -65,7 +73,9 @@ El administrador, en cambio, tiene acceso al código y a la operación del siste
 
 Un usuario sin conocimientos de Python, Git, PostgreSQL ni administración de servidores puede utilizar TradingCore únicamente con el manual y la ayuda contextual de la UI.
 
-## 4. Prioridad 2 - Reorganizar el acceso documental por rol
+**Estado:** completada en `f9b8dc5`.
+
+## 4. Prioridad 2 - Reorganizar el acceso documental por rol [COMPLETADA]
 
 ### Objetivo
 
@@ -104,7 +114,9 @@ Alinear la documentación visible con el modelo real de usuarios.
 
 El usuario normal solo ve documentación útil para operar la UI y el administrador conserva acceso completo a toda la documentación.
 
-## 5. Prioridad 3 - Revisar integración funcional de MACD
+**Estado:** completada en `f9b8dc5`; validación web `40 passed` y comprobación visual realizada.
+
+## 5. Prioridad 3 - Revisar integración funcional de MACD [COMPLETADA]
 
 ### Motivo
 
@@ -129,6 +141,8 @@ La lógica interna de `Filtro_MACD.py` trabaja con estados y condiciones que no 
 ### Criterio de cierre
 
 Cada opción MACD visible en UI tiene un comportamiento inequívoco, probado y documentado.
+
+**Estado:** completada en `6ad2d9e`; `32` tests unitarios de señales técnicas y `40` tests web superados.
 
 ## 6. Prioridad 4 - Auditoría de contratos UI -> configuración -> motor
 
@@ -248,13 +262,13 @@ Solo después de estabilizar la lógica funcional:
 
 ## 11. Orden de ejecución recomendado
 
-1. Crear el Manual de Usuario completo.
-2. Ajustar el acceso documental por rol.
-3. Actualizar índice, README y convenciones documentales.
-4. Añadir/ajustar tests de acceso documental.
-5. Abrir rama específica para revisión MACD.
-6. Resolver y testear MACD.
-7. Ejecutar auditoría UI -> configuración -> motor.
+1. [COMPLETADO] Crear el Manual de Usuario completo.
+2. [COMPLETADO] Ajustar el acceso documental por rol.
+3. [COMPLETADO] Actualizar índice, README y convenciones documentales.
+4. [COMPLETADO] Añadir/ajustar tests de acceso documental.
+5. [COMPLETADO] Revisar la integración funcional de MACD.
+6. [COMPLETADO] Resolver y testear MACD.
+7. [SIGUIENTE] Ejecutar auditoría UI -> configuración -> motor.
 8. Corregir discrepancias encontradas en commits pequeños e independientes.
 9. Ampliar tests de combinaciones.
 10. Endurecer arranque/parada web.
@@ -334,6 +348,14 @@ Antes de cerrar cualquier bloque:
 
 ## 16. Próximo bloque concreto
 
-El siguiente trabajo recomendado es **crear el Manual de Usuario de TradingCore y reorganizar el acceso documental por rol**.
+El siguiente trabajo es la **auditoría de contratos UI -> configuración -> motor**.
 
-La revisión funcional de MACD pasa a ser el siguiente bloque técnico una vez resuelta esta separación documental.
+Objetivo inmediato:
+
+1. inventariar los parámetros visibles en Global, EMA, RSI, MACD, ATR, Estocástico, Bollinger y Volumen/MoS;
+2. trazar cada control desde `name`/`id` en HTML hasta persistencia, tipado, `System` y consumidor real en el motor;
+3. registrar para cada parámetro: `UI | clave config | default | tipo | módulo consumidor | efecto | test asociado`;
+4. identificar controles sin consumidor conocido, valores por defecto inconsistentes o parámetros del motor sin correspondencia clara en la UI;
+5. corregir las discrepancias encontradas en commits pequeños y separados, con tests y documentación cuando proceda.
+
+MACD queda como referencia de patrón ya corregido para esta auditoría.
