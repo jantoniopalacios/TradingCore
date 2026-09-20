@@ -237,14 +237,16 @@ Estado a 20/09/2026:
 2. MACD - completado.
 3. Auditoría UI -> configuración -> motor - completada.
 4. Correcciones Stochastic, Bollinger, MoS y Volumen - completadas.
-5. Consolidación documental transversal - bloque actual.
-6. Ampliar tests de lógica combinada.
+5. Consolidación documental transversal - completada en `0c8f5a2`.
+6. [SIGUIENTE] Ampliar tests de lógica combinada.
 7. Revisar pendientes menores de Bollinger y limpieza EMA/RSI.
 8. Endurecer arranque/parada web.
 9. Revisar datos fundamentales y proveedores.
 10. Abordar rendimiento, scheduler y limpieza legacy.
 
 ## 12. Gestión continua del plan
+
+El seguimiento no técnico del efecto de cada cambio sobre las estrategias se mantiene en `docs/Summaries/IMPACTO_FUNCIONAL_EVOLUCION_TRADINGCORE.md`. Ese documento es vivo y debe actualizarse al cerrar cada bloque restante del plan, aunque el bloque no tenga impacto funcional esperado sobre los resultados.
 
 Este fichero debe mantenerse actualizado durante el desarrollo.
 
@@ -258,7 +260,8 @@ Cada vez que se incorpore una nueva tarea, mejora o funcionalidad relevante:
 4. actualizar el orden de ejecución si procede;
 5. revisar el impacto en documentación de usuario, documentación técnica, tests y ayudas contextuales;
 6. actualizar la fecha del plan;
-7. versionar el cambio documental en Git.
+7. actualizar `docs/Summaries/IMPACTO_FUNCIONAL_EVOLUCION_TRADINGCORE.md` con las implicaciones del bloque para una persona no técnica;
+8. versionar el cambio documental en Git.
 
 ### Al cerrar una tarea
 
@@ -309,6 +312,7 @@ Antes de cerrar cualquier bloque:
 [ ] Ayuda contextual revisada si aplica
 [ ] Manual de Usuario revisado si aplica
 [ ] Documentación técnica revisada
+[ ] Documento de impacto funcional actualizado
 [ ] Commit temático realizado
 [ ] Rama limpia
 [ ] Merge a main realizado cuando corresponda
@@ -317,6 +321,6 @@ Antes de cerrar cualquier bloque:
 
 ## 16. Próximo bloque concreto
 
-Tras completar esta consolidación documental, el siguiente bloque recomendado es **ampliar los tests de lógica combinada** entre señales técnicas, filtros globales y Buy & Hold.
+El siguiente bloque recomendado es **ampliar los tests de lógica combinada** entre señales técnicas, filtros globales y Buy & Hold.
 
 Después se revisarán los pendientes menores identificados en Bollinger y la limpieza legacy de EMA/RSI antes de pasar al endurecimiento operativo de la aplicación web.

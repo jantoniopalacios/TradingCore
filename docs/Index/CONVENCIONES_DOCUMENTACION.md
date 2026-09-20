@@ -126,6 +126,7 @@ Todo cambio funcional debe revisar, antes de darse por cerrado, si requiere actu
 [ ] Ayuda contextual añadida si tiene interfaz
 [ ] Manual de usuario actualizado
 [ ] Documentacion admin/tecnica actualizada si procede
+[ ] Documento vivo de impacto funcional actualizado (`docs/Summaries/IMPACTO_FUNCIONAL_EVOLUCION_TRADINGCORE.md`)
 [ ] README actualizado si cambia arquitectura
 [ ] Verificacion funcional realizada
 [ ] Commit realizado
