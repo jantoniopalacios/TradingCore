@@ -1,6 +1,6 @@
 # Plan de siguientes pasos - TradingCore
 
-Última actualización: 19/09/2026
+Última actualización: 20/09/2026
 
 ## 1. Objetivo
 
@@ -116,73 +116,42 @@ El usuario normal solo ve documentación útil para operar la UI y el administra
 
 **Estado:** completada en `f9b8dc5`; validación web `40 passed` y comprobación visual realizada.
 
-## 5. Prioridad 3 - Revisar integración funcional de MACD [COMPLETADA]
+## 5. Prioridad 3 - Integración funcional de MACD [COMPLETADO]
 
-### Motivo
+La correspondencia UI -> configuración -> motor ha quedado validada y corregida.
 
-Es el principal punto funcional pendiente identificado durante la revisión documental.
+Estado cerrado:
 
-La UI utiliza:
+- compra por cruce alcista MACD/Signal;
+- compra por cambio del histograma a positivo;
+- venta por cruce bajista MACD/Signal;
+- venta por cambio del histograma a negativo;
+- `None` desactiva el lado correspondiente;
+- Buy & Hold no queda desplazado por MACD si no existe una lógica de compra utilizable;
+- tests y ayuda contextual actualizados.
 
-- `macd_buy_logic`: `macd_cruce_up`, `macd_histogram_buy`, `None`.
-- `macd_sell_logic`: `macd_cruce_down`, `macd_histogram_sell`, `None`.
+Commit de referencia: `6ad2d9e fix: alinear MACD entre interfaz y motor`.
 
-La lógica interna de `Filtro_MACD.py` trabaja con estados y condiciones que no se han confirmado todavía como una traducción directa y completa de esas opciones de UI.
+## 6. Prioridad 4 - Auditoría de contratos UI -> configuración -> motor [COMPLETADO]
 
-### Trabajo
+La auditoría funcional de Global/Riesgo, EMA, RSI, MACD, ATR, Stochastic, Bollinger, Volumen y MoS se ha ejecutado. Las discrepancias prioritarias se han corregido en commits independientes.
 
-1. Trazar el flujo completo desde formulario web hasta `Filtro_MACD.py`.
-2. Identificar la traducción real de `macd_buy_logic` y `macd_sell_logic`.
-3. Determinar si las opciones de histograma están implementadas, parcialmente implementadas o solo expuestas en UI.
-4. Corregir únicamente la integración necesaria, sin rediseñar MACD.
-5. Añadir tests unitarios para cada opción de compra y venta.
-6. Actualizar ayuda contextual y Manual de Usuario si cambia el comportamiento validado.
+Correcciones cerradas:
 
-### Criterio de cierre
+- persistencia de booleanos (`atr_enabled`, `margen_seguridad_minimo`, `volume_minimo`) y render explícito de `stoploss_swing_enabled` - `b933e2c`;
+- MACD - `6ad2d9e`;
+- Stochastic - `5a79719`;
+- compra Bollinger y gating B&H - `277a831`;
+- MoS mínimo/ascendente y combinación AND - `da92dd7`;
+- Volumen basado en V-SMA y tendencia ascendente real - `8809036`.
 
-Cada opción MACD visible en UI tiene un comportamiento inequívoco, probado y documentado.
+Validación del cierre de Volumen: `49 passed` en `tests/unit/test_technical_signals.py` y `42 passed` en `tests/web/test_routes.py`.
 
-**Estado:** completada en `6ad2d9e`; `32` tests unitarios de señales técnicas y `40` tests web superados.
+Pendientes de limpieza o revisión no bloqueantes que pasan al trabajo posterior:
 
-## 6. Prioridad 4 - Auditoría de contratos UI -> configuración -> motor
-
-### Objetivo
-
-Evitar discrepancias similares a la detectada en MACD.
-
-### Alcance
-
-Revisar los parámetros visibles de:
-
-- Global y gestión de riesgo.
-- EMA.
-- RSI.
-- MACD.
-- ATR.
-- Stochastic FAST/MID/SLOW.
-- Bollinger Bands.
-- Volumen y MoS.
-
-Para cada parámetro verificar:
-
-1. Nombre HTML (`name` / `id`).
-2. Lectura y normalización en backend.
-3. Valor por defecto.
-4. Tipo real (`bool`, `str`, `float`, `int`).
-5. Propagación a la estrategia.
-6. Uso efectivo por el motor.
-7. Persistencia y recuperación de configuraciones.
-8. Correspondencia con ayuda y documentación.
-
-### Entregable sugerido
-
-Una tabla técnica única con:
-
-`UI | clave config | default | tipo | módulo consumidor | efecto | test asociado`.
-
-### Criterio de cierre
-
-No existen controles visibles sin consumidor conocido ni parámetros de motor importantes sin correspondencia clara en configuración.
+- Bollinger: revisar si la UI debe exponer/documentar explícitamente la condición de salida sobre la SMA central y el uso de `bb_window_state`;
+- EMA/RSI: limpiar nombres/comentarios legacy cuando exista un bloque específico;
+- ampliar tests de interacción entre múltiples indicadores y filtros.
 
 ## 7. Prioridad 5 - Consolidar tests de lógica combinada
 
@@ -262,18 +231,18 @@ Solo después de estabilizar la lógica funcional:
 
 ## 11. Orden de ejecución recomendado
 
-1. [COMPLETADO] Crear el Manual de Usuario completo.
-2. [COMPLETADO] Ajustar el acceso documental por rol.
-3. [COMPLETADO] Actualizar índice, README y convenciones documentales.
-4. [COMPLETADO] Añadir/ajustar tests de acceso documental.
-5. [COMPLETADO] Revisar la integración funcional de MACD.
-6. [COMPLETADO] Resolver y testear MACD.
-7. [SIGUIENTE] Ejecutar auditoría UI -> configuración -> motor.
-8. Corregir discrepancias encontradas en commits pequeños e independientes.
-9. Ampliar tests de combinaciones.
-10. Endurecer arranque/parada web.
-11. Revisar datos fundamentales.
-12. Abordar rendimiento, scheduler y limpieza legacy.
+Estado a 20/09/2026:
+
+1. Manual de Usuario y acceso documental por rol - completado.
+2. MACD - completado.
+3. Auditoría UI -> configuración -> motor - completada.
+4. Correcciones Stochastic, Bollinger, MoS y Volumen - completadas.
+5. Consolidación documental transversal - bloque actual.
+6. Ampliar tests de lógica combinada.
+7. Revisar pendientes menores de Bollinger y limpieza EMA/RSI.
+8. Endurecer arranque/parada web.
+9. Revisar datos fundamentales y proveedores.
+10. Abordar rendimiento, scheduler y limpieza legacy.
 
 ## 12. Gestión continua del plan
 
@@ -348,14 +317,6 @@ Antes de cerrar cualquier bloque:
 
 ## 16. Próximo bloque concreto
 
-El siguiente trabajo es la **auditoría de contratos UI -> configuración -> motor**.
+Tras completar esta consolidación documental, el siguiente bloque recomendado es **ampliar los tests de lógica combinada** entre señales técnicas, filtros globales y Buy & Hold.
 
-Objetivo inmediato:
-
-1. inventariar los parámetros visibles en Global, EMA, RSI, MACD, ATR, Estocástico, Bollinger y Volumen/MoS;
-2. trazar cada control desde `name`/`id` en HTML hasta persistencia, tipado, `System` y consumidor real en el motor;
-3. registrar para cada parámetro: `UI | clave config | default | tipo | módulo consumidor | efecto | test asociado`;
-4. identificar controles sin consumidor conocido, valores por defecto inconsistentes o parámetros del motor sin correspondencia clara en la UI;
-5. corregir las discrepancias encontradas en commits pequeños y separados, con tests y documentación cuando proceda.
-
-MACD queda como referencia de patrón ya corregido para esta auditoría.
+Después se revisarán los pendientes menores identificados en Bollinger y la limpieza legacy de EMA/RSI antes de pasar al endurecimiento operativo de la aplicación web.

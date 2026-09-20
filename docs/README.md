@@ -315,10 +315,11 @@ docs/
 
 El acceso a `docs/` desde el explorador web está filtrado por rol:
 
-- **Usuario normal:** solo puede ver y abrir `docs/User/MANUAL_USUARIO_TRADINGCORE.md`.
-- **Admin:** puede ver y abrir todo `docs/` sin restricciones.
-- La autorización se valida también en backend; no depende únicamente de que el árbol oculte elementos en la interfaz.
-- Cualquier ampliación futura de documentación visible para usuarios normales debe añadirse expresamente a `DOCS_ALLOWED_FOR_USER` y quedar cubierta por tests.
+- **Usuario normal:** solo puede ver `docs/User/MANUAL_USUARIO_TRADINGCORE.md` y las ayudas contextuales integradas en la interfaz.
+- **Admin:** puede ver y abrir toda la documentación válida situada bajo `docs/`.
+- La autorización se valida en backend mediante `scenarios/BacktestWeb/file_handler.py`; no depende únicamente de ocultar elementos en la interfaz.
+
+La auditoría de contratos UI -> configuración -> motor de los indicadores principales se completó el 20/09/2026. MACD, Stochastic, compra Bollinger, MoS y Volumen disponen de correcciones y tests de regresión específicos.
 
 ### Ayuda contextual en configuración
 

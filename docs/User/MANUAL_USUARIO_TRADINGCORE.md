@@ -1,6 +1,6 @@
 # Manual de Usuario de TradingCore
 
-**Última actualización:** 19/09/2026
+**Última actualización:** 20/09/2026
 **Audiencia:** usuarios de la interfaz web de TradingCore
 **Alcance:** uso funcional de la aplicación. No incluye instalación, arranque/parada del servidor, Git, PowerShell, PostgreSQL, código fuente ni tareas de administración.
 
@@ -234,55 +234,55 @@ Puede ser útil para evitar operaciones en periodos excesivamente planos o exces
 
 ## 13. Estocástico
 
-El oscilador **Estocástico** compara el cierre actual con el rango reciente del precio. TradingCore admite distintas variantes configurables, como rápida, media y lenta.
+El oscilador **Estocástico** compara el cierre actual con el rango reciente del precio. TradingCore permite configurar tres variantes independientes: **Fast**, **Mid** y **Slow**.
 
-Los parámetros habituales incluyen:
+Para cada variante puede seleccionarse una única lógica de compra y una única lógica de venta:
 
-- periodo;
-- suavizado;
-- nivel bajo;
-- nivel alto;
-- condiciones de mínimo / ascenso para compra;
-- condiciones de máximo / descenso para venta.
+- **Compra - Mínimo**: exige que el estado de esa variante esté en mínimo.
+- **Compra - Ascendente**: exige que el estado esté ascendiendo.
+- **Compra - Ninguna**: esa variante no genera señal de compra.
+- **Venta - Máximo**: genera salida cuando el estado está en máximo.
+- **Venta - Descendente**: genera salida cuando el estado está descendiendo.
+- **Venta - Ninguna**: esa variante no genera señal de venta.
 
-Puede utilizarse para identificar zonas de sobreventa, sobrecompra y posibles cambios de dirección.
-
----
+La opción **Ninguna** desactiva la señal de ese lado; no debe interpretarse como una condición que se cumple automáticamente. Las variantes Fast, Mid y Slow se evalúan de forma independiente según su configuración.
 
 ## 14. Bandas de Bollinger
 
-Las **Bandas de Bollinger** crean una envolvente alrededor de una media móvil a partir de la volatilidad del precio.
+Las **Bandas de Bollinger** crean una envolvente alrededor de una media móvil central utilizando la volatilidad del precio.
 
-TradingCore puede utilizar las bandas para identificar situaciones cercanas a la banda inferior o superior.
+En la lógica de compra validada actualmente, Bollinger solo aporta una señal técnica cuando está activo **y** `bb_buy_crossover` está habilitado. La señal se produce cuando el precio cruza al alza la banda inferior, confirmando una reversión desde esa zona.
 
-La lógica de compra puede trabajar, según la opción seleccionada, con:
+Si `bb_buy_crossover` está desactivado, Bollinger no genera una compra por simple toque o permanencia bajo la banda inferior y no desplaza por sí solo la vía de respaldo Buy & Hold.
 
-- **toque / permanencia fuera de banda**;
-- **cruce de vuelta hacia el interior de la banda**.
-
-La segunda alternativa exige una confirmación adicional de reversión respecto a un simple toque.
-
----
+La lógica de salida puede utilizar el cruce bajista de la banda superior y mantiene además una condición interna relacionada con la media central. La ayuda contextual de la pestaña Bollinger debe utilizarse como referencia operativa para las opciones visibles.
 
 ## 15. Volumen
 
-El filtro de **Volumen** evalúa si la actividad del mercado confirma una posible entrada.
+El filtro de **Volumen** confirma que una posible entrada tenga suficiente participación del mercado. En la implementación actual utiliza como referencia una **SMA de volumen (V-SMA)**.
 
-Puede utilizar referencias como una media móvil de volumen y condiciones de exceso o persistencia de actividad.
+La condición base exige que el volumen actual sea superior a:
 
-En la lógica actual actúa como filtro: una señal técnica favorable puede quedar bloqueada si la condición de volumen exigida no se cumple.
+`V-SMA × volume_avg_multiplier`
 
----
+Además pueden activarse estados adicionales. `volume_minimo` exige que la V-SMA esté en mínimo dentro de la ventana configurada y `volume_ascendente` exige que la V-SMA esté realmente en tendencia ascendente.
+
+El antiguo contador interno de veces que el volumen superaba su media ya no define el estado "ascendente". Si se seleccionan varios estados de volumen, basta con que se cumpla uno de los estados seleccionados, además de cumplirse siempre el umbral de nivel.
+
+Volumen actúa como filtro de entrada: no crea por sí solo una compra si no existe antes una señal técnica válida.
 
 ## 16. Margen de Seguridad (MoS)
 
-El **Margen de Seguridad (MoS)** es un filtro fundamental opcional. Su objetivo es exigir que exista suficiente margen entre el precio del activo y una estimación de su valor intrínseco.
+El **Margen de Seguridad (MoS)** es un filtro fundamental opcional. Cuando está activo exige que el valor de MoS supere `margen_seguridad_threshold`.
 
-Cuando está activo, puede restringir las compras aunque los indicadores técnicos sean favorables.
+Pueden añadirse dos confirmaciones:
 
-Su uso depende de que existan los datos fundamentales necesarios para el activo y periodo analizado.
+- **`margen_seguridad_minimo`**: exige que el MoS esté en estado mínimo.
+- **`margen_seguridad_ascendente`**: exige que el MoS esté ascendiendo.
 
----
+Las confirmaciones activadas se combinan con lógica **AND**: si se activan mínimo y ascendente, ambas deben cumplirse además del umbral. Si faltan los datos necesarios de MoS, el filtro activo bloquea la entrada.
+
+MoS no genera una señal técnica independiente; autoriza o bloquea una entrada propuesta por la lógica técnica. Es distinto del filtrado fundamental previo del universo de símbolos.
 
 ## 17. Cómo se combinan los indicadores
 

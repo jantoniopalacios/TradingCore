@@ -1,25 +1,36 @@
 # Guia de combinacion de indicadores
 
-Ultima actualizacion: 19/09/2026
+Ultima actualizacion: 20/09/2026
 
 ## Objetivo
-Definir combinaciones de indicadores que reduzcan falsos positivos y mejoren la calidad de entrada en backtest.
+Definir como se combinan las senales tecnicas y los filtros de entrada con el comportamiento validado actualmente en TradingCore.
 
-## Problema tipico
-Usar un unico indicador (por ejemplo, solo cruce EMA) puede producir sobre-trading en mercados laterales.
+## Regla general
+Las senales tecnicas de compra se combinan por logica OR. Despues, los filtros globales activos deben autorizar la entrada mediante logica AND. Un filtro inactivo no bloquea la compra.
 
 ## Combinaciones recomendadas
-- `EMA + RSI`: confirmacion de tendencia y momentum.
-- `EMA + MACD`: confirmacion de tendencia con sesgo mas fuerte. MACD consume directamente `macd_buy_logic` (`macd_cruce_up`, `macd_histogram_buy`, `None`) y `macd_sell_logic` (`macd_cruce_down`, `macd_histogram_sell`, `None`). Las opciones de histograma disparan al cruzar el nivel cero y `None` desactiva la señal MACD de ese lado.
-- `EMA + RSI + ATR`: añade control de volatilidad para filtrar extremos.
 
-## Regla base sugerida
-Entrada si se cumple:
-1. señal tecnica principal (EMA/RSI/MACD, logica OR).
-2. filtros globales activos (logica AND): tendencia, momentum, volatilidad, volumen, MoS. Cada filtro solo interviene en la decision si esta activado explicitamente en la configuracion; un filtro inactivo no bloquea ni condiciona la entrada.
+Estas combinaciones son puntos de partida para backtest, no reglas universales:
+
+- `EMA + RSI`: tendencia y momentum.
+- `EMA + MACD`: tendencia y confirmacion de impulso.
+- `EMA + RSI + ATR`: senal tecnica con control adicional de volatilidad.
+- Cualquiera de las anteriores puede endurecerse con Volumen y/o MoS como filtros de entrada.
+
+## Contratos validados
+
+- `MACD`: `macd_cruce_up` cruza MACD sobre Signal; `macd_histogram_buy` cruza histograma de no positivo a positivo. En venta, `macd_cruce_down` y `macd_histogram_sell` aplican los cruces inversos. `None` desactiva ese lado.
+- `Stochastic`: cada familia Fast/Mid/Slow consume directamente su opcion de compra (`minimo`, `ascendente`, `None`) y venta (`maximo`, `descendente`, `None`). `None` no genera senal.
+- `Bollinger`: la compra solo existe cuando `bb_active` y `bb_buy_crossover` estan activos y se produce un cruce alcista de la banda inferior. Desactivar el crossover no equivale a una compra por toque.
+- `ATR`: filtro AND de volatilidad dentro del rango configurado.
+- `MoS`: exige superar el umbral y, si se activan, cumplir `margen_seguridad_minimo` y/o `margen_seguridad_ascendente`; las confirmaciones activas son AND.
+- `Volumen`: usa una SMA de volumen. El volumen actual debe superar `V-SMA * volume_avg_multiplier`. `volume_minimo` y `volume_ascendente` son estados de la V-SMA; los estados seleccionados se combinan por OR entre ellos, manteniendose el umbral de nivel como condicion obligatoria.
+
+## Buy & Hold de respaldo
+La via B&H solo debe considerarse desplazada por una condicion tecnica de compra realmente utilizable. Tener un indicador activo sin una logica de compra seleccionada no debe bastar por si solo para anular el respaldo.
 
 ## Filtro ATR por perfil de activo
-El ATR debe calibrarse por tipo de volatilidad. Los siguientes rangos son orientativos, no valores canonicos del motor.
+Los siguientes rangos son orientativos y no valores canonicos del motor.
 
 | Perfil | ATR Min | ATR Max | Ejemplos |
 | :--- | ---: | ---: | :--- |
@@ -29,14 +40,16 @@ El ATR debe calibrarse por tipo de volatilidad. Los siguientes rangos son orient
 | Especulativo | 3.0 | 15.0 | BTC, MEME |
 
 ## Flujo operativo recomendado
-1. Ejecutar baseline sin ATR.
-2. Probar ATR amplio (`0.1-20.0`) para validar logica.
-3. Ajustar ATR por activo.
+1. Definir primero las vias tecnicas de entrada.
+2. Activar filtros globales de uno en uno.
+3. Verificar que cada filtro reduce o conserva operaciones por el motivo esperado.
 4. Comparar `Return`, `Win Rate`, `Max Drawdown` y `Total Trades`.
-
-Para un caso concreto de calibracion sobre un activo especifico, ver la guia tecnica [GUIDE_TEST_NKE.md](./GUIDE_TEST_NKE.md).
+5. Guardar la configuracion validada antes de recargar o cerrar la sesion.
 
 ## Referencias
-- [Guía de prueba NKE](./GUIDE_TEST_NKE.md)
-- [Quick Start Web](./QUICK_START_BACKTEST_WEB.md)
-- [Guia de Stops y Proteccion](./GUIA_STOPS_Y_PROTECCION.md)
+
+- Manual de usuario: `docs/User/MANUAL_USUARIO_TRADINGCORE.md`
+- Guia de prueba NKE: `docs/Guides/GUIDE_TEST_NKE.md`
+- Quick Start Web: `docs/Guides/QUICK_START_BACKTEST_WEB.md`
+- Guia de stops: `docs/Guides/GUIA_STOPS_Y_PROTECCION.md`
+- Referencia tecnica: `docs/api/motor_indicators.md`

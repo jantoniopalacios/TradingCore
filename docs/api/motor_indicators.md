@@ -1,10 +1,10 @@
 # Referencia API: Indicadores Tecnicos
 
-Ultima actualizacion: 17/09/2026
+Ultima actualizacion: 20/09/2026
 
-Este documento resume la implementacion y la logica de filtrado especifica de los indicadores tecnicos. La combinacion funcional de senales y filtros se describe en `docs/ARCHITECTURE.md`.
+Este documento resume la implementacion y los contratos funcionales validados de los indicadores. La combinacion general de senales y filtros se describe en `docs/ARCHITECTURE.md` y `docs/Guides/GUIA_COMBINACION_INDICADORES.md`.
 
-## Filtro EMA (Exponential Moving Average)
+## Filtro EMA
 
 ::: trading_engine.indicators.Filtro_EMA
     options:
@@ -14,9 +14,7 @@ Este documento resume la implementacion y la logica de filtrado especifica de lo
         - apply_ema_global_filter
         - check_ema_sell_signal
 
-EMA puede participar tanto como senal tecnica como filtro global, segun la configuracion activa.
-
-## Filtro RSI (Relative Strength Index)
+## Filtro RSI
 
 ::: trading_engine.indicators.Filtro_RSI
     options:
@@ -25,9 +23,9 @@ EMA puede participar tanto como senal tecnica como filtro global, segun la confi
         - check_rsi_buy_signal
         - check_rsi_sell_signal
 
-RSI puede aportar senales tecnicas y tambien intervenir como filtro global de fuerza cuando esa condicion esta configurada. El valor por defecto actual de `rsi_strength_threshold` es `50`.
+`rsi_strength_threshold` actua como filtro global cuando corresponde.
 
-## Filtro MACD (Moving Average Convergence Divergence)
+## Filtro MACD
 
 ::: trading_engine.indicators.Filtro_MACD
     options:
@@ -36,11 +34,15 @@ RSI puede aportar senales tecnicas y tambien intervenir como filtro global de fu
         - check_macd_buy_signal
         - check_macd_sell_signal
 
-La interfaz usa `macd_buy_logic` y `macd_sell_logic` para seleccionar la logica de compra y venta. Las opciones basadas en histograma estan pendientes de revision funcional respecto a su integracion con la logica interna; no debe asumirse comportamiento no validado para esas opciones.
+Contrato UI -> motor validado:
 
-## Filtro Stochastic (Fast, Mid, Slow)
+- compra `macd_cruce_up`: cruce alcista MACD/Signal;
+- compra `macd_histogram_buy`: histograma de no positivo a positivo;
+- venta `macd_cruce_down`: cruce bajista MACD/Signal;
+- venta `macd_histogram_sell`: histograma de no negativo a negativo;
+- `None`: desactiva la senal de ese lado.
 
-Este modulo contiene funciones genericas aplicables a las distintas variantes del oscilador estocastico (rapido, medio y lento). Se utilizan prefijos dinamicos, por ejemplo `stoch_fast`, para manejar sus estados y configuraciones.
+## Filtro Stochastic
 
 ::: trading_engine.indicators.Filtro_Stochastic
     options:
@@ -50,9 +52,9 @@ Este modulo contiene funciones genericas aplicables a las distintas variantes de
         - check_oscillator_buy_signal
         - check_oscillator_sell_signal
 
-## Filtro Margen de Seguridad (MoS)
+Fast, Mid y Slow consumen directamente sus opciones de compra (`minimo`, `ascendente`, `None`) y venta (`maximo`, `descendente`, `None`). `None` no habilita una senal base.
 
-MoS es un filtro fundamental opcional que puede condicionar la entrada cuando esta activado.
+## Filtro Margen de Seguridad (MoS)
 
 ::: trading_engine.indicators.Filtro_MoS
     options:
@@ -60,28 +62,29 @@ MoS es un filtro fundamental opcional que puede condicionar la entrada cuando es
         - update_mos_state
         - apply_mos_filter
 
-## Filtro de Volumen
+Cuando esta activo, exige superar `margen_seguridad_threshold`. Las confirmaciones `margen_seguridad_minimo` y `margen_seguridad_ascendente` son opcionales y se combinan mediante AND cuando se activan.
 
-El filtro de volumen actua como condicion global de entrada cuando esta activado.
+## Filtro de Volumen
 
 ::: trading_engine.indicators.Filtro_Volume
     options:
       members:
+        - calculate_volume_ma
         - update_volume_state
         - apply_volume_filter
 
-## Filtro de Volatilidad ATR
+La referencia es una SMA de volumen (V-SMA). `volume_ascendente_STATE` representa la tendencia real de esa V-SMA; ya no se deriva de un contador interno de overshoots. El filtro exige nivel (`volumen > V-SMA * multiplicador`) y, si hay estados seleccionados, al menos uno de esos estados.
 
-ATR filtra entradas segun el rango de volatilidad configurado mediante sus limites minimo y maximo cuando el filtro esta activo.
+## Filtro ATR
 
 ::: trading_engine.indicators.Filtro_ATR
     options:
       members:
         - apply_atr_range_filter
 
-## Filtro de Bandas de Bollinger (BB)
+ATR actua como filtro de entrada dentro del rango minimo/maximo configurado.
 
-Bollinger Bands puede aportar senales tecnicas de compra y venta. El parametro `bb_buy_crossover` permite distinguir entre la logica configurada de toque y la de cruce.
+## Filtro de Bandas de Bollinger
 
 ::: trading_engine.indicators.Filtro_BollingerBands
     options:
@@ -91,7 +94,12 @@ Bollinger Bands puede aportar senales tecnicas de compra y venta. El parametro `
         - check_bb_buy_signal
         - check_bb_sell_signal
 
+La compra Bollinger solo se considera cuando `bb_active` y `bb_buy_crossover` estan activos. En ese caso se exige un cruce alcista del precio sobre la banda inferior. Desactivar `bb_buy_crossover` no habilita una compra alternativa por toque o permanencia fuera de banda.
+
+La salida mantiene la logica implementada de cruce bajista de la banda superior y una condicion interna adicional sobre la media central. La correspondencia de esta segunda condicion con la UI de venta queda como pendiente menor de revision, junto con el uso de `bb_window_state`.
+
 ## Referencias
 
 - Arquitectura canonica: `docs/ARCHITECTURE.md`
+- Manual de usuario: `docs/User/MANUAL_USUARIO_TRADINGCORE.md`
 - Guia de combinacion: `docs/Guides/GUIA_COMBINACION_INDICADORES.md`

@@ -104,14 +104,13 @@ Cuando un archivo sea historico (snapshot, plan viejo, resumen cerrado), incluir
 
 ## 8. Clasificacion por audiencia
 
-Cada documento debe poder identificarse como uno de estos dos tipos:
+Cada documento debe identificarse como uno de estos dos tipos:
 
-- **Usuario**: documentacion destinada a una persona que utiliza exclusivamente la interfaz web. El documento principal es `docs/User/MANUAL_USUARIO_TRADINGCORE.md`. No debe exigir conocimientos de Python, Git, PowerShell, PostgreSQL, codigo fuente, procesos ni administracion del servidor.
-- **Admin / tecnica**: documentacion de arquitectura, operacion, desarrollo, API, guias tecnicas o funcionales de referencia, planificacion y meta-documentacion. El administrador puede consultar todo `docs/`.
-
-El usuario normal solo tiene acceso desde el explorador web al Manual de Usuario y a los documentos que se incorporen expresamente a `DOCS_ALLOWED_FOR_USER`.
+- **Usuario**: documentacion funcional orientada exclusivamente a operar la interfaz web. En el modelo actual, el documento principal visible al usuario normal es `docs/User/MANUAL_USUARIO_TRADINGCORE.md`, complementado por las ayudas contextuales de la UI.
+- **Admin / tecnica**: README tecnico, arquitectura, API, guias tecnicas, planes, resumenes, diagnosticos, manual operativo y meta-documentacion. Es visible solo para administradores desde el explorador web.
 
 Esta clasificacion debe mantenerse alineada con:
+
 - `scenarios/BacktestWeb/file_handler.py` (`DOCS_ALLOWED_FOR_USER` e `is_docs_path_allowed`);
 - `docs/Index/00_INDEX_DOCUMENTACION.md`;
 - los tests de autorizacion documental por rol.
