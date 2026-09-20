@@ -275,13 +275,27 @@ Esta sección se actualizará al cerrar cada uno de los bloques restantes del pl
 
 **Impacto funcional sobre resultados:** ninguno adicional. El cambio consolida y explica modificaciones funcionales ya realizadas.
 
-### Siguiente bloque - Tests de lógica combinada
+### Tests de lógica combinada
 
-**Estado:** pendiente.
+**Estado:** completado.
 
-Objetivo: comprobar cómo interactúan varias señales y filtros cuando están activos simultáneamente.
+Se ha ampliado la cobertura automática para comprobar cómo interactúan entre sí las señales técnicas, los filtros globales, el modo Buy & Hold y la gestión de stops.
 
-Posible implicación para resultados: los tests por sí mismos no deberían modificar resultados. Sin embargo, pueden descubrir combinaciones en las que la aplicación actual no se comporte como se espera. Si aparece una corrección funcional derivada de esos tests, se añadirá aquí explicando qué configuraciones históricas deben revalidarse.
+Las pruebas confirman, entre otros casos, que:
+
+- las señales técnicas de compra se combinan mediante lógica OR;
+- los filtros globales pueden bloquear una señal de compra válida;
+- Buy & Hold solo actúa cuando no hay una vía técnica de compra habilitada;
+- RSI global puede bloquear también una entrada Buy & Hold;
+- ATR, Volumen y Margen de Seguridad actúan como filtros excluyentes;
+- las señales técnicas de venta se combinan mediante OR;
+- trailing, break-even y swing conservan el stop más protector y el stop no retrocede.
+
+**Impacto sobre resultados históricos:** ninguno esperado por este bloque.
+
+No se ha modificado la lógica de trading ni los parámetros utilizados por las estrategias. Este trabajo añade pruebas de regresión para fijar el comportamiento ya existente y detectar cambios accidentales en el futuro.
+
+Por tanto, este bloque no obliga por sí mismo a repetir backtests anteriores.
 
 ### Pendiente posterior - Bollinger y limpieza EMA/RSI
 

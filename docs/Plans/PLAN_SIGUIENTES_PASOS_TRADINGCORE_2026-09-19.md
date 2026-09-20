@@ -238,8 +238,8 @@ Estado a 20/09/2026:
 3. Auditoría UI -> configuración -> motor - completada.
 4. Correcciones Stochastic, Bollinger, MoS y Volumen - completadas.
 5. Consolidación documental transversal - completada en `0c8f5a2`.
-6. [SIGUIENTE] Ampliar tests de lógica combinada.
-7. Revisar pendientes menores de Bollinger y limpieza EMA/RSI.
+6. Ampliar tests de lógica combinada - completado.
+7. [SIGUIENTE] Revisar pendientes menores de Bollinger y limpieza EMA/RSI.
 8. Endurecer arranque/parada web.
 9. Revisar datos fundamentales y proveedores.
 10. Abordar rendimiento, scheduler y limpieza legacy.
@@ -321,6 +321,6 @@ Antes de cerrar cualquier bloque:
 
 ## 16. Próximo bloque concreto
 
-El siguiente bloque recomendado es **ampliar los tests de lógica combinada** entre señales técnicas, filtros globales y Buy & Hold.
+El siguiente bloque recomendado es **revisar los pendientes menores de Bollinger y realizar la limpieza legacy de EMA/RSI**.
 
-Después se revisarán los pendientes menores identificados en Bollinger y la limpieza legacy de EMA/RSI antes de pasar al endurecimiento operativo de la aplicación web.
+Después se pasará al endurecimiento operativo del arranque y parada de la aplicación web.
