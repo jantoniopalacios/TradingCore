@@ -600,3 +600,69 @@ def test_mos_filter_active_without_data_blocks_entry():
     )
 
     assert Filtro_MoS.apply_mos_filter(strategy) == (False, "MOS Faltan Datos")
+
+def test_volume_ma_uses_simple_moving_average():
+    result = Filtro_Volume.calculate_volume_ma(pd.Series([1.0, 2.0, 3.0, 4.0]), 3)
+
+    assert np.isnan(result.iloc[0])
+    assert np.isnan(result.iloc[1])
+    assert result.iloc[2] == 2.0
+    assert result.iloc[3] == 3.0
+
+
+def test_volume_state_ascending_uses_vma_trend_not_overshoot_count():
+    strategy = SimpleNamespace(
+        volume_active=True,
+        volume_period=3,
+        volume_series=np.array([100.0, 101.0, 102.0, 103.0]),
+        volume_avg_multiplier=1.0,
+        data=SimpleNamespace(Volume=np.array([10.0, 10.0, 10.0, 200.0])),
+        volume_umbral_s=np.array([np.nan, np.nan, np.nan, np.nan]),
+    )
+
+    def fake_state(_series):
+        return {"ascendente": True, "descendente": False}
+
+    Filtro_Volume.update_volume_state(strategy, fake_state)
+
+    assert strategy.volume_ascendente_STATE is True
+    assert strategy.volume_descendente_STATE is False
+    assert strategy.volume_minimo_STATE is False
+    assert strategy.volume_maximo_STATE is True
+
+
+def test_volume_filter_requires_selected_ascending_state():
+    strategy = SimpleNamespace(
+        volume_active=True,
+        volume_series=np.array([100.0]),
+        data=SimpleNamespace(Volume=np.array([150.0])),
+        volume_avg_multiplier=1.2,
+        volume_minimo=False,
+        volume_maximo=False,
+        volume_ascendente=True,
+        volume_ascendente_STATE=False,
+        volume_descendente=False,
+    )
+
+    assert Filtro_Volume.apply_volume_filter(strategy) == (
+        False,
+        "Volumen No Cumple Estado",
+    )
+
+    strategy.volume_ascendente_STATE = True
+    assert Filtro_Volume.apply_volume_filter(strategy) == (True, "Volumen Ok (x1.5)")
+
+
+def test_volume_filter_accepts_pandas_series_last_value():
+    strategy = SimpleNamespace(
+        volume_active=True,
+        volume_series=pd.Series([100.0]),
+        data=SimpleNamespace(Volume=pd.Series([150.0])),
+        volume_avg_multiplier=1.2,
+        volume_minimo=False,
+        volume_maximo=False,
+        volume_ascendente=False,
+        volume_descendente=False,
+    )
+
+    assert Filtro_Volume.apply_volume_filter(strategy) == (True, "Volumen Ok (x1.5)")

@@ -1,177 +1,111 @@
-import pandas as pd
 import numpy as np
-import ta.trend 
-from typing import Callable, Tuple, Optional, Any
+import pandas as pd
+import ta.trend
+from typing import Any, Callable, Optional, Tuple
 
-# ----------------------------------------------------------------------
-# --- CÁLCULO DE MEDIA MÓVIL (Utilizado en System.init()) ---
-# ----------------------------------------------------------------------
+
 def calculate_volume_ma(volume_series: pd.Series, period: int) -> pd.Series:
-    """
-    Calcula la Media Móvil Simple (SMA) para la serie de volumen.
-
-    Esta función es utilizada durante la inicialización de la estrategia para
-    crear la serie base de Volumen de Media Móvil (V-MA).
-
-    Parameters
-    ----------
-    volume_series : pd.Series
-        Serie de datos de volumen histórico (Volume).
-    period : int
-        Período (ventana) de la Media Móvil a calcular (ej. 20).
-
-    Returns
-    -------
-    pd.Series
-        Serie de la Media Móvil de Volumen (V-MA).
-    """
+    """Calcula la media móvil simple (SMA) del volumen."""
     return ta.trend.sma_indicator(volume_series, window=period)
 
-# ----------------------------------------------------------------------
-# --- Actualización de Estado (CORREGIDO) ---
-# ----------------------------------------------------------------------
+
+def _last_value(values):
+    """Devuelve el último valor de forma compatible con pandas, numpy y backtesting."""
+    if values is None:
+        return None
+    try:
+        return values.iloc[-1]
+    except AttributeError:
+        return values[-1]
+
+
 def update_volume_state(strategy_self: Any, verificar_estado_indicador_func: Callable):
     """
-    Actualiza el estado dinámico (STATE) del Volumen.
+    Actualiza los estados dinámicos de la SMA de volumen.
 
-    Esta función establece estados de mínimo/máximo en la ventana configurada y, 
-    de forma personalizada, define el estado **ascendente** basado en el **Umbral de Overshoot**.
-    
-    El estado ``volume_ascendente_STATE`` se convierte en un indicador de "fuerza"
-    basado en la cantidad de veces que el volumen real ha superado a la V-MA en la ventana de período.
-
-    Parameters
-    ----------
-    strategy_self : strategy_system.System
-        Instancia de la estrategia (clase Logica_Trading).
-    verificar_estado_indicador_func : Callable
-        Función auxiliar para calcular el estado dinámico (usada aquí solo para tendencia básica).
-
-    Returns
-    -------
-    None
+    Los estados ascendente/descendente representan la tendencia real de la
+    V-SMA. Mínimo/máximo se calculan sobre la ventana ``volume_period``.
     """
-    # Verificamos que el indicador exista y tenga datos suficientes
-    if (strategy_self.volume_active and 
-        hasattr(strategy_self, 'volume_series') and 
-        strategy_self.volume_series is not None and 
-        len(strategy_self.volume_series) > strategy_self.volume_period):
-            
-        # 1. Llamada Genérica (Solo para Ascendente/Descendente básico, ignorando Min/Max)
-        estado_volume = verificar_estado_indicador_func(strategy_self.volume_series)
-        
-        # Asignamos estados de tendencia básicos (pendiente de la VMA)
-        strategy_self.volume_descendente_STATE = estado_volume['descendente']
-        # 'ascendente' se sobrescribe con la lógica del Umbral/Overshoot (Punto 3)
+    if not getattr(strategy_self, "volume_active", False):
+        return
 
-        # ------------------------------------------------------------
-        # 2. CÁLCULO PRECISO DE MÍNIMO / MÁXIMO
-        # ------------------------------------------------------------
-        periodo = strategy_self.volume_period
-        # La lógica de Min/Max usa la VMA, no el volumen crudo, como indicador de tendencia.
-        vma_window = strategy_self.volume_series[-periodo:]
-        vma_actual = strategy_self.volume_series[-1]
-        
-        strategy_self.volume_minimo_STATE = (vma_actual == vma_window.min())
-        strategy_self.volume_maximo_STATE = (vma_actual == vma_window.max())
+    volume_series = getattr(strategy_self, "volume_series", None)
+    period = int(getattr(strategy_self, "volume_period", 0) or 0)
+    if volume_series is None or period <= 0 or len(volume_series) <= period:
+        return
 
-        # ------------------------------------------------------------
-        # 3. Lógica Personalizada: UMBRAL DE VOLUMEN (Overshoot)
-        # ------------------------------------------------------------
-        # Contar cuántas veces el volumen real ha superado la V-MA en la ventana.
-        vol_window = pd.Series(strategy_self.data.Volume[-periodo:])
-        vma_window_series = pd.Series(strategy_self.volume_series[-periodo:])
-        
-        overshoots = vol_window > vma_window_series
-        count = overshoots.sum()
-        strategy_self.volume_overshoot_count = count
-        
-        threshold = getattr(strategy_self, 'volume_overshoot_threshold', 0)
-        cumple_umbral = count >= threshold
-        
-        # 🌟 Estado Ascendente = Cumple Umbral de "Fuerza" 🌟
-        strategy_self.volume_ascendente_STATE = cumple_umbral
-        
-        # ------------------------------------------------------------
-        # 4. Actualizar la serie de ploteo (Puntos Verdes)
-        # ------------------------------------------------------------
-        current_volume = strategy_self.data.Volume[-1]
-        current_ma = strategy_self.volume_series[-1]
-        umbral_nivel = current_ma * strategy_self.volume_avg_multiplier
-        cond_nivel_valida = current_volume > umbral_nivel
-        
-        # Condición para Ploteo: el volumen actual debe superar el multiplicador promedio.
-        condicion_final_ploteo = cond_nivel_valida
-        
-        if condicion_final_ploteo:
-            # Ploteamos en el nivel del multiplicador para visualizar el evento.
-            strategy_self.volume_umbral_s[-1] = strategy_self.volume_avg_multiplier
-        else:
-            # Usamos np.nan para que el punto no se dibuje
-            strategy_self.volume_umbral_s[-1] = np.nan
+    estado_volume = verificar_estado_indicador_func(volume_series)
+    strategy_self.volume_ascendente_STATE = bool(estado_volume.get("ascendente", False))
+    strategy_self.volume_descendente_STATE = bool(estado_volume.get("descendente", False))
 
-# ----------------------------------------------------------------------
-# --- Filtro de Volumen (Condición AND) ---
-# ----------------------------------------------------------------------
+    vma_window = np.asarray(volume_series[-period:], dtype=float)
+    vma_actual = float(vma_window[-1])
+    strategy_self.volume_minimo_STATE = bool(vma_actual == np.nanmin(vma_window))
+    strategy_self.volume_maximo_STATE = bool(vma_actual == np.nanmax(vma_window))
+
+    current_volume = _last_value(strategy_self.data.Volume)
+    current_ma = _last_value(volume_series)
+    if current_volume is None or current_ma is None:
+        return
+
+    umbral_nivel = float(current_ma) * float(strategy_self.volume_avg_multiplier)
+    cond_nivel_valida = float(current_volume) > umbral_nivel
+
+    volume_umbral_s = getattr(strategy_self, "volume_umbral_s", None)
+    if volume_umbral_s is not None:
+        volume_umbral_s[-1] = (
+            float(strategy_self.volume_avg_multiplier)
+            if cond_nivel_valida
+            else np.nan
+        )
+
+
 def apply_volume_filter(strategy_self: Any) -> Tuple[bool, Optional[str]]:
     """
-    Aplica el filtro de Volumen como una condición AND para la entrada.
+    Aplica el filtro de volumen como condición AND para la entrada.
 
-    El filtro de volumen consta de dos sub-condiciones que deben cumplirse:
-
-    1.  **Umbral de Nivel:** El volumen de la vela actual debe superar un nivel base,
-        definido por la V-MA multiplicada por ``strategy_self.volume_avg_multiplier``.
-    2.  **Filtro de Estado (Opcional):** Si el usuario activa filtros de estado (Min, Max, Asc, Desc), 
-        al menos uno de ellos debe cumplirse en la vela actual.
-
-    Parameters
-    ----------
-    strategy_self : strategy_system.System
-        Instancia de la estrategia.
-
-    Returns
-    -------
-    tuple[bool, str | None]
-        - bool: `True` si el filtro es válido (o inactivo), `False` si lo invalida.
-        - str | None: Razón del log.
+    El volumen actual debe superar la V-SMA por el multiplicador configurado.
+    Si hay filtros de estado seleccionados, basta con que se cumpla al menos
+    uno de ellos.
     """
-    if strategy_self.volume_active:
-        
-        if strategy_self.volume_series is None or len(strategy_self.data.Volume) < 1:
-            return False, "Volume Faltan Datos"
-        
-        current_volume = strategy_self.data.Volume[-1]
-        current_ma = strategy_self.volume_series[-1]
-        
-        # 1. Condición de Umbral de Nivel (Volumen Actual > V-MA * Multiplicador)
-        umbral_nivel = current_ma * strategy_self.volume_avg_multiplier
-        cond_nivel_valida = current_volume > umbral_nivel
-        
-        if not cond_nivel_valida:
-            # Falla el filtro AND si el volumen actual es bajo.
-            return False, f"Volumen Bajo ({int(current_volume)} < {int(umbral_nivel)})"
+    if not getattr(strategy_self, "volume_active", False):
+        return True, None
 
-        # 2. Condición de Estado
-        filtros_estado_activos = (strategy_self.volume_minimo or strategy_self.volume_maximo or 
-                                  strategy_self.volume_ascendente or strategy_self.volume_descendente)
+    volume_series = getattr(strategy_self, "volume_series", None)
+    data = getattr(strategy_self, "data", None)
+    volume_data = getattr(data, "Volume", None)
+    if volume_series is None or volume_data is None or len(volume_data) < 1:
+        return False, "Volume Faltan Datos"
 
-        if filtros_estado_activos:
-            cond_estado_cumplida = (
-                (strategy_self.volume_minimo and strategy_self.volume_minimo_STATE) or 
-                (strategy_self.volume_maximo and strategy_self.volume_maximo_STATE) or 
-                (strategy_self.volume_ascendente and strategy_self.volume_ascendente_STATE) or 
-                (strategy_self.volume_descendente and strategy_self.volume_descendente_STATE)
-            )
-            
-            if not cond_estado_cumplida:
-                # Falla el filtro AND si el nivel es ok pero el estado requerido no se cumple.
-                return False, "Volumen No Cumple Estado"
-            
-            # Si se activaron filtros de estado Y se cumplen
-            return True, f"Volumen Ok (x{round(current_volume/current_ma, 1)})"
-        
-        # Si NO se activaron filtros de estado, solo necesitamos el Umbral de Nivel (que ya pasó)
-        return True, f"Volumen Ok (x{round(current_volume/current_ma, 1)})"
+    current_volume = _last_value(volume_data)
+    current_ma = _last_value(volume_series)
+    if current_volume is None or current_ma is None:
+        return False, "Volume Faltan Datos"
 
-    # El filtro no está activo, por lo que la condición es TRUE por defecto.
-    return True, None
+    current_volume = float(current_volume)
+    current_ma = float(current_ma)
+    multiplier = float(getattr(strategy_self, "volume_avg_multiplier", 1.0))
+    umbral_nivel = current_ma * multiplier
+
+    if current_volume <= umbral_nivel:
+        return False, f"Volumen Bajo ({int(current_volume)} < {int(umbral_nivel)})"
+
+    state_settings = (
+        ("volume_minimo", "volume_minimo_STATE"),
+        ("volume_maximo", "volume_maximo_STATE"),
+        ("volume_ascendente", "volume_ascendente_STATE"),
+        ("volume_descendente", "volume_descendente_STATE"),
+    )
+    active_state_filters = [
+        state_attr
+        for setting_attr, state_attr in state_settings
+        if bool(getattr(strategy_self, setting_attr, False))
+    ]
+
+    if active_state_filters and not any(
+        bool(getattr(strategy_self, state_attr, False))
+        for state_attr in active_state_filters
+    ):
+        return False, "Volumen No Cumple Estado"
+
+    return True, f"Volumen Ok (x{round(current_volume / current_ma, 1)})"

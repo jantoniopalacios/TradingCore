@@ -161,14 +161,12 @@ class System(Strategy):
     volume_active = False 
     volume_period = 20 
     volume_avg_multiplier = 1.0 
-    volume_overshoot_threshold = 3 # 🌟 NUEVO: Parámetro para el Umbral de veces (asumido del .env)
-    volume_overshoot_count = 0 # 🌟 NUEVO: Contador para el estado actual
     # Estados de Volumen (Exclusivos)
     volume_minimo = False
     volume_maximo = False
     volume_ascendente = False
     volume_descendente = False
-    # Serie del indicador (para almacenar el V-SMA/V-EMA)
+    # Serie del indicador: SMA de volumen (V-SMA)
     volume_series = None
     
 

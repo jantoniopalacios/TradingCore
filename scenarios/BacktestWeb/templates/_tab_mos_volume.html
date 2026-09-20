@@ -27,9 +27,10 @@
         <li><strong>margen_seguridad_minimo:</strong> exige además que el MoS esté en estado mínimo.</li>
         <li><strong>margen_seguridad_ascendente:</strong> exige además que el MoS esté ascendiendo.</li>
         <li><strong>volume_active:</strong> activa los filtros de volumen.</li>
-        <li><strong>volume_period:</strong> periodo de la EMA de volumen.</li>
-        <li><strong>volume_avg_multiplier:</strong> multiplicador mínimo respecto a la EMA de volumen.</li>
-        <li><strong>volume_minimo / volume_ascendente:</strong> filtros de estado adicionales.</li>
+        <li><strong>volume_period:</strong> periodo de la SMA de volumen.</li>
+        <li><strong>volume_avg_multiplier:</strong> multiplicador mínimo respecto a la SMA de volumen.</li>
+        <li><strong>volume_minimo:</strong> exige que la SMA de volumen esté en mínimo dentro de la ventana configurada.</li>
+        <li><strong>volume_ascendente:</strong> exige que la SMA de volumen esté en tendencia ascendente.</li>
     </ul>
 
     <h6 class="mt-4 text-success"><strong>4. Condiciones de compra</strong></h6>
@@ -43,7 +44,7 @@
 
     <h6 class="mt-4 text-info"><strong>7. Ejemplo práctico</strong></h6>
     <div class="alert alert-info small">
-        Si existe una señal técnica de compra, el filtro de volumen puede exigir que el volumen actual sea superior a la EMA de volumen multiplicada por el factor configurado. Si no se cumple, la compra se descarta.
+        Si existe una señal técnica de compra, el filtro de volumen puede exigir que el volumen actual sea superior a la SMA de volumen multiplicada por el factor configurado. Si no se cumple, la compra se descarta.
     </div>
 
     <h6 class="mt-4 text-warning"><strong>8. Advertencias / comportamiento real actual</strong></h6>
@@ -118,7 +119,7 @@
         </div>
 
         <div class="row row-control align-items-center mb-3">
-            <div class="col-7"><label for="volume_period" class="form-label">Período EMA de Volumen:</label></div>
+            <div class="col-7"><label for="volume_period" class="form-label">Período SMA de Volumen:</label></div>
             <div class="col-3">
                 <input type="number" class="form-control" id="volume_period" name="volume_period" min="1" value="{{ config.volume_period }}">
             </div>
@@ -144,7 +145,7 @@
             </div>
         </div>
         <div class="row row-control align-items-center mb-2">
-            <div class="col-7"><label for="volume_ascendente" class="form-check-label">V-EMA Ascendente:</label></div>
+            <div class="col-7"><label for="volume_ascendente" class="form-check-label">V-SMA Ascendente:</label></div>
             <div class="col-3">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" role="switch" id="volume_ascendente" name="volume_ascendente" value="True" {% if config.volume_ascendente == 'True' %}checked{% endif %}>
