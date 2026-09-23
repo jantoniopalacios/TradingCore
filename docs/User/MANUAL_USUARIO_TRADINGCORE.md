@@ -255,7 +255,7 @@ En la lógica de compra validada actualmente, Bollinger solo aporta una señal t
 
 Si `bb_buy_crossover` está desactivado, Bollinger no genera una compra por simple toque o permanencia bajo la banda inferior y no desplaza por sí solo la vía de respaldo Buy & Hold.
 
-La lógica de salida puede utilizar el cruce bajista de la banda superior y mantiene además una condición interna relacionada con la media central. La ayuda contextual de la pestaña Bollinger debe utilizarse como referencia operativa para las opciones visibles.
+Con `bb_sell_crossover` activado, Bollinger genera una salida técnica cuando el precio cruza a la baja la banda superior o cuando cruza a la baja la SMA central.
 
 ## 15. Volumen
 

@@ -162,11 +162,13 @@ Podían darse dos tipos de diferencia:
 
 Esto puede cambiar tanto el número de operaciones como el momento en que comienza una posición y, por tanto, toda su evolución posterior.
 
-### Situación actual y pendiente conocido
+### Situación actual
 
-La compra Bollinger queda ahora ligada al cruce alcista sobre la banda inferior cuando la opción correspondiente está habilitada.
+La compra Bollinger queda ligada al cruce alcista sobre la banda inferior cuando la opción correspondiente está habilitada.
 
-La lógica de salida mantiene además una condición interna asociada a la media central que todavía debe revisarse desde el punto de vista de su correspondencia completa con la interfaz. También queda pendiente revisar el papel de `bb_window_state`.
+La salida Bollinger se activa con `bb_sell_crossover` cuando el precio cruza a la baja la banda superior o la SMA central. La interfaz y la documentación ya reflejan expresamente ambas condiciones.
+
+`bb_window_state` se ha retirado de la interfaz porque no participa actualmente en la lógica de señales o estados. Se mantiene en configuración por compatibilidad con configuraciones existentes.
 
 ### Resultados que conviene revalidar
 
@@ -297,13 +299,24 @@ No se ha modificado la lógica de trading ni los parámetros utilizados por las 
 
 Por tanto, este bloque no obliga por sí mismo a repetir backtests anteriores.
 
-### Pendiente posterior - Bollinger y limpieza EMA/RSI
+### Bloque posterior - Bollinger y limpieza EMA/RSI
 
-**Estado:** pendiente.
+**Estado:** completado.
 
-Se revisarán la correspondencia completa de la salida Bollinger con la interfaz, `bb_window_state` y elementos legacy de EMA/RSI.
+Se ha alineado la interfaz y la documentación con el comportamiento real de la salida Bollinger, se ha retirado `bb_window_state` de la UI manteniéndolo únicamente por compatibilidad de configuración, y se han limpiado comentarios/docstrings legacy de EMA/RSI. No se ha modificado la lógica de trading en este bloque.
 
-Cualquier modificación funcional que resulte de esa revisión se incorporará aquí antes de dar el bloque por cerrado.
+
+### Impacto sobre resultados históricos
+
+No se espera un impacto adicional en resultados de backtest por este bloque:
+
+- la lógica Bollinger de salida ya existía y no se ha cambiado;
+- `bb_window_state` no tenía efecto funcional sobre señales o estados;
+- los cambios EMA/RSI son exclusivamente de documentación interna y comentarios;
+- se ha añadido cobertura de regresión para la salida Bollinger por SMA central.
+
+Por tanto, este bloque no obliga por sí mismo a repetir backtests anteriores.
+
 
 ### Pendiente posterior - Operación de la aplicación web
 

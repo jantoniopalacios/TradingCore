@@ -106,11 +106,11 @@ def apply_ema_global_filter(strategy_self: 'StrategySelf', condicion_base_tecnic
     """
     Aplica el filtro global excluyente (Condición AND) de la EMA Lenta.
 
-    IMPORTANTE: Este filtro implementa una **regla de veto permanente**:
-    - Si EMA Lenta está en DESCENSO → BLOQUEA CUALQUIER COMPRA (sin excepciones)
-    - Esto es un filtro de protección hardcodeado que no depende de configuración
-    
-    Además, aplica requerimientos configurables si están habilitados.
+    Aplica las restricciones configuradas para la EMA Lenta.
+
+    Si `ema_slow_descendente` está habilitado y la EMA lenta está descendiendo,
+    bloquea la compra. El resto de estados configurados se evalúan igualmente
+    como condiciones globales de entrada.
 
     Parameters
     ----------
@@ -126,10 +126,10 @@ def apply_ema_global_filter(strategy_self: 'StrategySelf', condicion_base_tecnic
     """
 
     # ======================================================================
-    # --- FILTRO GLOBAL DE VETO (HARDCODEADO): EMA Descendente BLOQUEA TODO ---
+    # --- FILTRO CONFIGURABLE: EMA LENTA DESCENDENTE ---
     # ======================================================================
-    # Veto configurable con el switch existente `ema_slow_descendente`.
-    # Si está activo y la EMA lenta desciende, se bloquean compras.
+    # Si el switch `ema_slow_descendente` está activo, bloquea la compra
+    # mientras la EMA lenta esté descendiendo.
     if getattr(strategy_self, 'ema_slow_descendente', False) and hasattr(strategy_self, 'ema_slow_descendente_STATE') and strategy_self.ema_slow_descendente_STATE:
         return False  # VETO por EMA descendente habilitado por configuración
     
@@ -145,8 +145,8 @@ def apply_ema_global_filter(strategy_self: 'StrategySelf', condicion_base_tecnic
         getattr(strategy_self, 'ema_cruce_signal', False),
     ])
 
-    # Si ningún flag relacionado con EMA Lenta está activado, devolvemos la condición original
-    # (pero el filtro de veto ya se aplicó arriba)
+    # Si ningún otro flag relacionado con EMA Lenta está activado,
+    # devolvemos la condición original.
     if not ema_filter_enabled:
         return condicion_base_tecnica
 

@@ -24,16 +24,15 @@
     <ul class="small">
         <li><strong>bb_window:</strong> número de velas usadas para la SMA y las bandas.</li>
         <li><strong>bb_num_std:</strong> número de desviaciones estándar que separan las bandas.</li>
-        <li><strong>bb_window_state:</strong> parámetro cargado por configuración; la lógica actual de señales/estados no lo utiliza.</li>
         <li><strong>bb_buy_crossover:</strong> activa la lógica de compra asociada a la banda inferior.</li>
-        <li><strong>bb_sell_crossover:</strong> activa la lógica de salida asociada a la banda superior.</li>
+        <li><strong>bb_sell_crossover:</strong> activa la salida por cruce bajista de la banda superior o de la SMA central.</li>
     </ul>
 
     <h6 class="mt-4 text-success"><strong>4. Condiciones de compra</strong></h6>
     <p class="small">Con la lógica de compra activa, TradingCore busca el cruce configurado respecto a la banda inferior como señal técnica de posible reversión.</p>
 
     <h6 class="mt-4 text-danger"><strong>5. Condiciones de venta / bloqueo</strong></h6>
-    <p class="small">Con la lógica de venta activa, el cruce respecto a la banda superior puede actuar como condición de salida o toma de beneficios según el flujo de estrategia.</p>
+    <p class="small">Con la lógica de venta activa, TradingCore genera una salida técnica si el precio cruza a la baja la banda superior o la SMA central.</p>
 
     <h6 class="mt-4 text-dark"><strong>6. Relación con otros filtros</strong></h6>
     <p class="small">Bollinger aporta una condición técnica. La entrada puede seguir dependiendo de filtros adicionales como RSI, ATR, Volumen o MoS.</p>
@@ -47,7 +46,6 @@
     <div class="alert alert-warning small mb-0">
         <ul class="mb-0">
             <li>Tocar una banda no equivale automáticamente a comprar o vender.</li>
-            <li><code>bb_window_state</code> existe en configuración, pero la lógica actual de señales y estados no lo utiliza.</li>
             <li>La utilidad de las bandas depende del activo y del intervalo analizado.</li>
         </ul>
     </div>
@@ -96,11 +94,6 @@
                        value="{{ config.bb_num_std }}" min="1.0" max="3.0" step="0.1">
             </div>
 
-            <div class="mb-0">
-                <label class="form-label small fw-bold" for="bb_window_state">Ventana de Estado (Volatilidad):</label>
-                <input type="number" class="form-control form-control-sm" id="bb_window_state" name="bb_window_state" 
-                       value="{{ config.bb_window_state }}" min="10" max="200">
-            </div>
         </div>
     </div>
 
@@ -120,12 +113,12 @@
                 <input class="form-check-input" type="checkbox" role="switch" id="bb_sell_crossover" name="bb_sell_crossover" value="True"
                        {% if config.bb_sell_crossover == 'True' %}checked{% endif %}>
                 <label class="form-check-label small" for="bb_sell_crossover">
-                    🔴 Venta: Cruce Banda Superior
+                    🔴 Venta: Cruce Banda Superior / SMA Central
                 </label>
             </div>
         </div>
         <p class="text-muted small mt-3 italic">
-            <i class="fas fa-info-circle"></i> El cruce de la banda inferior sugiere agotamiento de ventas (reversión), mientras que el superior sugiere toma de beneficios.
+            <i class="fas fa-info-circle"></i> La compra usa el cruce alcista de la banda inferior. La salida se activa por cruce bajista de la banda superior o de la SMA central.
         </p>
     </div>
 </div>

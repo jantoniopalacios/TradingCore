@@ -120,7 +120,7 @@ class System(Strategy):
     bb_window = 20              # Período de la SMA central
     bb_num_std = 2.0            # Desviaciones estándar para las bandas
     bb_buy_crossover = False    # Lógica de compra: cruce de banda inferior
-    bb_sell_crossover = False   # Lógica de venta: cruce de banda superior
+    bb_sell_crossover = False   # Lógica de venta: cruce bajista de banda superior o SMA central
     
     # Series de indicadores
     bb_sma_series = None        # Media Móvil Simple (línea central)

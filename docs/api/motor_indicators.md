@@ -96,7 +96,7 @@ ATR actua como filtro de entrada dentro del rango minimo/maximo configurado.
 
 La compra Bollinger solo se considera cuando `bb_active` y `bb_buy_crossover` estan activos. En ese caso se exige un cruce alcista del precio sobre la banda inferior. Desactivar `bb_buy_crossover` no habilita una compra alternativa por toque o permanencia fuera de banda.
 
-La salida mantiene la logica implementada de cruce bajista de la banda superior y una condicion interna adicional sobre la media central. La correspondencia de esta segunda condicion con la UI de venta queda como pendiente menor de revision, junto con el uso de `bb_window_state`.
+La salida Bollinger se activa con `bb_sell_crossover` cuando el precio cruza a la baja la banda superior o la SMA central. `bb_window_state` se conserva únicamente por compatibilidad de configuración y no participa actualmente en la lógica de señales o estados.
 
 ## Referencias
 

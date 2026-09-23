@@ -206,11 +206,10 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
     """
     Filtro global de RSI: FUERZA PURA.
     
-    Bloquea TODAS las compras si RSI está por debajo del umbral de fuerza.
-    Similar al veto hardcoded de EMA descendente, pero basado en nivel absoluto.
-    
-    IMPORTANTE: Este filtro SIEMPRE se aplica cuando RSI está activado.
-    No depende de switches - el umbral funciona independientemente.
+    Bloquea las compras si RSI está por debajo del umbral de fuerza.
+
+    El filtro se aplica cuando RSI está activado y existe un umbral positivo
+    configurado. No depende de los switches de señal de compra o venta del RSI.
     
     Parameters
     ----------
@@ -253,10 +252,7 @@ def apply_rsi_global_filter(strategy_self: 'StrategySelf') -> bool:
             # print(f"DEBUG RSI: umbral={umbral} <= 0, filtro desactivado")
             return True  # Permite todas las compras
         
-    # ======================================================================
-    # --- FILTRO GLOBAL DE VETO (HARDCODEADO): EMA Descendente BLOQUEA TODO ---
-    # ======================================================================
-        # Aplicar filtro de Fuerza Pura: bloquea si RSI < umbral
+        # Aplicar filtro global de fuerza: bloquea si RSI < umbral
         rsi_actual = _last_value(rsi_ind)
         if rsi_actual is not None:
             resultado = rsi_actual >= umbral

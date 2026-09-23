@@ -1,6 +1,6 @@
 # Plan de siguientes pasos - TradingCore
 
-Última actualización: 20/09/2026
+Última actualización: 23/09/2026
 
 ## 1. Objetivo
 
@@ -147,11 +147,12 @@ Correcciones cerradas:
 
 Validación del cierre de Volumen: `49 passed` en `tests/unit/test_technical_signals.py` y `42 passed` en `tests/web/test_routes.py`.
 
-Pendientes de limpieza o revisión no bloqueantes que pasan al trabajo posterior:
+Pendientes de limpieza o revisión no bloqueantes cerrados posteriormente:
 
-- Bollinger: revisar si la UI debe exponer/documentar explícitamente la condición de salida sobre la SMA central y el uso de `bb_window_state`;
-- EMA/RSI: limpiar nombres/comentarios legacy cuando exista un bloque específico;
-- ampliar tests de interacción entre múltiples indicadores y filtros.
+- Bollinger: la UI y documentación ya reflejan que `bb_sell_crossover` puede cerrar por cruce bajista de banda superior o SMA central;
+- `bb_window_state`: retirado de la UI al no participar actualmente en la lógica de señales o estados; se conserva en configuración por compatibilidad;
+- EMA/RSI: comentarios y docstrings legacy limpiados sin modificar la lógica funcional;
+- tests de interacción entre múltiples indicadores y filtros ampliados y consolidados.
 
 ## 7. Prioridad 5 - Consolidar tests de lógica combinada
 
@@ -231,7 +232,7 @@ Solo después de estabilizar la lógica funcional:
 
 ## 11. Orden de ejecución recomendado
 
-Estado a 20/09/2026:
+Estado a 23/09/2026:
 
 1. Manual de Usuario y acceso documental por rol - completado.
 2. MACD - completado.
@@ -239,8 +240,8 @@ Estado a 20/09/2026:
 4. Correcciones Stochastic, Bollinger, MoS y Volumen - completadas.
 5. Consolidación documental transversal - completada en `0c8f5a2`.
 6. Ampliar tests de lógica combinada - completado.
-7. [SIGUIENTE] Revisar pendientes menores de Bollinger y limpieza EMA/RSI.
-8. Endurecer arranque/parada web.
+7. Revisar pendientes menores de Bollinger y limpieza EMA/RSI - completado.
+8. [SIGUIENTE] Endurecer arranque/parada web.
 9. Revisar datos fundamentales y proveedores.
 10. Abordar rendimiento, scheduler y limpieza legacy.
 
@@ -321,6 +322,12 @@ Antes de cerrar cualquier bloque:
 
 ## 16. Próximo bloque concreto
 
-El siguiente bloque recomendado es **revisar los pendientes menores de Bollinger y realizar la limpieza legacy de EMA/RSI**.
+El siguiente bloque recomendado es **endurecer el arranque y parada de la aplicación web**.
 
-Después se pasará al endurecimiento operativo del arranque y parada de la aplicación web.
+Objetivo inmediato:
+
+1. revisar `start_web.bat` y `stop_web.bat`;
+2. identificar de forma clara el proceso/PID que ocupa el puerto 5000;
+3. evitar o advertir arranques duplicados;
+4. facilitar una parada y reinicio inequívocos sin dejar instancias antiguas;
+5. añadir una comprobación operativa sencilla al flujo de verificación.

@@ -216,8 +216,8 @@ Regla clave para interpretar B&H:
 | STOCH | `*_maximo` / `*_descendente` | Venta tecnica Stoch | Salida tecnica |
 | BB | `bb_active` | Activa Bollinger Bands | Si ON, hay via tecnica de compra/venta |
 | BB | `bb_window` / `bb_num_std` | Parametros de bandas | Ajustan ancho/sensibilidad |
-| BB | `bb_buy_crossover` | Compra BB por cruce (o toque segun modo) | Si ON, B&H queda desplazado por via tecnica |
-| BB | `bb_sell_crossover` | Cierre tecnico BB | Salida tecnica |
+| BB | `bb_buy_crossover` | Compra BB por cruce alcista de banda inferior | Si ON, B&H queda desplazado por via tecnica |
+| BB | `bb_sell_crossover` | Cierre por cruce bajista de banda superior o SMA central | Salida tecnica |
 | Filtros | `atr_enabled` | Activa filtro de volatilidad ATR | Puede bloquear compras |
 | Filtros | `atr_period` / `atr_min` / `atr_max` | Parametros de filtro ATR | Control de calidad de entrada |
 | Fundamentales | `Margen_Seguridad_Active` | Activa filtro MoS | Puede bloquear compras |

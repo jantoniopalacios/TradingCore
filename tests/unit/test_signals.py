@@ -65,5 +65,23 @@ class TestSenales(unittest.TestCase):
         print(f"Resultado: {venta_activa} | Motivo: {razon}")
         self.assertTrue(venta_activa)
 
+
+    def test_cruce_sma_central_venta(self):
+        """Test: El precio cruza hacia abajo la SMA central sin cruzar la banda superior."""
+        print("\n--- [EJECUTANDO: VENTA SMA CENTRAL] ---")
+        df = pd.DataFrame({'Close': [100.0, 115.0, 120.0, 105.0]})
+
+        # Banda superior neutra para aislar la condición de la SMA central.
+        banda_sup = pd.Series([999.0, 999.0, 999.0, 999.0])
+        sma_central = pd.Series([110.0, 110.0, 110.0, 110.0])
+
+        strategy = MockStrategy(df, upper=banda_sup, sma=sma_central)
+        venta_activa, razon = check_bb_sell_signal(strategy)
+
+        print(f"Resultado: {venta_activa} | Motivo: {razon}")
+        self.assertTrue(venta_activa)
+        self.assertEqual(razon, "BB Extremo/Fin Tendencia")
+
+
 if __name__ == '__main__':
     unittest.main()
