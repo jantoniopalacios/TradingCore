@@ -151,13 +151,13 @@ Nota de seguridad:
 
 ### Comprobación visual de configuración y ayudas
 
-Antes de validar cambios de plantillas, comprueba que solo exista una instancia web escuchando en el puerto 5000:
+Antes de validar cambios de plantillas, comprueba el proceso web activo con `./scripts/verify.ps1`.
 
 ```powershell
 netstat -ano | findstr :5000
 ```
 
-Debe existir una sola línea `LISTENING`. Si hay varias instancias, identifica sus PID, detén las antiguas y arranca de nuevo con `start_web.bat`. Una instancia antigua puede seguir sirviendo HTML previo y producir falsos diagnósticos.
+El paso `[3/4] Web server state` muestra el PID, proceso y línea de comandos que escuchan en el puerto 5000. `start_web.bat` no lanza una segunda instancia si el puerto ya está ocupado y `stop_web.bat` solo termina el listener cuando lo identifica como `scenarios.BacktestWeb.app`. Esto evita que una instancia antigua siga sirviendo HTML previo y produzca falsos diagnósticos.
 
 Después de reiniciar, realiza `Ctrl+F5` en el navegador y valida:
 

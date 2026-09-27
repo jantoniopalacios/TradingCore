@@ -318,11 +318,19 @@ No se espera un impacto adicional en resultados de backtest por este bloque:
 Por tanto, este bloque no obliga por sí mismo a repetir backtests anteriores.
 
 
-### Pendiente posterior - Operación de la aplicación web
+### Bloque posterior - Operación de la aplicación web
 
-**Estado:** pendiente.
+**Estado:** completado.
 
-El objetivo principal es hacer más fiable el arranque/parada y evitar instancias antiguas de la aplicación. En principio es un cambio operativo y no debería cambiar el cálculo de las estrategias, salvo que durante la revisión se detecte un defecto funcional adicional.
+Se ha reforzado el control del proceso que sirve TradingCore en el puerto 5000. El arranque identifica y muestra el PID propietario del puerto y evita lanzar una segunda instancia. La parada comprueba que el proceso propietario sea realmente TradingCore antes de terminarlo y, por seguridad, no actúa sobre procesos ajenos.
+
+La verificación general muestra también el PID, proceso y línea de comandos del servidor web cuando existe una instancia activa.
+
+La secuencia parada-arranque se validó de forma completa: el puerto 5000 quedó libre tras la parada, PostgreSQL se detuvo correctamente, ambos servicios volvieron a arrancar y `/login` respondió con HTTP 200.
+
+**Implicación para los resultados:** sin impacto funcional esperado sobre los resultados de las estrategias.
+
+Este bloque no modifica señales de compra o venta, filtros, stops, datos utilizados por las estrategias ni cálculos del backtest. Por tanto, no obliga por sí mismo a repetir backtests históricos.
 
 ### Pendiente posterior - Datos fundamentales y proveedores
 

@@ -1,6 +1,6 @@
 # Índice de Documentación - Proyecto TradingCore
 
-Última actualización: 20/09/2026
+Última actualización: 28/09/2026
 
 Este índice lista la documentación activa dentro de `docs/` y su audiencia principal.
 
@@ -23,7 +23,7 @@ El usuario normal solo tiene acceso desde la aplicación a este manual y a las a
 - [motor_utils.md](../api/motor_utils.md) - API de utilidades del motor.
 - [PLAN_SIGUIENTES_PASOS_TRADINGCORE_2026-09-19.md](../Plans/PLAN_SIGUIENTES_PASOS_TRADINGCORE_2026-09-19.md) - Plan vivo y prioridades actuales.
 - [IMPACTO_FUNCIONAL_EVOLUCION_TRADINGCORE.md](../Summaries/IMPACTO_FUNCIONAL_EVOLUCION_TRADINGCORE.md) - Explicación no técnica y registro vivo del impacto de los cambios sobre los resultados de las estrategias.
-- [Manual_operativo_TradingCore_PowerShell_Git_Copilot.docx](../Manual_operativo_TradingCore_PowerShell_Git_Copilot.docx) - Manual operativo de mantenimiento y desarrollo.
+- [Manual_operativo_TradingCore_PowerShell_Git_Copilot.md](../Manual_operativo_TradingCore_PowerShell_Git_Copilot.md) - Manual operativo de mantenimiento y desarrollo.
 
 ## Meta-documentación
 

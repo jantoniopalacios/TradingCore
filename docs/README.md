@@ -239,7 +239,7 @@ La verificación habitual del proyecto puede ejecutarse mediante:
 .\scripts\verify.ps1
 ```
 
-Este script comprueba sintaxis Python, tests baseline y estado de Git.
+Este script ejecuta cuatro pasos: sintaxis Python, tests base, estado del servidor web y estado de Git. En el paso `[3/4] Web server state` muestra PID, proceso y línea de comandos del listener del puerto 5000 y confirma si corresponde a TradingCore Web.
 
 ---
 
@@ -304,7 +304,7 @@ Laboratorio/
 docs/
 ├── README.md                                              Este fichero técnico
 ├── ARCHITECTURE.md                                        Arquitectura canónica del sistema
-├── Manual_operativo_TradingCore_PowerShell_Git_Copilot.docx  Manual operativo del administrador
+├── Manual_operativo_TradingCore_PowerShell_Git_Copilot.md  Manual operativo del administrador
 ├── User/                                                  Documentación de usuario final
 │   └── MANUAL_USUARIO_TRADINGCORE.md                     Manual completo de la interfaz web
 ├── api/                                                   Documentación de la API interna (MkDocs)
@@ -337,7 +337,7 @@ Las pestañas de configuración incorporan ayuda contextual mediante el botón *
 | `backup_trading_db_20260227.dump` | Backup puntual de la BD PostgreSQL |
 | `mkdocs.yml` | Configuración de MkDocs |
 
-`start_web.bat` comprueba previamente si el puerto web ya está ocupado para evitar lanzar instancias duplicadas.
+`start_web.bat` identifica el PID y proceso que ocupan el puerto 5000 y evita lanzar instancias duplicadas. `stop_web.bat` verifica que el listener corresponda a TradingCore antes de terminarlo, y `scripts/verify.ps1` muestra el estado operativo del servidor web.
 
 ---
 
@@ -346,3 +346,4 @@ Las pestañas de configuración incorporan ayuda contextual mediante el botón *
 - Manual de Usuario: **[User/MANUAL_USUARIO_TRADINGCORE.md](User/MANUAL_USUARIO_TRADINGCORE.md)**
 - Arquitectura canónica: **[ARCHITECTURE.md](ARCHITECTURE.md)**
 - Índice general: **[Index/00_INDEX_DOCUMENTACION.md](Index/00_INDEX_DOCUMENTACION.md)**
+- Manual operativo: **[Manual_operativo_TradingCore_PowerShell_Git_Copilot.md](Manual_operativo_TradingCore_PowerShell_Git_Copilot.md)**

@@ -1,6 +1,6 @@
 # Plan de siguientes pasos - TradingCore
 
-Última actualización: 23/09/2026
+Última actualización: 27/09/2026
 
 ## 1. Objetivo
 
@@ -31,7 +31,7 @@ Estado consolidado a 19/09/2026:
 - Commit de cierre MACD: `6ad2d9e fix: alinear MACD entre interfaz y motor`.
 - Plan de trabajo versionado en `docs/Plans/`.
 
-El siguiente bloque técnico es la **auditoría completa de contratos UI -> configuración -> motor** para detectar discrepancias similares a las corregidas en MACD.
+El siguiente bloque técnico es la **revisión de datos fundamentales y proveedores**, una vez cerradas la auditoría de indicadores, las pruebas de lógica combinada y el endurecimiento operativo de la aplicación web.
 
 ## 3. Prioridad 1 - Crear un verdadero Manual de Usuario [COMPLETADA]
 
@@ -183,19 +183,28 @@ No tratarlo como un disparador de beneficio salvo que el motor se rediseñe expl
 
 Las combinaciones críticas tienen tests de regresión y los resultados esperados no dependen de interpretación manual.
 
-## 8. Prioridad 6 - Endurecer operación de la aplicación web
+## 8. Prioridad 6 - Endurecer operación de la aplicación web [COMPLETADA]
 
 ### Problema observado
 
 Durante la validación se detectó que una instancia antigua de Flask podía seguir sirviendo plantillas anteriores y provocar diagnósticos falsos.
 
-### Trabajo
+### Trabajo completado
 
-1. Revisar `start_web.bat` y `stop_web.bat`.
-2. Hacer visible el PID/proceso que ocupa el puerto 5000.
-3. Evitar o advertir claramente el arranque cuando ya existe otra instancia.
-4. Añadir una comprobación operativa sencilla al flujo de verificación.
-5. Valorar un fichero PID o mecanismo equivalente si simplifica el control en Windows.
+1. `start_web.bat` identifica el proceso que ocupa el puerto 5000 y muestra su PID y línea de comandos.
+2. El arranque se rechaza cuando ya existe un listener en el puerto 5000.
+3. `stop_web.bat` localiza primero el propietario real del puerto 5000 y solo termina el proceso si corresponde a `scenarios.BacktestWeb.app`.
+4. Si el puerto 5000 pertenece a otra aplicación, el script no termina ese proceso ni detiene PostgreSQL.
+5. `scripts/verify.ps1` incorpora una comprobación informativa del estado del servidor web, PID y comando.
+6. Se mantiene el control basado en el socket real, sin añadir un fichero PID adicional.
+
+### Validación realizada
+
+- `scripts/verify.ps1`: compilación correcta y `51 passed`.
+- La instancia activa fue identificada correctamente por PID y línea de comandos.
+- `stop_web.bat` liberó correctamente el puerto 5000 y detuvo PostgreSQL.
+- `start_web.bat` levantó de nuevo PostgreSQL y el servidor web con un nuevo PID.
+- `/login` respondió con HTTP 200 después del reinicio.
 
 ### Criterio de cierre
 
@@ -232,7 +241,7 @@ Solo después de estabilizar la lógica funcional:
 
 ## 11. Orden de ejecución recomendado
 
-Estado a 23/09/2026:
+Estado a 27/09/2026:
 
 1. Manual de Usuario y acceso documental por rol - completado.
 2. MACD - completado.
@@ -241,8 +250,8 @@ Estado a 23/09/2026:
 5. Consolidación documental transversal - completada en `0c8f5a2`.
 6. Ampliar tests de lógica combinada - completado.
 7. Revisar pendientes menores de Bollinger y limpieza EMA/RSI - completado.
-8. [SIGUIENTE] Endurecer arranque/parada web.
-9. Revisar datos fundamentales y proveedores.
+8. Endurecer arranque/parada web - completado.
+9. [SIGUIENTE] Revisar datos fundamentales y proveedores.
 10. Abordar rendimiento, scheduler y limpieza legacy.
 
 ## 12. Gestión continua del plan
@@ -322,12 +331,12 @@ Antes de cerrar cualquier bloque:
 
 ## 16. Próximo bloque concreto
 
-El siguiente bloque recomendado es **endurecer el arranque y parada de la aplicación web**.
+El siguiente bloque recomendado es **revisar los datos fundamentales y sus proveedores**.
 
 Objetivo inmediato:
 
-1. revisar `start_web.bat` y `stop_web.bat`;
-2. identificar de forma clara el proceso/PID que ocupa el puerto 5000;
-3. evitar o advertir arranques duplicados;
-4. facilitar una parada y reinicio inequívocos sin dejar instancias antiguas;
-5. añadir una comprobación operativa sencilla al flujo de verificación.
+1. identificar qué métricas fundamentales consume realmente cada estrategia;
+2. revisar el papel actual de Yahoo Finance y Alpha Vantage;
+3. comprobar el flujo real de descarga, caché y actualización;
+4. separar, donde sea necesario, la lógica del motor del proveedor concreto;
+5. determinar antes de modificar resultados qué backtests podrían verse afectados.
