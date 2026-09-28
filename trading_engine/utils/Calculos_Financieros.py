@@ -232,6 +232,12 @@ def calcular_fullratio_OHLCV(ohlcv_data: pd.DataFrame, financial_data: pd.DataFr
     fin_date_col = 'fiscalDateEnding' if 'fiscalDateEnding' in df_fin.columns else df_fin.columns[0]
     df_fin.rename(columns={fin_date_col: "fiscalDateEnding"}, inplace=True)
     df_fin["fiscalDateEnding"] = pd.to_datetime(df_fin["fiscalDateEnding"]).dt.tz_localize(None)
+    if "reportedDate" in df_fin.columns:
+        df_fin["reportedDate"] = pd.to_datetime(
+            df_fin["reportedDate"], errors="coerce"
+        ).dt.tz_localize(None)
+    else:
+        df_fin["reportedDate"] = pd.NaT
     df_fin["Diluted EPS"] = pd.to_numeric(df_fin["Diluted EPS"], errors="coerce")
     df_fin = df_fin.dropna(subset=["Diluted EPS"]).sort_values("fiscalDateEnding")
 
@@ -262,14 +268,31 @@ def calcular_fullratio_OHLCV(ohlcv_data: pd.DataFrame, financial_data: pd.DataFr
     df_fin_calc = pd.concat(all_symbol_fundamentals)
 
     # 5. Cruce Diario por Símbolo
-    stocks_data = pd.merge_asof(
-        df_ohlcv.sort_values("Date"),
-        df_fin_calc[["fiscalDateEnding", "Symbol", "LTM EPS_Q", "LTM EPS %_Q", "PER M5Y_Q"]].sort_values("fiscalDateEnding"),
-        left_on="Date",
-        right_on="fiscalDateEnding",
-        by="Symbol",
-        direction="backward"
-    )
+    available_fundamentals = df_fin_calc.dropna(subset=["reportedDate"])
+    if available_fundamentals.empty:
+        stocks_data = df_ohlcv.copy()
+        stocks_data["fiscalDateEnding"] = pd.NaT
+        stocks_data["reportedDate"] = pd.NaT
+        for column in ("LTM EPS_Q", "LTM EPS %_Q", "PER M5Y_Q"):
+            stocks_data[column] = np.nan
+    else:
+        stocks_data = pd.merge_asof(
+            df_ohlcv.sort_values("Date"),
+            available_fundamentals[
+                [
+                    "reportedDate",
+                    "fiscalDateEnding",
+                    "Symbol",
+                    "LTM EPS_Q",
+                    "LTM EPS %_Q",
+                    "PER M5Y_Q",
+                ]
+            ].sort_values("reportedDate"),
+            left_on="Date",
+            right_on="reportedDate",
+            by="Symbol",
+            direction="backward",
+        )
 
     # 6. Ratios Diarios
     stocks_data["PER"] = (stocks_data["Close"] / stocks_data["LTM EPS_Q"]).round(2)
