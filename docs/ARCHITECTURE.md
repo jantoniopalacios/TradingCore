@@ -2,7 +2,7 @@
 
 Documento canónico de arquitectura funcional y técnica de la aplicación.
 
-Última actualización: 17/09/2026
+Última actualización: 29/09/2026
 
 ## 1. Visión General
 
@@ -38,6 +38,15 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 
 `trading_engine/utils/`
 - Descarga de datos (`Data_download.py`), cálculo de ratios/fundamentales (`Calculos_Financieros.py`), correo (`utils_mail.py`) y utilidades técnicas.
+
+`trading_engine/fundamentals/`
+- Capa normalizada de fundamentales, acumulativa por símbolo y todavía integrada progresivamente con el formato legado.
+- `FundamentalRecord` conserva `symbol`, `fiscal_date`, `reported_date`, `metric`, `value`, `provider`, `source_type` y `updated_at`.
+- `FundamentalStore` fusiona registros por símbolo sin eliminar la procedencia; `fiscal_date` identifica el trimestre y `reported_date` indica desde cuándo podía conocerse el dato.
+- `YahooFundamentalProvider` y `FundamentalUpdater` mantienen los datos recientes para la lista explícita de símbolos.
+- `AlphaVantageFundamentalProvider` y `AlphaVantageBootstrapper` construyen histórico inicial. El bootstrap persiste su estado en `<fundamentals_path>/bootstrap_state.json`.
+- `FundamentalService` coordina actualización Yahoo y bootstrap, y devuelve cobertura/estado por símbolo.
+- `legacy_adapter.py` convierte EPS normalizado al DataFrame que todavía consume Full Ratio.
 
 ### 2.2 Escenario web (`scenarios/BacktestWeb/`)
 
@@ -136,11 +145,50 @@ Contrato de la capa HTTP (`main_bp.py`):
 5. La UI consulta `GET /backtest_status` en polling para mostrar progreso por fases en el modal de lanzamiento.
 6. `ejecutar_backtest()` mezcla configuración guardada y enviada, y reporta hitos con callback.
 7. Obtiene símbolos del usuario (`simbolos`).
-8. Descarga datos de mercado (Yahoo Finance) y opcionalmente fundamentales/ratios.
-9. Ejecuta `run_multi_symbol_backtest(...)` con `System`.
-10. `System.next()` delega en `Logica_Trading` para decidir compra/venta por vela.
-11. Se guardan métricas, trades y gráficos en BD/HTML y se exponen en la UI.
-12. Al finalizar, se marca estado `completed` o `error`; el usuario confirma con `OK` y se recarga la vista para ver historial actualizado.
+8. Descarga datos de mercado y, si `filtro_fundamental` está activo, envía exactamente los símbolos configurados a la actualización fundamental.
+9. La capa normalizada actualiza Yahoo y solicita bootstrap Alpha Vantage cuando está configurada la clave de entorno. Se intenta adaptar la caché normalizada; si no hay EPS utilizable para todos los símbolos o falla la adaptación, se usa temporalmente `manage_fundamental_data(...)`.
+10. Full Ratio calcula y propaga los valores trimestrales desde `reportedDate`; después se aplica la selección fundamental y continúa el backtest.
+11. Ejecuta `run_multi_symbol_backtest(...)` con `System`.
+12. `System.next()` delega en `Logica_Trading` para decidir compra/venta por vela.
+13. Se guardan métricas, trades y gráficos en BD/HTML y se exponen en la UI.
+14. Al finalizar, se marca estado `completed` o `error`; el usuario confirma con `OK` y se recarga la vista para ver historial actualizado.
+
+### Fundamentales: actualización y estado
+
+El flujo fundamental es una transición compatible, no una sustitución completa del mecanismo anterior:
+
+```text
+símbolos configurados
+  -> Yahoo / FundamentalUpdater
+  -> Alpha Vantage / bootstrap histórico cuando procede
+  -> FundamentalStore (CSV acumulativo por símbolo)
+  -> legacy_adapter.py
+  -> Full Ratio y selección fundamental
+```
+
+La lista de entrada es exactamente el universo configurado; no se añaden activos. Yahoo mantiene datos recientes. Alpha Vantage se usa para construir histórico inicial y, cuando el estado es `completed`, no vuelve a descargarlo automáticamente. Su clave para el bootstrap normalizado se lee de `ALPHA_VANTAGE_KEY`; sin esa variable Yahoo sigue actualizando y el bootstrap queda como `not_requested`. La ausencia de clave no debe abortar el backtest.
+
+Yahoo obtiene `fiscal_date` del EPS trimestral y asocia `reported_date` con eventos de resultados posteriores mediante una heurística de ingestión con ventana máxima configurable (120 días por defecto). El origen queda reflejado en `source_type`; no se inventa la fecha de publicación a partir del cierre fiscal.
+
+Los estados persistidos del bootstrap son `pending`, `in_progress`, `completed`, `partial`, `quota_blocked`, `no_data` y `error`. `completed` y `no_data` se saltan automáticamente; `partial`, `quota_blocked`, `error`, `in_progress` y `pending` pueden intentarse en otra ejecución. `no_data` solo vuelve a intentarse tras un reset explícito. El agotamiento de cuota marca el símbolo como `quota_blocked`, conserva lo ya almacenado y detiene el resto del lote.
+
+`completed` requiere al menos 20 periodos fiscales únicos de `diluted_eps` en la cobertura final del store. Entre 1 y 19 periodos el estado es `partial`; ese estado es reintentable. La cobertura por proveedor y símbolo se mantiene para diagnóstico.
+
+Durante la migración, `load_fundamental_data_with_fallback(...)` usa el formato normalizado solo si hay registros utilizables para todos los símbolos solicitados. Si falta cobertura de algún activo o falla el adaptador, conserva `manage_fundamental_data(...)` como fallback. Los CSV `Q1_`–`Q4_` pertenecen a ese camino de compatibilidad, no al formato objetivo de la capa nueva. La clave del bootstrap normalizado se obtiene exclusivamente del entorno; el backtest aún entrega al fallback legado el argumento `ALPHA_VANTAGE_KEY` de `config_final` (con un valor placeholder si no existe), por lo que el contrato de credenciales del fallback no está unificado todavía.
+
+### Métricas y disponibilidad temporal
+
+Para EPS diluido, el cálculo conserva la secuencia trimestral por `fiscalDateEnding`, pero el backtest solo dispone cada resultado desde `reportedDate`, inclusive. Una fecha de publicación ausente o inválida no se reemplaza por la fecha fiscal ni por un desplazamiento estimado.
+
+- `LTM EPS`: suma móvil de cuatro trimestres completos; antes de cuatro, queda NaN.
+- `LTM EPS %`: variación porcentual de LTM EPS, sin rellenar NaN de forma implícita.
+- `PER`: precio dividido por LTM EPS; EPS no positivo invalida el PER.
+- `PER M5Y`: media móvil de 20 observaciones trimestrales válidas de PER; antes de 20 queda NaN.
+- `% PER vs PER M5Y`: `100 * (PER - PER_M5Y) / PER_M5Y`; negativo indica PER inferior a su media y positivo, superior.
+- `Margen de seguridad`: `LTM EPS % - % PER vs PER M5Y`. Es una métrica propia de TradingCore y no necesariamente el concepto clásico de margen de seguridad.
+- `Full Ratio`: `Margen de seguridad / PER`.
+
+En la fecha global más reciente del DataFrame, la selección devuelve `Mantener (Atractivo)` solo cuando LTM EPS %, Margen de seguridad y Full Ratio son positivos (AND). Con métricas disponibles que no cumplen alguna condición devuelve `Desestimar (No cumple criterios)`; si falta alguna métrica requerida devuelve `No evaluable (Datos insuficientes)`. Desestimar y no evaluable son resultados distintos.
 
 Notas de UX del formulario:
 
@@ -177,6 +225,7 @@ En cada vela:
 
 - `end_date`: parámetro operativo no persistente en `config_actual`; se define por defecto como `ayer` y puede sobreescribirse por ejecución.
 - Logging estructurado del ciclo completo en `logs/`.
+- El estado persistente del bootstrap fundamental se guarda en `<fundamentals_path>/bootstrap_state.json`, separado de los CSV normalizados por símbolo.
 - Motivos técnicos consolidados en los registros de trade (`technical_reasons`).
 - Estado operativo visible en la UI durante la ejecución (fase actual, mensaje y eventos recientes).
 - Estado de pestañas (`activeTabKey` y `activeSubTabKey`) persistido en `localStorage` para mantener contexto visual entre recargas.

@@ -1,6 +1,6 @@
 # Quick Start: Backtest Web
 
-Última actualización: 18/09/2026
+Última actualización: 29/09/2026
 
 ## Objetivo
 Validar en pocos minutos que el flujo web de backtest funciona, genera resultados y guarda datos en base de datos.
@@ -37,6 +37,10 @@ python scenarios/BacktestWeb/app.py
 4. Revisar parametros globales y usar el boton `Ayuda` de la pestaña Global para consultar ejemplos de stop loss, swing y break-even.
 5. Activar indicadores de prueba (por ejemplo, EMA y RSI).
 6. Pulsar `Lanzar Backtest`.
+
+Si `filtro_fundamental` está activo, la actualización fundamental utiliza exactamente los símbolos seleccionados para el backtest; no amplía el universo. Yahoo mantiene los datos recientes y el bootstrap histórico de Alpha Vantage solo se solicita cuando `ALPHA_VANTAGE_KEY` está disponible en el entorno. Sin esa variable, Yahoo continúa, el bootstrap queda omitido y el flujo no debe abortar. Si la caché normalizada no cubre todos los símbolos, puede ejecutarse el fallback Q legado con su contrato de credencial anterior; ese contrato aún está pendiente de unificación.
+
+La caché normalizada se guarda bajo `fundamentals_path`, junto al estado `bootstrap_state.json`. Cuando la caché normalizada contiene EPS utilizable para todos los símbolos se usa para Full Ratio; si falta cobertura de algún símbolo o falla la adaptación, se mantiene temporalmente el mecanismo Q legado.
 
 ## Paso 5: Seguir el progreso por fases (sin refresco manual)
 

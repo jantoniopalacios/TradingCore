@@ -1,6 +1,6 @@
 # Manual de Usuario de TradingCore
 
-**Última actualización:** 20/09/2026
+**Última actualización:** 29/09/2026
 **Audiencia:** usuarios de la interfaz web de TradingCore
 **Alcance:** uso funcional de la aplicación. No incluye instalación, arranque/parada del servidor, Git, PowerShell, PostgreSQL, código fuente ni tareas de administración.
 
@@ -342,6 +342,8 @@ Antes de lanzar un backtest:
 3. revise el rango de fechas;
 4. compruebe que la configuración de indicadores es la deseada;
 5. guarde la configuración si quiere conservar los cambios.
+
+Cuando el filtro fundamental está activo, se aplica a los mismos símbolos seleccionados para el backtest, sin ampliar esa lista. La selección fundamental usa la fecha global más reciente disponible; un resultado no evaluable por datos insuficientes no equivale a un activo desestimado por sus métricas.
 
 La temporalidad modifica la serie de datos utilizada por todos los indicadores. Una configuración diaria y una semanal pueden producir resultados muy distintos aunque el resto de parámetros sea idéntico.
 

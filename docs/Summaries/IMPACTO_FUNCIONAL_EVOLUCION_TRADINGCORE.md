@@ -1,6 +1,6 @@
 # Impacto funcional de la evolución de TradingCore
 
-**Última actualización:** 20/09/2026
+**Última actualización:** 29/09/2026
 **Estado:** documento vivo
 **Audiencia:** propietario del sistema, administrador y cualquier persona que necesite entender cómo los cambios del plan pueden afectar a los resultados sin entrar en detalles de programación.
 
@@ -332,11 +332,17 @@ La secuencia parada-arranque se validó de forma completa: el puerto 5000 quedó
 
 Este bloque no modifica señales de compra o venta, filtros, stops, datos utilizados por las estrategias ni cálculos del backtest. Por tanto, no obliga por sí mismo a repetir backtests históricos.
 
-### Pendiente posterior - Datos fundamentales y proveedores
+### Datos fundamentales y proveedores
 
-**Estado:** pendiente.
+**Estado:** implementado de forma progresiva; el fallback legado sigue disponible.
 
-Este bloque sí puede tener implicaciones sobre la información utilizada por filtros fundamentales. Antes de introducir cambios se documentará qué datos cambian, desde qué fecha y qué backtests pueden dejar de ser directamente comparables.
+La actualización fundamental ahora mantiene EPS reciente con Yahoo y construye histórico con Alpha Vantage cuando existe `ALPHA_VANTAGE_KEY` en el entorno. Los datos se conservan en una caché normalizada acumulativa por símbolo, con procedencia y fecha de publicación. Full Ratio no hace disponible un trimestre antes de `reportedDate`; además, exige cuatro trimestres para LTM EPS y 20 observaciones PER para PER M5Y. El adaptador usa la caché normalizada cuando todos los símbolos solicitados tienen EPS utilizable; en caso contrario conserva temporalmente la ruta antigua.
+
+La métrica `% PER vs PER M5Y` se calcula respecto a PER M5Y. La selección fundamental distingue entre activos atractivos, activos evaluables que no cumplen criterios y activos no evaluables por métricas ausentes. Mantiene la lista configurada por el usuario y decide con la fecha global más reciente.
+
+**Impacto sobre resultados históricos:** puede haber cambios en ratios, fechas de disponibilidad y símbolos que superan el filtro. En particular, el uso de `reportedDate` elimina disponibilidad anticipada respecto al cierre fiscal; los umbrales de profundidad producen NaN hasta reunir cobertura suficiente; la desviación PER corregida puede cambiar el margen de seguridad, Full Ratio y la selección. Conviene repetir los backtests que tengan activo el filtro fundamental y comparar con la misma lista, rango, temporalidad y configuración. Los resultados no deben compararse directamente si cambiaron proveedor, cobertura o fechas de publicación.
+
+La selección no amplía el universo configurado. La caché `Q1_`–`Q4_` y `manage_fundamental_data(...)` permanecen solo como compatibilidad transitoria, por lo que la migración de almacenamiento aún no está completamente cerrada.
 
 ### Pendiente posterior - Rendimiento, scheduler y limpieza legacy
 

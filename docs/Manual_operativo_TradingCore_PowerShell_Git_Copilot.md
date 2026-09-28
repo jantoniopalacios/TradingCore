@@ -4,7 +4,7 @@
 
 Manual práctico basado en el flujo de trabajo utilizado durante la revisión, refactorización, integración y saneamiento de la aplicación.
 
-**Última actualización:** 28/09/2026
+**Última actualización:** 29/09/2026
 
 **Proyecto:** TradingCore
 
@@ -205,6 +205,8 @@ La operación normal de la aplicación web se realiza con `.\start_web.bat` y `.
 ## 12. Pruebas Python y validación mínima
 
 Aunque normalmente usamos scripts\verify.ps1, estas son las piezas básicas que hay debajo y resultan útiles para aislar fallos.
+
+`pytest.ini` limita la colección del proyecto a `tests/`; así se evita recoger suites internas de pgAdmin u otros componentes externos.
 
 ```powershell
 python -m compileall -q scenarios trading_engine scripts tests

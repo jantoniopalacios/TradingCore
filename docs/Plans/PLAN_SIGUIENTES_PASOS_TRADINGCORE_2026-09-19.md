@@ -1,6 +1,6 @@
 # Plan de siguientes pasos - TradingCore
 
-Última actualización: 27/09/2026
+Última actualización: 29/09/2026
 
 ## 1. Objetivo
 
@@ -31,7 +31,7 @@ Estado consolidado a 19/09/2026:
 - Commit de cierre MACD: `6ad2d9e fix: alinear MACD entre interfaz y motor`.
 - Plan de trabajo versionado en `docs/Plans/`.
 
-El siguiente bloque técnico es la **revisión de datos fundamentales y proveedores**, una vez cerradas la auditoría de indicadores, las pruebas de lógica combinada y el endurecimiento operativo de la aplicación web.
+El bloque de revisión de datos fundamentales y proveedores ya está implementado de forma progresiva. El siguiente bloque técnico pendiente es observabilidad, rendimiento, scheduler y limpieza legacy.
 
 ## 3. Prioridad 1 - Crear un verdadero Manual de Usuario [COMPLETADA]
 
@@ -210,24 +210,22 @@ Durante la validación se detectó que una instancia antigua de Flask podía seg
 
 El operador puede saber de forma inequívoca qué proceso web está activo y reiniciarlo sin dejar instancias antiguas.
 
-## 9. Prioridad 7 - Revisar datos fundamentales y proveedores
+## 9. Prioridad 7 - Revisar datos fundamentales y proveedores [COMPLETADA]
 
-### Objetivo
+### Resultado implementado
 
-Retomar esta parte solo después de cerrar contratos y tests de indicadores.
+- `trading_engine/fundamentals/` contiene el modelo normalizado, store acumulativo por símbolo, proveedores, updater, bootstrap persistente, servicio de orquestación y adaptador de compatibilidad EPS.
+- Yahoo actualiza fundamentales recientes para la lista explícita configurada. Alpha Vantage construye el histórico inicial cuando `ALPHA_VANTAGE_KEY` está disponible en el entorno.
+- El bootstrap persiste en `<fundamentals_path>/bootstrap_state.json`; `completed` no se repite, `partial` y `quota_blocked` son reintentables, `no_data` requiere reset explícito y los errores ordinarios se conservan por símbolo. El agotamiento de cuota detiene el resto del lote.
+- La cobertura final determina el estado: 20 periodos fiscales únicos de `diluted_eps` o más es `completed`; de 1 a 19 es `partial`.
+- Los cálculos mantienen `fiscalDateEnding` como periodo fiscal y usan `reportedDate` como fecha de disponibilidad. Con cuatro trimestres se calcula LTM EPS y con 20 PER trimestrales válidos se calcula PER M5Y.
+- `% PER vs PER M5Y` usa la media histórica como denominador; la selección diferencia `Mantener (Atractivo)`, `Desestimar (No cumple criterios)` y `No evaluable (Datos insuficientes)`.
+- `BacktestWeb` adapta EPS normalizado al formato que consume Full Ratio. Si no hay EPS utilizable para todos los símbolos o falla el adaptador, conserva `manage_fundamental_data(...)` como fallback temporal.
+- Se añadieron tests offline para store, proveedores, updater, bootstrap, servicio, integración, adaptador, disponibilidad por `reportedDate`, profundidad, fórmulas y selección.
 
-### Trabajo previsto
+### Compatibilidad pendiente
 
-- Confirmar qué métricas fundamentales consume realmente cada estrategia.
-- Revisar el papel actual de Yahoo Finance y Alpha Vantage.
-- Separar la lógica del motor del proveedor concreto.
-- Normalizar el formato de datos fundamentales.
-- Revisar caché, antigüedad y actualización incremental.
-- Evitar inferir actualidad únicamente por nombres de fichero o trimestre.
-
-### Criterio de cierre
-
-El motor solicita métricas normalizadas y la capa de datos decide proveedor, caché y actualización.
+La sustitución del formato de entrada de Full Ratio y la retirada de `manage_fundamental_data()` / `download_fundamentals_AlphaV()` quedan para una fase posterior, cuando la compatibilidad y los resultados hayan sido validados suficientemente.
 
 ## 10. Prioridad 8 - Observabilidad, rendimiento y mantenimiento
 
@@ -251,8 +249,8 @@ Estado a 27/09/2026:
 6. Ampliar tests de lógica combinada - completado.
 7. Revisar pendientes menores de Bollinger y limpieza EMA/RSI - completado.
 8. Endurecer arranque/parada web - completado.
-9. [SIGUIENTE] Revisar datos fundamentales y proveedores.
-10. Abordar rendimiento, scheduler y limpieza legacy.
+9. Revisar datos fundamentales y proveedores - completado.
+10. [SIGUIENTE] Abordar observabilidad, rendimiento, scheduler y limpieza legacy.
 
 ## 12. Gestión continua del plan
 
@@ -331,12 +329,11 @@ Antes de cerrar cualquier bloque:
 
 ## 16. Próximo bloque concreto
 
-El siguiente bloque recomendado es **revisar los datos fundamentales y sus proveedores**.
+El siguiente bloque recomendado es **observabilidad, rendimiento, scheduler y limpieza legacy**.
 
 Objetivo inmediato:
 
-1. identificar qué métricas fundamentales consume realmente cada estrategia;
-2. revisar el papel actual de Yahoo Finance y Alpha Vantage;
-3. comprobar el flujo real de descarga, caché y actualización;
-4. separar, donde sea necesario, la lógica del motor del proveedor concreto;
-5. determinar antes de modificar resultados qué backtests podrían verse afectados.
+1. revisar tiempos de ejecución y puntos de espera del flujo web y del scheduler;
+2. vigilar crecimiento de logs, cachés y artefactos de diagnóstico;
+3. retirar código legacy solo cuando la cobertura y compatibilidad permitan hacerlo;
+4. conservar separados los scripts productivos, de diagnóstico y de mantenimiento.

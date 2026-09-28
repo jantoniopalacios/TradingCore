@@ -1,6 +1,6 @@
 # TradingCore: Motor Central y Arquitectura Modular
 
-Última actualización: 19/09/2026
+Última actualización: 29/09/2026
 
 Este repositorio contiene la arquitectura central (Motor) para múltiples escenarios de trading (Backtesting, Live Trading, Web Apps).
 
@@ -63,6 +63,14 @@ trading_engine/
 │   ├── Backtest_Runner.py            Orquestador del ciclo de backtesting
 │   ├── database_pg.py                Configuración y acceso compartido a PostgreSQL
 │   └── constants.py                  Constantes globales del motor
+├── fundamentals/                 🔴 Datos fundamentales normalizados
+│   ├── models.py                      Modelo normalizado de observación fundamental
+│   ├── store.py                       Almacenamiento acumulativo por símbolo
+│   ├── providers/                     Yahoo reciente y Alpha Vantage histórico
+│   ├── updater.py                      Actualización Yahoo
+│   ├── bootstrap.py                    Histórico y estado persistente
+│   ├── service.py                      Orquestación por símbolo
+│   └── legacy_adapter.py               Conversión temporal al formato EPS anterior
 ├── indicators/                   🔴 Filtros técnicos
 │   ├── Filtro_EMA.py                 Cruce de medias / precio vs EMA
 │   ├── Filtro_RSI.py                 Relative Strength Index
@@ -143,7 +151,7 @@ Data_files/
 └── Fundamentals/              Caché de datos fundamentales
 ```
 
-El motor reutiliza estos ficheros para reducir descargas y acelerar los backtests.
+La nueva capa fundamental guarda un CSV acumulativo por símbolo en `Fundamentals/` y el estado del bootstrap en `Fundamentals/bootstrap_state.json`. Los ficheros `Q1_`–`Q4_` se conservan únicamente para el fallback de compatibilidad.
 
 ---
 
@@ -168,8 +176,11 @@ Directorio de salida y de artefactos generados por las ejecuciones.
 Backtesting/
 ├── Graphics/                  🟡 Caché de gráficos HTML por usuario
 ├── Run_Results/               🟡 Resultados CSV de ejecuciones históricas
+├── diagnostics/                🟢 Salidas generadas de análisis y comparación
 └── logs/                      🟡 Logs persistentes de la aplicación y backtesting
 ```
+
+`Backtesting/diagnostics/` contiene artefactos de diagnóstico; no es una caché productiva ni una fuente de datos para el motor.
 
 El log persistente específico del scheduler se guarda en:
 
@@ -202,7 +213,7 @@ Los scripts auxiliares se agrupan por finalidad. No forman parte del núcleo del
 ```text
 scripts/
 ├── analysis/                    Análisis de resultados de backtests
-├── diagnostics/                 Diagnóstico manual de rutas, login y estado
+├── diagnostics/                 Diagnóstico manual; incluye comparación de proveedores fundamentales
 ├── experiments/                 Experimentos de estrategias e indicadores
 ├── maintenance/                 Administración y mantenimiento
 ├── presets/                     Configuraciones predefinidas
@@ -215,6 +226,8 @@ scripts/
 ├── query_backtest_results.py    Consulta y exportación de resultados
 └── verificar_backtest_web.py    Verificación de integridad de la app web
 ```
+
+`scripts/diagnostics/compare_fundamental_providers.py` compara cobertura de EPS y fechas de publicación de Yahoo, Alpha Vantage y, opcionalmente, la caché CSV. Es una herramienta manual de diagnóstico, no forma parte del flujo normal del backtest. Puede escribir sus resultados bajo `Backtesting/diagnostics/`.
 
 El scheduler utiliza APScheduler y mantiene su estado mediante los ficheros de `logs/`. Su log persistente se almacena en `Backtesting/logs/backtest_scheduler.log`.
 
@@ -231,7 +244,9 @@ tests/
 └── web/                        Pruebas de rutas y comportamiento web
 ```
 
-La batería incluye cobertura específica de señales y filtros técnicos para EMA, RSI, MACD, Stochastic, ATR, Volumen y Bollinger Bands.
+La batería incluye pruebas offline para store, Yahoo, updater, proveedor Alpha Vantage, bootstrap, servicio, integración del backtest, adaptador legado, alineación por `reportedDate`, profundidad histórica, desviación PER, margen de seguridad, Full Ratio, selección fundamental e histórico insuficiente.
+
+`pytest.ini` limita la colección a `tests/`, por lo que no se recogen suites internas de pgAdmin ni de otros componentes externos.
 
 La verificación habitual del proyecto puede ejecutarse mediante:
 
@@ -243,23 +258,24 @@ Este script ejecuta cuatro pasos: sintaxis Python, tests base, estado del servid
 
 ---
 
-### 🟡 Escenario Datos Fundamentales (`scenarios/Fundamental_Data/`)
+### 🟡 Datos Fundamentales y compatibilidad legado
 
-Conjunto de utilidades auxiliares para la descarga, actualización, migración y mantenimiento de datos fundamentales.
-
-Actualmente, el flujo productivo utilizado por el backtest web obtiene los datos fundamentales mediante Alpha Vantage:
+La capa activa de negocio es `trading_engine/fundamentals/`. El backtest web conserva una transición compatible:
 
 ```text
-scenarios/BacktestWeb/Backtest.py
-        ↓
-trading_engine/utils/Data_download.py
-        ↓
-manage_fundamental_data()
-        ↓
-download_fundamentals_AlphaV()
+símbolos configurados, sin ampliar el universo
+  -> Yahoo para fundamentales recientes
+  -> bootstrap histórico Alpha Vantage cuando corresponde
+  -> caché normalizada acumulativa por símbolo
+  -> adaptador EPS al formato requerido por Full Ratio
+  -> fallback Q legado si falta cobertura normalizada para algún símbolo o falla el adaptador
 ```
 
-El directorio `scenarios/Fundamental_Data/` contiene utilidades standalone y de mantenimiento y no constituye actualmente la ruta principal utilizada por el backtest web.
+Yahoo es el proveedor operativo habitual. Alpha Vantage construye el histórico inicial y no se repite para símbolos `completed`. La clave del bootstrap normalizado se obtiene de `ALPHA_VANTAGE_KEY`; si no existe, Yahoo sigue actualizando y el bootstrap no se solicita. La ruta legado conserva su interfaz anterior mientras dure la migración.
+
+Cada CSV normalizado conserva `symbol`, `fiscal_date`, `reported_date`, `metric`, `value`, `provider`, `source_type` y `updated_at`. `fiscal_date` identifica el periodo fiscal; `reported_date` es la fecha de disponibilidad y no se reemplaza por una fecha estimada. El detalle de fórmulas, estados, selección y look-ahead está en [ARCHITECTURE.md](ARCHITECTURE.md).
+
+El directorio `scenarios/Fundamental_Data/` conserva utilidades standalone y de mantenimiento; no es el flujo productivo del backtest web.
 
 ```text
 scenarios/Fundamental_Data/
@@ -268,22 +284,7 @@ scenarios/Fundamental_Data/
 └── database.py              Persistencia para estas utilidades
 ```
 
-#### Revisión pendiente de fundamentales
-
-La arquitectura de datos fundamentales está pendiente de una revisión más profunda.
-
-La evolución prevista es:
-
-- estudiar las métricas fundamentales disponibles mediante Yahoo Finance;
-- utilizar Yahoo Finance como fuente principal cuando proporcione los datos e histórico necesarios;
-- utilizar Alpha Vantage como fuente complementaria para ampliar el histórico cuando sea necesario;
-- determinar exactamente qué métricas fundamentales necesita cada estrategia;
-- desacoplar el motor de backtest del proveedor concreto de datos;
-- unificar el formato de datos procedentes de distintos proveedores;
-- mejorar la lógica de caché, antigüedad y actualización incremental;
-- evitar que el número de trimestre de un fichero sea el único criterio para determinar si una caché está actualizada.
-
-No debe asumirse una profundidad histórica fija de Yahoo Finance hasta que esta parte sea revisada y comprobada específicamente.
+La migración de proveedor, formato, persistencia, disponibilidad por fecha y adaptación al formato legado está implementada progresivamente. La arquitectura aún no ha retirado `manage_fundamental_data()` ni `download_fundamentals_AlphaV()`; su retirada requiere una fase posterior de compatibilidad y validación.
 
 ---
 

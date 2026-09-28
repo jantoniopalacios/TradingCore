@@ -1,6 +1,6 @@
 # Referencia API: Utilidades del Motor (`motor_utils`)
 
-Ultima actualizacion: 17/09/2026
+Ultima actualizacion: 29/09/2026
 
 Este documento resume las funciones y herramientas auxiliares utilizadas por el motor central y los indicadores.
 
@@ -41,8 +41,9 @@ Modulo responsable de descarga y gestion de datos de mercado y fundamentales.
 
 En el flujo productivo actual:
 - los datos historicos de mercado se obtienen principalmente mediante Yahoo Finance;
-- los datos fundamentales utilizados por el backtest web se gestionan actualmente mediante Alpha Vantage;
-- la arquitectura de fundamentales esta pendiente de una revision posterior para desacoplar la logica de negocio del proveedor concreto y mejorar la estrategia de cache.
+- la capa `trading_engine/fundamentals/` actualiza EPS reciente con Yahoo y utiliza Alpha Vantage para bootstrap historico;
+- `Data_download` intenta adaptar la cache normalizada y mantiene `manage_fundamental_data` / `download_fundamentals_AlphaV` como compatibilidad cuando falta cobertura para algun simbolo o falla el adaptador.
+- el detalle de estados, disponibilidad temporal y formulas fundamentales se mantiene en [la arquitectura canonica](../ARCHITECTURE.md#fundamentales-actualizacion-y-estado).
 
 ::: trading_engine.utils.Data_download
     options:
@@ -53,6 +54,11 @@ En el flujo productivo actual:
         - descargar_datos_YF
         - manage_fundamental_data
         - download_fundamentals_AlphaV
+        - update_normalized_fundamentals
+        - update_normalized_fundamentals_if_enabled
+        - load_fundamental_data_with_fallback
+
+      La capa normalizada incluye `FundamentalStore`, `FundamentalUpdater`, `AlphaVantageBootstrapper`, `FundamentalService` y `build_legacy_eps_dataframe`; su estado de bootstrap vive en `<fundamentals_path>/bootstrap_state.json`.
 
 ## Graficos Financieros
 
