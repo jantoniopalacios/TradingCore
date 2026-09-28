@@ -247,8 +247,10 @@ def calcular_fullratio_OHLCV(ohlcv_data: pd.DataFrame, financial_data: pd.DataFr
         symbol_q = df_fin[df_fin["Symbol"] == symbol].copy()
         
         # Ratios LTM
-        symbol_q["LTM EPS_Q"] = symbol_q["Diluted EPS"].rolling(window=4, min_periods=1).sum().round(2)
-        symbol_q["LTM EPS %_Q"] = (symbol_q["LTM EPS_Q"].pct_change() * 100).round(2)
+        symbol_q["LTM EPS_Q"] = symbol_q["Diluted EPS"].rolling(window=4, min_periods=4).sum().round(2)
+        symbol_q["LTM EPS %_Q"] = (
+            symbol_q["LTM EPS_Q"].pct_change(fill_method=None) * 100
+        ).round(2)
 
         # Precio para PER histórico
         symbol_prices = df_ohlcv[df_ohlcv["Symbol"] == symbol][["Date", "Close"]].sort_values("Date")
@@ -261,7 +263,7 @@ def calcular_fullratio_OHLCV(ohlcv_data: pd.DataFrame, financial_data: pd.DataFr
         )
         symbol_q["PER_Q"] = (symbol_q["Close"] / symbol_q["LTM EPS_Q"]).round(2)
         symbol_q.loc[symbol_q["LTM EPS_Q"] <= 0, "PER_Q"] = np.nan
-        symbol_q["PER M5Y_Q"] = symbol_q["PER_Q"].rolling(window=20, min_periods=1).mean().round(2)
+        symbol_q["PER M5Y_Q"] = symbol_q["PER_Q"].rolling(window=20, min_periods=20).mean().round(2)
         
         all_symbol_fundamentals.append(symbol_q)
 
