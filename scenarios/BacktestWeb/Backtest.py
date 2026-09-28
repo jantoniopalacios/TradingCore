@@ -32,8 +32,7 @@ try:
     from trading_engine.core.Backtest_Runner import run_multi_symbol_backtest 
     from trading_engine.utils.Data_download import (
         descargar_datos_YF,
-        manage_fundamental_data,
-        update_normalized_fundamentals_if_enabled,
+        load_fundamental_data_with_fallback,
     )
     from trading_engine.utils.Calculos_Financieros import calcular_fullratio_OHLCV, generar_seleccion_activos
     from trading_engine.utils.utils_mail import send_email
@@ -308,16 +307,11 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
             )
 
         financial_data = None
-        update_normalized_fundamentals_if_enabled(
-            bool(filtro_fundamental),
-            simbolos_df["Symbol"].tolist(),
-            fundamentals_path,
-        )
         if filtro_fundamental:
             _progress(5, 11, 'Fundamentales', 'Procesando datos fundamentales y ratios')
             logger.info("[5/9] Procesando datos fundamentales")
             try:
-                financial_data = manage_fundamental_data(
+                financial_data = load_fundamental_data_with_fallback(
                     simbolos_df, 
                     config_final.get('ALPHA_VANTAGE_KEY', "TU_KEY_POR_DEFECTO"), 
                     fundamentals_path

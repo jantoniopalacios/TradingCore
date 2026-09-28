@@ -111,6 +111,53 @@ def update_normalized_fundamentals(
     return results
 
 
+def load_fundamental_data_with_fallback(
+    simbolos_df: pd.DataFrame,
+    api_key_av: str,
+    fundamentals_path: Path,
+) -> pd.DataFrame:
+    """Prefiere EPS normalizado y conserva la descarga/caché fundamental legada como fallback."""
+    from trading_engine.fundamentals.legacy_adapter import (
+        build_legacy_eps_dataframe,
+    )
+
+    symbols = simbolos_df["Symbol"].tolist()
+    try:
+        update_normalized_fundamentals_if_enabled(
+            True,
+            symbols,
+            fundamentals_path,
+        )
+        normalized_data = build_legacy_eps_dataframe(
+            symbols,
+            fundamentals_path,
+        )
+        requested_set = {str(symbol).strip().upper() for symbol in symbols}
+        available_set = set(normalized_data["Symbol"].dropna().astype(str).str.upper())
+
+        if not normalized_data.empty and requested_set.issubset(available_set):
+            logger.info(
+                "Usando fundamentales EPS normalizados para %s símbolos.",
+                normalized_data["Symbol"].nunique(),
+            )
+            return normalized_data
+        logger.warning(
+            "La caché normalizada no contiene EPS utilizable; "
+            "se usará el mecanismo fundamental legado."
+        )
+    except Exception:
+        logger.exception(
+            "No se pudieron preparar fundamentales normalizados; "
+            "se usará el mecanismo fundamental legado."
+        )
+
+    return manage_fundamental_data(
+        simbolos_df,
+        api_key_av,
+        fundamentals_path,
+    )
+
+
 def _load_cached_ohlcv(csv_path: Path) -> pd.DataFrame:
     data = pd.read_csv(csv_path, index_col='Date', parse_dates=True)
     data.index = pd.to_datetime(data.index)
