@@ -30,7 +30,11 @@ if str(project_root) not in sys.path:
 # 4. Imports del Motor (Ahora que sys.path es correcto)
 try:
     from trading_engine.core.Backtest_Runner import run_multi_symbol_backtest 
-    from trading_engine.utils.Data_download import descargar_datos_YF, manage_fundamental_data
+    from trading_engine.utils.Data_download import (
+        descargar_datos_YF,
+        manage_fundamental_data,
+        update_normalized_fundamentals_if_enabled,
+    )
     from trading_engine.utils.Calculos_Financieros import calcular_fullratio_OHLCV, generar_seleccion_activos
     from trading_engine.utils.utils_mail import send_email
     from trading_engine.core.constants import COLUMNAS_HISTORICO 
@@ -304,6 +308,11 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
             )
 
         financial_data = None
+        update_normalized_fundamentals_if_enabled(
+            bool(filtro_fundamental),
+            simbolos_df["Symbol"].tolist(),
+            fundamentals_path,
+        )
         if filtro_fundamental:
             _progress(5, 11, 'Fundamentales', 'Procesando datos fundamentales y ratios')
             logger.info("[5/9] Procesando datos fundamentales")

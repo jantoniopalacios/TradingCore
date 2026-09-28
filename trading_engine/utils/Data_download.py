@@ -37,6 +37,80 @@ from trading_engine.core.database_pg import engine_pg
 logger = logging.getLogger(__name__)
 
 
+def update_normalized_fundamentals_if_enabled(
+    enabled: bool,
+    symbols: list[str],
+    fundamentals_path: Path,
+) -> list:
+    if not enabled:
+        return []
+    return update_normalized_fundamentals(symbols, fundamentals_path)
+
+
+def update_normalized_fundamentals(
+    symbols: list[str],
+    fundamentals_path: Path,
+) -> list:
+    """Actualiza la caché normalizada sin sustituir el flujo fundamental legado."""
+    from trading_engine.fundamentals.bootstrap import (
+        AlphaVantageBootstrapper,
+        BootstrapStateStore,
+    )
+    from trading_engine.fundamentals.providers.alpha_vantage import (
+        AlphaVantageFundamentalProvider,
+    )
+    from trading_engine.fundamentals.providers.yahoo import YahooFundamentalProvider
+    from trading_engine.fundamentals.service import FundamentalService
+    from trading_engine.fundamentals.store import FundamentalStore
+    from trading_engine.fundamentals.updater import FundamentalUpdater
+
+    requested_symbols = list(symbols)
+    folder_path = Path(fundamentals_path)
+
+    try:
+        store = FundamentalStore(folder_path)
+        yahoo_provider = YahooFundamentalProvider()
+        updater = FundamentalUpdater(store, yahoo_provider)
+        alpha_vantage_provider = AlphaVantageFundamentalProvider()
+        state_store = BootstrapStateStore(folder_path / "bootstrap_state.json")
+        bootstrapper = AlphaVantageBootstrapper(
+            store=store,
+            provider=alpha_vantage_provider,
+            state_store=state_store,
+        )
+        service = FundamentalService(store, updater, bootstrapper)
+        results = service.update_for_symbols(
+            requested_symbols,
+            bootstrap_missing=bool(os.getenv("ALPHA_VANTAGE_KEY")),
+        )
+    except Exception:
+        logger.exception(
+            "Error en la actualización fundamental normalizada; "
+            "se continuará con el flujo compatible."
+        )
+        return []
+
+    for result in results:
+        log_method = (
+            logger.warning
+            if result.yahoo_status == "error"
+            or result.bootstrap_status in {"error", "quota_blocked"}
+            else logger.info
+        )
+        log_method(
+            "Fundamentales %s | Yahoo=%s | bootstrap=%s | periodos=%s | proveedores=%s",
+            result.symbol,
+            result.yahoo_status,
+            result.bootstrap_status,
+            result.unique_fiscal_periods,
+            ", ".join(result.providers) or "ninguno",
+        )
+        if result.message:
+            logger.warning("Fundamentales %s: %s", result.symbol, result.message)
+
+    return results
+
+
 def _load_cached_ohlcv(csv_path: Path) -> pd.DataFrame:
     data = pd.read_csv(csv_path, index_col='Date', parse_dates=True)
     data.index = pd.to_datetime(data.index)
