@@ -94,7 +94,7 @@ def test_full_ratio_formula_is_unchanged_with_sufficient_history():
     quarterly_per[ltm_eps <= 0] = np.nan
     per_mean = quarterly_per.rolling(window=20, min_periods=20).mean().round(2)
     final_per = quarterly_per.iloc[-1]
-    per_vs_mean = round(100 * (final_per - per_mean.iloc[-1]) / final_per, 2)
+    per_vs_mean = round(100 * (final_per - per_mean.iloc[-1]) / per_mean.iloc[-1], 2)
     safety_margin = round(ltm_eps_pct.iloc[-1] - per_vs_mean, 2)
     expected_full_ratio = round(safety_margin / final_per, 2)
 

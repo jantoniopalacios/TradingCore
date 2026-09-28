@@ -298,10 +298,16 @@ def calcular_fullratio_OHLCV(ohlcv_data: pd.DataFrame, financial_data: pd.DataFr
 
     # 6. Ratios Diarios
     stocks_data["PER"] = (stocks_data["Close"] / stocks_data["LTM EPS_Q"]).round(2)
-    valid_per = (stocks_data["PER"].notna()) & (stocks_data["PER"] != 0)
+    valid_per_mean = (
+        np.isfinite(stocks_data["PER"])
+        & np.isfinite(stocks_data["PER M5Y_Q"])
+        & (stocks_data["PER M5Y_Q"] > 0)
+    )
     stocks_data["% PER vs PER M5Y"] = np.nan
-    stocks_data.loc[valid_per, "% PER vs PER M5Y"] = (
-        100 * (stocks_data["PER"] - stocks_data["PER M5Y_Q"]) / stocks_data["PER"]
+    stocks_data.loc[valid_per_mean, "% PER vs PER M5Y"] = (
+        100
+        * (stocks_data["PER"] - stocks_data["PER M5Y_Q"])
+        / stocks_data["PER M5Y_Q"]
     ).round(2)
     stocks_data["Margen de seguridad"] = (stocks_data["LTM EPS %_Q"] - stocks_data["% PER vs PER M5Y"]).round(2)
     stocks_data["Full Ratio"] = (stocks_data["Margen de seguridad"] / stocks_data["PER"]).round(2)
