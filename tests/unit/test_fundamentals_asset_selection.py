@@ -18,6 +18,7 @@ COLUMNS = [
 ]
 ATTRACTIVE = "Mantener (Atractivo)"
 REJECTED = "Desestimar (No cumple criterios)"
+NOT_EVALUABLE = "No evaluable (Datos insuficientes)"
 
 
 def _row(
@@ -83,7 +84,7 @@ def test_each_nonpositive_condition_rejects_even_when_others_are_positive(
     assert _recommendation(selection, "AAPL") == REJECTED
 
 
-def test_nan_growth_or_margin_is_classified_as_rejected():
+def test_nan_growth_or_margin_is_classified_as_not_evaluable():
     selection = _select(
         [
             ("2025-09-29", _row("GROWTH", growth=np.nan)),
@@ -91,17 +92,35 @@ def test_nan_growth_or_margin_is_classified_as_rejected():
         ]
     )
 
-    assert _recommendation(selection, "GROWTH") == REJECTED
-    assert _recommendation(selection, "MARGIN") == REJECTED
+    assert _recommendation(selection, "GROWTH") == NOT_EVALUABLE
+    assert _recommendation(selection, "MARGIN") == NOT_EVALUABLE
 
 
-def test_nan_full_ratio_is_dropped_from_selection():
+def test_nan_full_ratio_is_classified_as_not_evaluable():
     selection = _select(
         [("2025-09-29", _row("AAPL", full_ratio=np.nan))]
     )
 
-    assert "AAPL" not in selection.index
-    assert selection.empty
+    assert _recommendation(selection, "AAPL") == NOT_EVALUABLE
+
+
+def test_missing_required_metric_column_is_classified_as_not_evaluable():
+    stocks_data = pd.DataFrame(
+        {
+            "Symbol": ["AAPL"],
+            "Close": [100.0],
+            "LTM EPS %": [10.0],
+            "Full Ratio": [1.0],
+        },
+        index=pd.DatetimeIndex(["2025-09-29"], name="Date"),
+    )
+
+    selection = generar_seleccion_activos(
+        stocks_data,
+        logging.getLogger("test.asset_selection"),
+    )
+
+    assert _recommendation(selection, "AAPL") == NOT_EVALUABLE
 
 
 def test_only_latest_market_date_is_used_for_a_symbol():
@@ -113,6 +132,18 @@ def test_only_latest_market_date_is_used_for_a_symbol():
     )
 
     assert _recommendation(selection, "AAPL") == REJECTED
+
+
+def test_latest_date_is_selected_independently_for_each_symbol():
+    selection = _select(
+        [
+            ("2025-09-28", _row("AAPL", growth=10.0, margin=10.0, full_ratio=10.0)),
+            ("2025-09-29", _row("MSFT", growth=10.0, margin=10.0, full_ratio=10.0)),
+        ]
+    )
+
+    assert _recommendation(selection, "AAPL") == ATTRACTIVE
+    assert _recommendation(selection, "MSFT") == ATTRACTIVE
 
 
 def test_symbols_on_latest_date_are_evaluated_independently():
@@ -142,3 +173,17 @@ def test_and_logic_requires_every_condition_to_be_positive():
     assert _recommendation(selection, "B") == REJECTED
     assert _recommendation(selection, "C") == REJECTED
     assert _recommendation(selection, "D") == ATTRACTIVE
+
+
+def test_missing_metrics_receive_distinct_classification_from_rejection():
+    selection = _select(
+        [
+            ("2025-09-29", _row("ATTRACTIVE", growth=1.0, margin=1.0, full_ratio=1.0)),
+            ("2025-09-29", _row("REJECTED", growth=0.0, margin=1.0, full_ratio=1.0)),
+            ("2025-09-29", _row("UNKNOWN", full_ratio=np.nan)),
+        ]
+    )
+
+    assert _recommendation(selection, "ATTRACTIVE") == ATTRACTIVE
+    assert _recommendation(selection, "REJECTED") == REJECTED
+    assert _recommendation(selection, "UNKNOWN") == NOT_EVALUABLE

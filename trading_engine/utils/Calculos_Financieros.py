@@ -354,28 +354,27 @@ def generar_seleccion_activos(stocks_data: pd.DataFrame, logger) -> pd.DataFrame
         logger.warning("Error: El DataFrame de stocks_data está vacío para la selección.")
         return pd.DataFrame()
 
-    # 1. Encontrar la fecha más reciente disponible
-    try:
-        fecha_actual = stocks_data.index.max()
-        if pd.isna(fecha_actual):
-            logger.warning("No se pudo determinar la fecha más reciente del índice.")
+    # 1. Asegurar el símbolo y seleccionar la observación más reciente por activo.
+    data_actual = stocks_data.copy()
+    if "Symbol" not in data_actual.columns:
+        data_actual = data_actual.reset_index()
+        if "Symbol" not in data_actual.columns:
+            logger.error("La columna 'Symbol' no se encontró en los datos.")
             return pd.DataFrame()
-        logger.info(f"Analizando la selección de activos con datos del: {fecha_actual.strftime('%Y-%m-%d')}")
+
+    try:
+        data_actual["_selection_date"] = stocks_data.index
+        latest_dates = data_actual.groupby("Symbol")["_selection_date"].transform("max")
+        data_actual = data_actual[
+            data_actual["_selection_date"] == latest_dates
+        ].copy()
+        if data_actual.empty:
+            logger.warning("No se pudo determinar una fecha reciente por símbolo.")
+            return pd.DataFrame()
     except Exception as e:
-        logger.error(f"Error al obtener la fecha máxima del índice: {e}")
+        logger.error(f"Error al obtener la fecha más reciente por símbolo: {e}")
         return pd.DataFrame()
-    
-    # 2. Filtrar los datos solo para esa fecha (último día de cotización)
-    data_actual = stocks_data.loc[stocks_data.index == fecha_actual].copy()
-    
-    # 3. Asegurar que 'Symbol' esté en las columnas
-    if 'Symbol' not in data_actual.columns:
-         data_actual.reset_index(inplace=True)
-         # Restaurar el índice original
-         if stocks_data.index.name in data_actual.columns:
-             data_actual.set_index(stocks_data.index.name, inplace=True)
-         
-    
+
     # 4. Seleccionar ratios clave y limpiar NaNs en Full Ratio
     columnas_clave = [
         "Symbol",
@@ -386,32 +385,33 @@ def generar_seleccion_activos(stocks_data: pd.DataFrame, logger) -> pd.DataFrame
         "Margen de seguridad",
         "Full Ratio",
     ]
-    
-    # Filtrar solo las columnas que existen y eliminar NaNs en la columna de decisión 'Full Ratio'
-    if "Symbol" in data_actual.columns:
-        data_actual_indexed = data_actual[[col for col in columnas_clave if col in data_actual.columns]].dropna(
-            subset=["Full Ratio"] 
-        ).set_index("Symbol")
-    else:
-        logger.error("La columna 'Symbol' no se encontró en los datos actuales, no se puede realizar la selección por activo.")
-        return pd.DataFrame()
-        
-    data_actual = data_actual_indexed 
+
+    metricas_requeridas = ["LTM EPS %", "Margen de seguridad", "Full Ratio"]
+    for columna in metricas_requeridas:
+        if columna not in data_actual.columns:
+            data_actual[columna] = np.nan
+
+    data_actual = data_actual[
+        [col for col in columnas_clave if col in data_actual.columns]
+    ].set_index("Symbol")
 
     if data_actual.empty:
-        logger.warning(f"Advertencia: Ningún activo tiene el 'Full Ratio' calculado en la fecha más reciente ({fecha_actual.strftime('%Y-%m-%d')}).")
+        logger.warning("No hay activos con observaciones para evaluar.")
         return pd.DataFrame()
 
     # 5. Lógica de Recomendación (Criterios de Atractivo Fundamental)
     # Criterios: LTM EPS % > 0, Margen de seguridad > 0, Full Ratio > 0
+    no_evaluable = data_actual[metricas_requeridas].isna().any(axis=1)
     criterios = (
         (data_actual["LTM EPS %"] > 0)
         & (data_actual["Margen de seguridad"] > 0)
         & (data_actual["Full Ratio"] > 0)
     )
-    
-    data_actual["Recomendación"] = np.where(
-        criterios, "Mantener (Atractivo)", "Desestimar (No cumple criterios)"
+
+    data_actual["Recomendación"] = np.select(
+        [no_evaluable, criterios],
+        ["No evaluable (Datos insuficientes)", "Mantener (Atractivo)"],
+        default="Desestimar (No cumple criterios)",
     )
     
     # 6. Formato de presentación
