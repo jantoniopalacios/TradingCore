@@ -354,25 +354,31 @@ def generar_seleccion_activos(stocks_data: pd.DataFrame, logger) -> pd.DataFrame
         logger.warning("Error: El DataFrame de stocks_data está vacío para la selección.")
         return pd.DataFrame()
 
-    # 1. Asegurar el símbolo y seleccionar la observación más reciente por activo.
-    data_actual = stocks_data.copy()
-    if "Symbol" not in data_actual.columns:
-        data_actual = data_actual.reset_index()
-        if "Symbol" not in data_actual.columns:
-            logger.error("La columna 'Symbol' no se encontró en los datos.")
-            return pd.DataFrame()
-
+    # 1. Seleccionar exclusivamente la fecha de mercado global más reciente.
     try:
-        data_actual["_selection_date"] = stocks_data.index
-        latest_dates = data_actual.groupby("Symbol")["_selection_date"].transform("max")
-        data_actual = data_actual[
-            data_actual["_selection_date"] == latest_dates
-        ].copy()
-        if data_actual.empty:
-            logger.warning("No se pudo determinar una fecha reciente por símbolo.")
+        fecha_actual = stocks_data.index.max()
+        if pd.isna(fecha_actual):
+            logger.warning("No se pudo determinar la fecha más reciente del índice.")
             return pd.DataFrame()
+        logger.info(
+            "Analizando la selección de activos con datos del: %s",
+            fecha_actual.strftime("%Y-%m-%d"),
+        )
     except Exception as e:
-        logger.error(f"Error al obtener la fecha más reciente por símbolo: {e}")
+        logger.error(f"Error al obtener la fecha máxima del índice: {e}")
+        return pd.DataFrame()
+
+    data_actual = stocks_data.loc[stocks_data.index == fecha_actual].copy()
+    if "Symbol" not in data_actual.columns:
+        data_actual.reset_index(inplace=True)
+        if stocks_data.index.name in data_actual.columns:
+            data_actual.set_index(stocks_data.index.name, inplace=True)
+
+    if "Symbol" not in data_actual.columns:
+        logger.error(
+            "La columna 'Symbol' no se encontró en los datos actuales, "
+            "no se puede realizar la selección por activo."
+        )
         return pd.DataFrame()
 
     # 4. Seleccionar ratios clave y limpiar NaNs en Full Ratio

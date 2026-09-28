@@ -134,7 +134,7 @@ def test_only_latest_market_date_is_used_for_a_symbol():
     assert _recommendation(selection, "AAPL") == REJECTED
 
 
-def test_latest_date_is_selected_independently_for_each_symbol():
+def test_only_symbols_on_global_latest_date_are_selected():
     selection = _select(
         [
             ("2025-09-28", _row("AAPL", growth=10.0, margin=10.0, full_ratio=10.0)),
@@ -142,8 +142,9 @@ def test_latest_date_is_selected_independently_for_each_symbol():
         ]
     )
 
-    assert _recommendation(selection, "AAPL") == ATTRACTIVE
     assert _recommendation(selection, "MSFT") == ATTRACTIVE
+    assert "AAPL" not in selection.index
+    assert set(selection.index) == {"MSFT"}
 
 
 def test_symbols_on_latest_date_are_evaluated_independently():
