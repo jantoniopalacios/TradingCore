@@ -121,7 +121,16 @@ def load_fundamental_data_with_fallback(
         build_legacy_eps_dataframe,
     )
 
-    symbols = simbolos_df["Symbol"].tolist()
+    symbols = list(
+        dict.fromkeys(
+            str(symbol).strip().upper()
+            for symbol in simbolos_df["Symbol"].tolist()
+            if pd.notna(symbol) and str(symbol).strip()
+        )
+    )
+    normalized_data = pd.DataFrame(
+        columns=["Symbol", "fiscalDateEnding", "reportedDate", "Diluted EPS"]
+    )
     try:
         update_normalized_fundamentals_if_enabled(
             True,
@@ -133,29 +142,70 @@ def load_fundamental_data_with_fallback(
             fundamentals_path,
         )
         requested_set = {str(symbol).strip().upper() for symbol in symbols}
-        available_set = set(normalized_data["Symbol"].dropna().astype(str).str.upper())
-
-        if not normalized_data.empty and requested_set.issubset(available_set):
-            logger.info(
-                "Usando fundamentales EPS normalizados para %s símbolos.",
-                normalized_data["Symbol"].nunique(),
-            )
-            return normalized_data
-        logger.warning(
-            "La caché normalizada no contiene EPS utilizable; "
-            "se usará el mecanismo fundamental legado."
-        )
+        covered_set = {
+            str(symbol).strip().upper()
+            for symbol in normalized_data["Symbol"].dropna()
+        }
     except Exception:
         logger.exception(
             "No se pudieron preparar fundamentales normalizados; "
-            "se usará el mecanismo fundamental legado."
+            "se usará el mecanismo fundamental legado para todos los símbolos."
         )
+        requested_set = set(symbols)
+        covered_set = set()
 
-    return manage_fundamental_data(
-        simbolos_df,
-        api_key_av,
-        fundamentals_path,
+    if requested_set.issubset(covered_set):
+        logger.info(
+            "Usando fundamentales EPS normalizados para %s símbolos.",
+            normalized_data["Symbol"].nunique(),
+        )
+        return normalized_data
+
+    missing_symbols = [symbol for symbol in symbols if symbol not in covered_set]
+    missing_symbols_df = pd.DataFrame({"Symbol": missing_symbols})
+    legacy_path = Path(fundamentals_path).parent / "Fundamentals_Legacy"
+    logger.info(
+        "Usando fallback legacy para %s de %s símbolos sin EPS normalizado utilizable.",
+        len(missing_symbols),
+        len(symbols),
     )
+    legacy_data = manage_fundamental_data(
+        missing_symbols_df,
+        api_key_av,
+        legacy_path,
+    )
+
+    if legacy_data is None or legacy_data.empty:
+        return normalized_data
+    if normalized_data.empty:
+        return legacy_data
+
+    legacy_data = legacy_data.copy()
+    if (
+        "fiscalDateEnding" not in legacy_data.columns
+        and legacy_data.index.name == "fiscalDateEnding"
+    ):
+        legacy_data = legacy_data.reset_index()
+
+    combined = pd.concat(
+        [normalized_data, legacy_data],
+        ignore_index=True,
+        sort=False,
+    )
+    if {"Symbol", "fiscalDateEnding"}.issubset(combined.columns):
+        combined["Symbol"] = combined["Symbol"].astype("string").str.strip().str.upper()
+        combined["fiscalDateEnding"] = pd.to_datetime(
+            combined["fiscalDateEnding"], errors="coerce"
+        )
+        valid_keys = combined["Symbol"].notna() & combined["fiscalDateEnding"].notna()
+        duplicate_indexes = combined.loc[valid_keys].index[
+            combined.loc[valid_keys].duplicated(
+                ["Symbol", "fiscalDateEnding"], keep="first"
+            )
+        ]
+        combined = combined.drop(index=duplicate_indexes).reset_index(drop=True)
+
+    return combined
 
 
 def _load_cached_ohlcv(csv_path: Path) -> pd.DataFrame:

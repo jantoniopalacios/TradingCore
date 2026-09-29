@@ -118,7 +118,8 @@ def test_sorts_periods_chronologically_per_symbol(tmp_path):
 
 
 def test_normalized_cache_is_used_without_calling_legacy_download(tmp_path, monkeypatch):
-    FundamentalStore(tmp_path).merge_records(
+    fundamentals_path = tmp_path / "Fundamentals"
+    FundamentalStore(fundamentals_path).merge_records(
         "AAPL",
         [_record("AAPL", date(2025, 3, 31), "yahoo", 1.25)],
     )
@@ -137,13 +138,15 @@ def test_normalized_cache_is_used_without_calling_legacy_download(tmp_path, monk
     result = Data_download.load_fundamental_data_with_fallback(
         symbols,
         "unused",
-        tmp_path,
+        fundamentals_path,
     )
 
     assert result.iloc[0]["Diluted EPS"] == 1.25
+    assert not (tmp_path / "Fundamentals_Legacy").exists()
 
 
 def test_empty_normalized_cache_falls_back_to_legacy(tmp_path, monkeypatch):
+    fundamentals_path = tmp_path / "Fundamentals"
     monkeypatch.setattr(
         Data_download,
         "update_normalized_fundamentals_if_enabled",
@@ -152,8 +155,8 @@ def test_empty_normalized_cache_falls_back_to_legacy(tmp_path, monkeypatch):
     legacy_data = pd.DataFrame({"Symbol": ["AAPL"], "Diluted EPS": [1.0]})
     legacy_calls = []
 
-    def fake_legacy(symbols_df, api_key, fundamentals_path):
-        legacy_calls.append(symbols_df["Symbol"].tolist())
+    def fake_legacy(symbols_df, api_key, legacy_path):
+        legacy_calls.append((symbols_df["Symbol"].tolist(), legacy_path))
         return legacy_data
 
     monkeypatch.setattr(Data_download, "manage_fundamental_data", fake_legacy)
@@ -162,37 +165,46 @@ def test_empty_normalized_cache_falls_back_to_legacy(tmp_path, monkeypatch):
     result = Data_download.load_fundamental_data_with_fallback(
         symbols,
         "unused",
-        tmp_path,
+        fundamentals_path,
     )
 
     assert result is legacy_data
-    assert legacy_calls == [["AAPL", "MSFT"]]
+    assert legacy_calls == [(["AAPL", "MSFT"], tmp_path / "Fundamentals_Legacy")]
     assert symbols["Symbol"].tolist() == ["AAPL", "MSFT"]
 
 
 def test_adapter_error_falls_back_to_legacy(tmp_path, monkeypatch):
+    fundamentals_path = tmp_path / "Fundamentals"
     monkeypatch.setattr(
         Data_download,
         "update_normalized_fundamentals_if_enabled",
         lambda *args: (_ for _ in ()).throw(RuntimeError("adapter error")),
     )
     legacy_data = pd.DataFrame({"Symbol": ["AAPL"]})
+    legacy_calls = []
+
+    def fake_legacy(symbols_df, api_key, legacy_path):
+        legacy_calls.append((symbols_df["Symbol"].tolist(), legacy_path))
+        return legacy_data
+
     monkeypatch.setattr(
         Data_download,
         "manage_fundamental_data",
-        lambda *args: legacy_data,
+        fake_legacy,
     )
 
     result = Data_download.load_fundamental_data_with_fallback(
         pd.DataFrame({"Symbol": ["AAPL"]}),
         "unused",
-        tmp_path,
+        fundamentals_path,
     )
 
     assert result is legacy_data
+    assert legacy_calls == [(["AAPL"], tmp_path / "Fundamentals_Legacy")]
 
 def test_partial_normalized_cache_falls_back_to_legacy(tmp_path, monkeypatch):
-    store = FundamentalStore(tmp_path)
+    fundamentals_path = tmp_path / "Fundamentals"
+    store = FundamentalStore(fundamentals_path)
     store.merge_records(
         "AAPL",
         [_record("AAPL", date(2025, 3, 31), "yahoo", 1.25)],
@@ -207,14 +219,21 @@ def test_partial_normalized_cache_falls_back_to_legacy(tmp_path, monkeypatch):
     legacy_data = pd.DataFrame(
         {
             "Symbol": ["AAPL", "MSFT"],
-            "Diluted EPS": [1.25, 3.50],
+            "fiscalDateEnding": ["2025-03-31", "2025-03-31"],
+            "Diluted EPS": [99.0, 3.50],
+            "totalRevenue": [100.0, 200.0],
         }
     )
+    legacy_calls = []
+
+    def fake_legacy(symbols_df, api_key, legacy_path):
+        legacy_calls.append((symbols_df["Symbol"].tolist(), legacy_path))
+        return legacy_data
 
     monkeypatch.setattr(
         Data_download,
         "manage_fundamental_data",
-        lambda *args: legacy_data,
+        fake_legacy,
     )
 
     symbols = pd.DataFrame({"Symbol": ["AAPL", "MSFT"]})
@@ -222,7 +241,14 @@ def test_partial_normalized_cache_falls_back_to_legacy(tmp_path, monkeypatch):
     result = Data_download.load_fundamental_data_with_fallback(
         symbols,
         "unused",
-        tmp_path,
+        fundamentals_path,
     )
 
-    assert result is legacy_data
+    assert legacy_calls == [(["MSFT"], tmp_path / "Fundamentals_Legacy")]
+    assert result["Symbol"].tolist() == ["AAPL", "MSFT"]
+    assert result.loc[result["Symbol"] == "AAPL", "Diluted EPS"].iloc[0] == 1.25
+    assert result.loc[result["Symbol"] == "MSFT", "Diluted EPS"].iloc[0] == 3.50
+    assert result.loc[result["Symbol"] == "MSFT", "totalRevenue"].iloc[0] == 200.0
+    assert not result.duplicated(["Symbol", "fiscalDateEnding"]).any()
+    assert not list(fundamentals_path.glob("Q[0-4]_*.csv"))
+    assert not list((tmp_path / "Fundamentals_Legacy").glob("Q[0-4]_*.csv"))

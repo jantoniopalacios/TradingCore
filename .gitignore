@@ -68,3 +68,4 @@ site/
 Data_files/Backtest_config/**/*.json
 # --- Cache fundamental normalizada generada ---
 Data_Files/Fundamentals/
+Data_Files/Fundamentals_Legacy/
