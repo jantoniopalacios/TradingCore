@@ -36,6 +36,7 @@ docs/_build/
 Backtesting/Run_Results/**
 Backtesting/Graphics/**
 Backtesting/Logs/**
+Backtesting/diagnostics/**
 
 # Evitar subir configuraciones locales
 Backtesting/Config/*.env
