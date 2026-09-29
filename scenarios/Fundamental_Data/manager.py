@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import func
 from database import engine, SessionLocal, FundamentalData, Simbolo
 
-# Tu API Key de Alpha Vantage
+# Tu API Key de Alpha Vantage, API_KEY = "60NPBW4583RN0HSB"
 API_KEY = "60NPBW4583RN0HSB"
 
 def limpiar_ticker(nombre_archivo):

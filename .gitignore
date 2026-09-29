@@ -66,3 +66,5 @@ site/
 
 # --- Configuraciones locales de usuarios de Backtest ---
 Data_files/Backtest_config/**/*.json
+# --- Cache fundamental normalizada generada ---
+Data_Files/Fundamentals/
