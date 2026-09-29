@@ -31,7 +31,7 @@ Estado consolidado a 19/09/2026:
 - Commit de cierre MACD: `6ad2d9e fix: alinear MACD entre interfaz y motor`.
 - Plan de trabajo versionado en `docs/Plans/`.
 
-El bloque de revisión de datos fundamentales y proveedores ya está implementado de forma progresiva. El siguiente bloque técnico pendiente es observabilidad, rendimiento, scheduler y limpieza legacy.
+La arquitectura fundamental normalizada, actualización Yahoo, bootstrap histórico AV, disponibilidad anti-look-ahead, integración del backtest, fallback parcial separado, dashboard de solo lectura y ayudas contextuales están implementados y documentados. El siguiente bloque técnico pendiente es observabilidad, rendimiento, scheduler y retirada controlada de componentes legacy.
 
 ## 3. Prioridad 1 - Crear un verdadero Manual de Usuario [COMPLETADA]
 
@@ -215,17 +215,19 @@ El operador puede saber de forma inequívoca qué proceso web está activo y rei
 ### Resultado implementado
 
 - `trading_engine/fundamentals/` contiene el modelo normalizado, store acumulativo por símbolo, proveedores, updater, bootstrap persistente, servicio de orquestación y adaptador de compatibilidad EPS.
-- Yahoo actualiza fundamentales recientes para la lista explícita configurada. Alpha Vantage construye el histórico inicial cuando `ALPHA_VANTAGE_KEY` está disponible en el entorno.
-- El bootstrap persiste en `<fundamentals_path>/bootstrap_state.json`; `completed` no se repite, `partial` y `quota_blocked` son reintentables, `no_data` requiere reset explícito y los errores ordinarios se conservan por símbolo. El agotamiento de cuota detiene el resto del lote.
-- La cobertura final determina el estado: 20 periodos fiscales únicos de `diluted_eps` o más es `completed`; de 1 a 19 es `partial`.
-- Los cálculos mantienen `fiscalDateEnding` como periodo fiscal y usan `reportedDate` como fecha de disponibilidad. Con cuatro trimestres se calcula LTM EPS y con 20 PER trimestrales válidos se calcula PER M5Y.
-- `% PER vs PER M5Y` usa la media histórica como denominador; la selección diferencia `Mantener (Atractivo)`, `Desestimar (No cumple criterios)` y `No evaluable (Datos insuficientes)`.
-- `BacktestWeb` adapta EPS normalizado al formato que consume Full Ratio. Si no hay EPS utilizable para todos los símbolos o falla el adaptador, conserva `manage_fundamental_data(...)` como fallback temporal.
+- `models.py`, `store.py`, `providers/yahoo.py`, `providers/alpha_vantage.py`, `updater.py`, `bootstrap.py`, `service.py` y `legacy_adapter.py` implementan el modelo y el flujo normalizados.
+- Yahoo actualiza fundamentales recientes para la lista explícita configurada. Alpha Vantage usa el endpoint EARNINGS (una llamada por símbolo) para histórico cuando `ALPHA_VANTAGE_KEY` está disponible; sin clave no se solicita bootstrap.
+- El bootstrap persiste en `<fundamentals_path>/bootstrap_state.json`; `completed` requiere 20 periodos EPS únicos y no se repite; `partial` (1–19), `quota_blocked` y `error` son reintentables; `no_data` es terminal hasta reset explícito. Si se agota la cuota, se persiste el estado y se detiene el lote.
+- `fiscal_date` identifica el periodo fiscal y `reported_date` la disponibilidad, evitando look-ahead. LTM EPS requiere 4 trimestres completos y PER M5Y 20 PER trimestrales válidos.
+- `% PER vs PER M5Y = 100 * (PER - PER_M5Y) / PER_M5Y`; baseline inválido o `<= 0` produce NaN. Margen de seguridad = `LTM EPS % - % PER vs PER M5Y`; Full Ratio = `Margen de seguridad / PER`.
+- La selección usa una fecha global de mercado: falta métrica requerida = `No evaluable (Datos insuficientes)`; las tres métricas positivas = `Mantener (Atractivo)`; resto = `Desestimar (No cumple criterios)`.
+- `Data_Files/Fundamentals/` almacena solo el formato normalizado por símbolo; `Data_Files/Fundamentals_Legacy/` separa `Q*`. El fallback solo consulta símbolos sin EPS normalizado utilizable y combina en memoria, dando prioridad a normalizado si coincide símbolo/periodo.
+- `/fundamentals` y `/fundamentals/<symbol>` muestran cobertura EPS por separado de valoración y son de solo lectura. Se añadieron ayudas contextuales en el switch, resumen y detalle; la documentación existente se actualizó para arquitectura, operación y usuario.
 - Se añadieron tests offline para store, proveedores, updater, bootstrap, servicio, integración, adaptador, disponibilidad por `reportedDate`, profundidad, fórmulas y selección.
 
 ### Compatibilidad pendiente
 
-La sustitución del formato de entrada de Full Ratio y la retirada de `manage_fundamental_data()` / `download_fundamentals_AlphaV()` quedan para una fase posterior, cuando la compatibilidad y los resultados hayan sido validados suficientemente.
+La retirada de `manage_fundamental_data()` / `download_fundamentals_AlphaV()` y del adaptador de compatibilidad queda para una fase posterior, cuando Full Ratio consuma directamente el formato normalizado y la compatibilidad/resultados hayan sido validados suficientemente. El almacenamiento legacy ya está separado y su fallback limitado a símbolos faltantes.
 
 ## 10. Prioridad 8 - Observabilidad, rendimiento y mantenimiento
 

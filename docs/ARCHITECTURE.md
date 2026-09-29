@@ -40,13 +40,18 @@ La comunicación es directa por importaciones Python y por base de datos. No se 
 - Descarga de datos (`Data_download.py`), cálculo de ratios/fundamentales (`Calculos_Financieros.py`), correo (`utils_mail.py`) y utilidades técnicas.
 
 `trading_engine/fundamentals/`
-- Capa normalizada de fundamentales, acumulativa por símbolo y todavía integrada progresivamente con el formato legado.
+- Capa normalizada de fundamentales, acumulativa por símbolo e integrada con el backtest web mediante un adaptador de compatibilidad.
 - `FundamentalRecord` conserva `symbol`, `fiscal_date`, `reported_date`, `metric`, `value`, `provider`, `source_type` y `updated_at`.
 - `FundamentalStore` fusiona registros por símbolo sin eliminar la procedencia; `fiscal_date` identifica el trimestre y `reported_date` indica desde cuándo podía conocerse el dato.
-- `YahooFundamentalProvider` y `FundamentalUpdater` mantienen los datos recientes para la lista explícita de símbolos.
-- `AlphaVantageFundamentalProvider` y `AlphaVantageBootstrapper` construyen histórico inicial. El bootstrap persiste su estado en `<fundamentals_path>/bootstrap_state.json`.
+- `providers/yahoo.py` y `updater.py` mantienen la actualización operativa de los datos recientes.
+- `providers/alpha_vantage.py` y `bootstrap.py` construyen el histórico inicial consultando el endpoint EARNINGS una vez por símbolo. El bootstrap persiste su estado en `<fundamentals_path>/bootstrap_state.json`.
 - `FundamentalService` coordina actualización Yahoo y bootstrap, y devuelve cobertura/estado por símbolo.
-- `legacy_adapter.py` convierte EPS normalizado al DataFrame que todavía consume Full Ratio.
+- `legacy_adapter.py` convierte EPS normalizado al DataFrame legacy-compatible que consume Full Ratio.
+
+Almacenamiento fundamental:
+
+- `Data_Files/Fundamentals/` es la caché normalizada: un CSV por símbolo exacto (por ejemplo, `AAPL.csv`) con columnas `symbol`, `fiscal_date`, `reported_date`, `metric`, `value`, `provider`, `source_type` y `updated_at`; también guarda `bootstrap_state.json`. No debe contener archivos `Q*`.
+- `Data_Files/Fundamentals_Legacy/` contiene exclusivamente la caché de compatibilidad/fallback (`Q0_*`, `Q1_*`, etc.). No pertenece al modelo normalizado.
 
 ### 2.2 Escenario web (`scenarios/BacktestWeb/`)
 
@@ -146,35 +151,41 @@ Contrato de la capa HTTP (`main_bp.py`):
 6. `ejecutar_backtest()` mezcla configuración guardada y enviada, y reporta hitos con callback.
 7. Obtiene símbolos del usuario (`simbolos`).
 8. Descarga datos de mercado y, si `filtro_fundamental` está activo, envía exactamente los símbolos configurados a la actualización fundamental.
-9. La capa normalizada actualiza Yahoo y solicita bootstrap Alpha Vantage cuando está configurada la clave de entorno. Se intenta adaptar la caché normalizada; si no hay EPS utilizable para todos los símbolos o falla la adaptación, se usa temporalmente `manage_fundamental_data(...)`.
+9. La capa normalizada intenta actualizar Yahoo y solicita bootstrap Alpha Vantage solo si existe `ALPHA_VANTAGE_KEY`. Se usa la caché normalizada para los símbolos cubiertos; `manage_fundamental_data(...)` atiende únicamente los símbolos faltantes en `Fundamentals_Legacy/`.
 10. Full Ratio calcula y propaga los valores trimestrales desde `reportedDate`; después se aplica la selección fundamental y continúa el backtest.
 11. Ejecuta `run_multi_symbol_backtest(...)` con `System`.
 12. `System.next()` delega en `Logica_Trading` para decidir compra/venta por vela.
 13. Se guardan métricas, trades y gráficos en BD/HTML y se exponen en la UI.
 14. Al finalizar, se marca estado `completed` o `error`; el usuario confirma con `OK` y se recarga la vista para ver historial actualizado.
 
-### Fundamentales: actualización y estado
+### Fundamentales: actualización, estado y fallback
 
-El flujo fundamental es una transición compatible, no una sustitución completa del mecanismo anterior:
+El flujo mantiene el modelo normalizado como fuente principal y un fallback legacy aislado:
 
 ```text
 símbolos configurados
   -> Yahoo / FundamentalUpdater
   -> Alpha Vantage / bootstrap histórico cuando procede
-  -> FundamentalStore (CSV acumulativo por símbolo)
-  -> legacy_adapter.py
+  -> FundamentalStore (Data_Files/Fundamentals/, CSV normalizado por símbolo)
+  -> legacy_adapter.py y EPS utilizable por símbolo
+  -> fallback legacy solo para símbolos faltantes (Data_Files/Fundamentals_Legacy/)
+  -> combinación en memoria; ante duplicados símbolo/periodo, prevalece normalizado
   -> Full Ratio y selección fundamental
 ```
 
-La lista de entrada es exactamente el universo configurado; no se añaden activos. Yahoo mantiene datos recientes. Alpha Vantage se usa para construir histórico inicial y, cuando el estado es `completed`, no vuelve a descargarlo automáticamente. Su clave para el bootstrap normalizado se lee de `ALPHA_VANTAGE_KEY`; sin esa variable Yahoo sigue actualizando y el bootstrap queda como `not_requested`. La ausencia de clave no debe abortar el backtest.
+La lista de entrada es exactamente el universo configurado; no se añaden activos. Yahoo mantiene la actualización operativa. Alpha Vantage construye histórico mediante el endpoint EARNINGS, con una llamada por símbolo y clave leída de `ALPHA_VANTAGE_KEY`; si falta la variable, no se solicita bootstrap, Yahoo continúa y la ausencia de clave no es un error.
 
 Yahoo obtiene `fiscal_date` del EPS trimestral y asocia `reported_date` con eventos de resultados posteriores mediante una heurística de ingestión con ventana máxima configurable (120 días por defecto). El origen queda reflejado en `source_type`; no se inventa la fecha de publicación a partir del cierre fiscal.
 
-Los estados persistidos del bootstrap son `pending`, `in_progress`, `completed`, `partial`, `quota_blocked`, `no_data` y `error`. `completed` y `no_data` se saltan automáticamente; `partial`, `quota_blocked`, `error`, `in_progress` y `pending` pueden intentarse en otra ejecución. `no_data` solo vuelve a intentarse tras un reset explícito. El agotamiento de cuota marca el símbolo como `quota_blocked`, conserva lo ya almacenado y detiene el resto del lote.
+Los estados persistidos del bootstrap son `pending`, `in_progress`, `completed`, `partial`, `quota_blocked`, `no_data` y `error`: `pending` está pendiente de procesar; `in_progress` indica una petición en curso; `completed` requiere al menos 20 periodos EPS únicos; `partial` indica de 1 a 19; `quota_blocked` indica cuota AV agotada; `no_data` indica que no se obtuvo EPS utilizable; `error` indica un fallo de petición o procesamiento. `completed` y `no_data` se omiten en ejecuciones posteriores; `no_data` solo vuelve a intentarse tras un reset explícito. `partial`, `quota_blocked` y `error` son reintentables. Si se agota la cuota AV, se conserva lo ya almacenado, se persiste el estado y se detiene el resto del lote.
 
-`completed` requiere al menos 20 periodos fiscales únicos de `diluted_eps` en la cobertura final del store. Entre 1 y 19 periodos el estado es `partial`; ese estado es reintentable. La cobertura por proveedor y símbolo se mantiene para diagnóstico.
+Entre 1 y 19 periodos el estado es `partial`; la cobertura por proveedor y símbolo se conserva para diagnóstico. `load_fundamental_data_with_fallback(...)` calcula los símbolos no cubiertos por EPS normalizado utilizable, consulta el mecanismo legacy solo para ese subconjunto y combina ambos resultados en memoria. Un símbolo ya cubierto no se vuelve a descargar por legacy. Ante un error al preparar el adaptador, no hay símbolos normalizados utilizables y se aplica el fallback al universo solicitado.
 
-Durante la migración, `load_fundamental_data_with_fallback(...)` usa el formato normalizado solo si hay registros utilizables para todos los símbolos solicitados. Si falta cobertura de algún activo o falla el adaptador, conserva `manage_fundamental_data(...)` como fallback. Los CSV `Q1_`–`Q4_` pertenecen a ese camino de compatibilidad, no al formato objetivo de la capa nueva. La clave del bootstrap normalizado se obtiene exclusivamente del entorno; el backtest aún entrega al fallback legado el argumento `ALPHA_VANTAGE_KEY` de `config_final` (con un valor placeholder si no existe), por lo que el contrato de credenciales del fallback no está unificado todavía.
+El dashboard `/fundamentals` y el detalle `/fundamentals/<symbol>` muestran exclusivamente símbolos configurados por el usuario y datos almacenados. Son vistas de solo lectura: no descargan proveedores ni recalculan ratios.
+
+La columna **Cobertura** mide periodos EPS en la caché normalizada, no disponibilidad de valoración: 0 = `Sin datos`; 1–3 = `Cobertura insuficiente`; 4–19 = `Cobertura parcial`; 20 o más = `Cobertura suficiente`. LTM EPS, PER M5Y y disponibilidad de métricas Full Ratio se muestran por separado. LTM EPS requiere cuatro periodos válidos; PER M5Y requiere 20 PER trimestrales válidos. `No calculado` no implica necesariamente un error.
+
+El resumen muestra registros, periodos EPS, primer y último periodo fiscal, último `reportedDate`, proveedores, cobertura, LTM EPS, PER M5Y, disponibilidad Full Ratio y bootstrap. El detalle muestra el histórico normalizado, el gráfico EPS con sus fechas de disponibilidad y métricas de valoración solo si ya están guardadas.
 
 ### Métricas y disponibilidad temporal
 
@@ -184,11 +195,11 @@ Para EPS diluido, el cálculo conserva la secuencia trimestral por `fiscalDateEn
 - `LTM EPS %`: variación porcentual de LTM EPS, sin rellenar NaN de forma implícita.
 - `PER`: precio dividido por LTM EPS; EPS no positivo invalida el PER.
 - `PER M5Y`: media móvil de 20 observaciones trimestrales válidas de PER; antes de 20 queda NaN.
-- `% PER vs PER M5Y`: `100 * (PER - PER_M5Y) / PER_M5Y`; negativo indica PER inferior a su media y positivo, superior.
+- `% PER vs PER M5Y`: `100 * (PER - PER_M5Y) / PER_M5Y`; si el baseline PER M5Y es inválido o `<= 0`, el resultado es NaN. Negativo indica PER inferior a su media y positivo, superior.
 - `Margen de seguridad`: `LTM EPS % - % PER vs PER M5Y`. Es una métrica propia de TradingCore y no necesariamente el concepto clásico de margen de seguridad.
 - `Full Ratio`: `Margen de seguridad / PER`.
 
-En la fecha global más reciente del DataFrame, la selección devuelve `Mantener (Atractivo)` solo cuando LTM EPS %, Margen de seguridad y Full Ratio son positivos (AND). Con métricas disponibles que no cumplen alguna condición devuelve `Desestimar (No cumple criterios)`; si falta alguna métrica requerida devuelve `No evaluable (Datos insuficientes)`. Desestimar y no evaluable son resultados distintos.
+En una única fecha global de mercado (no una fecha distinta por símbolo), la selección devuelve `Mantener (Atractivo)` solo cuando LTM EPS %, Margen de seguridad y Full Ratio son positivos (AND). Con métricas requeridas disponibles que no cumplen alguna condición devuelve `Desestimar (No cumple criterios)`; si falta una métrica requerida devuelve `No evaluable (Datos insuficientes)`. Desestimar y no evaluable son resultados distintos.
 
 Notas de UX del formulario:
 

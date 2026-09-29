@@ -334,15 +334,17 @@ Este bloque no modifica señales de compra o venta, filtros, stops, datos utiliz
 
 ### Datos fundamentales y proveedores
 
-**Estado:** implementado de forma progresiva; el fallback legado sigue disponible.
+**Estado:** arquitectura normalizada integrada; el fallback legacy sigue disponible, separado y limitado a símbolos faltantes.
 
-La actualización fundamental ahora mantiene EPS reciente con Yahoo y construye histórico con Alpha Vantage cuando existe `ALPHA_VANTAGE_KEY` en el entorno. Los datos se conservan en una caché normalizada acumulativa por símbolo, con procedencia y fecha de publicación. Full Ratio no hace disponible un trimestre antes de `reportedDate`; además, exige cuatro trimestres para LTM EPS y 20 observaciones PER para PER M5Y. El adaptador usa la caché normalizada cuando todos los símbolos solicitados tienen EPS utilizable; en caso contrario conserva temporalmente la ruta antigua.
+Yahoo actualiza EPS operativo y Alpha Vantage construye histórico mediante EARNINGS cuando existe `ALPHA_VANTAGE_KEY` (una llamada por símbolo). Los registros se conservan en `Data_Files/Fundamentals/`, un CSV normalizado por símbolo con proveedor, procedencia y fecha de publicación; el estado del bootstrap se guarda junto a ellos. `Data_Files/Fundamentals_Legacy/` está reservado a la compatibilidad Q. Si falta EPS normalizado para algunos símbolos, solo esos se envían al fallback; ambos resultados se combinan en memoria y, si se repite símbolo/periodo, prevalece normalizado.
+
+Full Ratio no hace disponible un trimestre antes de `reported_date`. LTM EPS exige cuatro trimestres completos; PER M5Y requiere 20 PER trimestrales válidos. La cobertura del dashboard mide solo profundidad EPS normalizada: 0 = sin datos, 1–3 = insuficiente, 4–19 = parcial y 20 o más = suficiente. Se mantiene separada de LTM EPS, PER M5Y y métricas Full Ratio guardadas.
 
 La métrica `% PER vs PER M5Y` se calcula respecto a PER M5Y. La selección fundamental distingue entre activos atractivos, activos evaluables que no cumplen criterios y activos no evaluables por métricas ausentes. Mantiene la lista configurada por el usuario y decide con la fecha global más reciente.
 
 **Impacto sobre resultados históricos:** puede haber cambios en ratios, fechas de disponibilidad y símbolos que superan el filtro. En particular, el uso de `reportedDate` elimina disponibilidad anticipada respecto al cierre fiscal; los umbrales de profundidad producen NaN hasta reunir cobertura suficiente; la desviación PER corregida puede cambiar el margen de seguridad, Full Ratio y la selección. Conviene repetir los backtests que tengan activo el filtro fundamental y comparar con la misma lista, rango, temporalidad y configuración. Los resultados no deben compararse directamente si cambiaron proveedor, cobertura o fechas de publicación.
 
-La selección no amplía el universo configurado. La caché `Q1_`–`Q4_` y `manage_fundamental_data(...)` permanecen solo como compatibilidad transitoria, por lo que la migración de almacenamiento aún no está completamente cerrada.
+El dashboard `/fundamentals` y `/fundamentals/<symbol>` son vistas de solo lectura para los símbolos configurados: resumen de cobertura/estado, histórico normalizado, gráfico EPS y métricas guardadas. No descargan datos ni recalculan ratios. Se añadieron ayudas contextuales para el filtro, cobertura, proveedores, reportedDate, valoración y bootstrap. La retirada de las funciones legacy sigue pendiente, pero las dos cachés ya están físicamente separadas.
 
 ### Pendiente posterior - Rendimiento, scheduler y limpieza legacy
 

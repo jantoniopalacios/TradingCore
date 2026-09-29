@@ -390,6 +390,10 @@
 
     // 1. LIMPIEZA Y PERSISTENCIA (Tu lógica original)
     document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((element) => {
+            bootstrap.Tooltip.getOrCreateInstance(element);
+        });
+
         // 1. Limpiar valores "None" de los inputs
         document.querySelectorAll('input').forEach(input => {
             if (input.value === "None") input.value = "";

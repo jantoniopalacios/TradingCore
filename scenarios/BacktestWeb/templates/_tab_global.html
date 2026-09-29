@@ -197,6 +197,7 @@
     <div class="col-4">
         <label for="filtro_fundamental" class="form-check-label fw-bold">
             Filtro Fundamental:
+            <i class="bi bi-question-circle text-muted ms-1" tabindex="0" data-bs-toggle="tooltip" title="Al activarlo, el backtest intenta actualizar fundamentales para los símbolos configurados y conserva solo los activos recomendados como «Mantener». Yahoo mantiene los datos operativos; Alpha Vantage aporta el bootstrap histórico solo si existe ALPHA_VANTAGE_KEY. Sin ella se omite el bootstrap, sin error."></i>
         </label>
     </div>
 
@@ -211,7 +212,7 @@
                    {% if config.filtro_fundamental == 'True' %}checked{% endif %}>
         </div>
         <small class="text-muted d-block">
-            Si está activo, solo se analizarán activos con recomendación "Mantener".
+            Solo se mantienen activos con recomendación "Mantener".
         </small>
     </div>
 

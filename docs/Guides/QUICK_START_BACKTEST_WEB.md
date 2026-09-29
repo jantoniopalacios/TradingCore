@@ -38,9 +38,17 @@ python scenarios/BacktestWeb/app.py
 5. Activar indicadores de prueba (por ejemplo, EMA y RSI).
 6. Pulsar `Lanzar Backtest`.
 
-Si `filtro_fundamental` está activo, la actualización fundamental utiliza exactamente los símbolos seleccionados para el backtest; no amplía el universo. Yahoo mantiene los datos recientes y el bootstrap histórico de Alpha Vantage solo se solicita cuando `ALPHA_VANTAGE_KEY` está disponible en el entorno. Sin esa variable, Yahoo continúa, el bootstrap queda omitido y el flujo no debe abortar. Si la caché normalizada no cubre todos los símbolos, puede ejecutarse el fallback Q legado con su contrato de credencial anterior; ese contrato aún está pendiente de unificación.
+Si `filtro_fundamental` está activo, el backtest intenta actualizar los datos para exactamente los símbolos seleccionados, sin ampliar el universo. Yahoo realiza la actualización operativa; Alpha Vantage aporta bootstrap histórico mediante EARNINGS solo cuando `ALPHA_VANTAGE_KEY` está disponible. Sin esa variable no se solicita bootstrap AV, pero Yahoo continúa y la ausencia de clave no es un error.
 
-La caché normalizada se guarda bajo `fundamentals_path`, junto al estado `bootstrap_state.json`. Cuando la caché normalizada contiene EPS utilizable para todos los símbolos se usa para Full Ratio; si falta cobertura de algún símbolo o falla la adaptación, se mantiene temporalmente el mecanismo Q legado.
+La caché normalizada vive en `Data_Files/Fundamentals/`, un CSV por símbolo exacto (por ejemplo, `AAPL.csv`) y `bootstrap_state.json`. La caché de compatibilidad vive separada en `Data_Files/Fundamentals_Legacy/`. Se usa el EPS normalizado para los símbolos cubiertos; el fallback Q se limita a los símbolos faltantes y los resultados se combinan en memoria, dando prioridad al registro normalizado si coincide símbolo y periodo.
+
+Para configurar la clave solo en la sesión actual de PowerShell:
+
+```powershell
+$env:ALPHA_VANTAGE_KEY="TU_CLAVE"
+```
+
+El dashboard está disponible en `/fundamentals` y enlaza al detalle `/fundamentals/<symbol>`. Solo muestra datos almacenados para símbolos configurados: no descarga proveedores ni recalcula ratios. La cobertura EPS histórica no equivale a métricas calculadas: 0 periodos es sin datos; 1–3, insuficiente; 4–19, parcial; 20 o más, suficiente. LTM EPS requiere 4 trimestres válidos y PER M5Y, 20 PER válidos. Consulta [la arquitectura fundamental](../ARCHITECTURE.md#fundamentales-actualizacion-estado-y-fallback) para estados, anti-look-ahead, fórmulas y criterios de selección.
 
 ## Paso 5: Seguir el progreso por fases (sin refresco manual)
 

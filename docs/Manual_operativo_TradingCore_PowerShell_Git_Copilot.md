@@ -190,6 +190,16 @@ La operación normal de la aplicación web se realiza con `.\start_web.bat` y `.
 
 `stop_web.bat` obtiene primero el PID propietario del puerto 5000 y comprueba que corresponda a `scenarios.BacktestWeb.app`. Si el puerto pertenece a otro programa, no termina ese proceso ni detiene PostgreSQL. Si reconoce TradingCore, libera el puerto y después detiene PostgreSQL.
 
+#### Clave para bootstrap fundamental Alpha Vantage
+
+El bootstrap histórico normalizado lee `ALPHA_VANTAGE_KEY` del entorno. Para una prueba en la sesión actual de PowerShell, antes de iniciar el servidor o ejecutar el backtest:
+
+```powershell
+$env:ALPHA_VANTAGE_KEY="TU_CLAVE"
+```
+
+Esta asignación es temporal: solo está disponible en esa sesión y en los procesos que se inicien desde ella. Para conservarla entre sesiones, configúrela desde **Variables de entorno** de Windows (preferiblemente en el ámbito del usuario), cierre las consolas/servidores ya abiertos y vuelva a iniciarlos. No escriba la clave real en documentación, archivos del repositorio, scripts de ejemplo, capturas ni logs. Si la variable no existe, no se solicita bootstrap AV; Yahoo continúa y esa ausencia no es un error.
+
 `scripts\verify.ps1` tiene cuatro pasos: `[1/4]` sintaxis Python, `[2/4]` tests base, `[3/4]` estado del servidor web y `[4/4]` estado Git. En `[3/4]` muestra PID, proceso, línea de comandos y si el listener activo se reconoce como TradingCore Web.
 
 | Objetivo | Comando | Qué hace | Cuándo usarlo |
@@ -512,7 +522,9 @@ Comprobar el paso `[3/4] Web server state` y confirmar qué PID, proceso y líne
 
 ## 22. Documentación y ayuda contextual
 
-Las ayudas de configuración forman parte del comportamiento visible del producto y deben revisarse cuando cambie la lógica de un indicador. Actualmente Global, EMA, RSI, MACD, ATR, Estocástico, Bollinger y Volumen/MoS disponen de ayuda contextual.
+Las ayudas de configuración forman parte del comportamiento visible del producto y deben revisarse cuando cambie la lógica de un indicador. Actualmente Global, EMA, RSI, MACD, ATR, Estocástico, Bollinger y Volumen/MoS disponen de ayuda contextual. El filtro fundamental y las vistas `/fundamentals` y `/fundamentals/<symbol>` también explican proveedores, cobertura, fechas de disponibilidad, métricas y bootstrap mediante ayudas Bootstrap.
+
+El dashboard fundamental es de solo lectura. Revisa especialmente que cobertura histórica esté explicada aparte de LTM EPS, PER M5Y y métricas Full Ratio; una métrica `No calculado` puede indicar historial insuficiente o falta de valor guardado, no necesariamente un fallo.
 
 La documentación web se filtra por rol: el usuario normal accede únicamente al Manual de Usuario y a las ayudas contextuales de la interfaz; el administrador puede consultar toda la documentación técnica y operativa. La autorización se mantiene también en backend.
 
@@ -584,6 +596,6 @@ No son “malos”, pero son peligrosos si se usan sin inspección previa:
 | Tests | tests/ | Versionados; deben acompañar comportamiento importante. |
 | Documentación | docs/README.md, guías | Versionada y actualizada con el estado real. |
 | Estrategias de usuario | Data_files/Backtest_config/*.json | No versionarlas; son datos operativos del usuario. |
-| Caché de mercado | Data_Files/*.csv, Fundamentals/ | Regenerable; normalmente ignorada por Git. |
+| Caché de mercado/fundamentales | `Data_Files/*.csv`, `Data_Files/Fundamentals/*.csv`, `Data_Files/Fundamentals_Legacy/Q*.csv` | Regenerable; normalmente ignorada por Git. La carpeta normalizada y la legacy son distintas. |
 | Logs/PID | Backtesting/logs/, logs/*.pid | Operativos; fuera del versionado. |
 | Respaldos temporales | carpetas backup, stashes | Conservar solo mientras aporten una vía de recuperación; limpiar al cierre. |

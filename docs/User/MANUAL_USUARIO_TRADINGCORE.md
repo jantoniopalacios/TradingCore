@@ -345,6 +345,16 @@ Antes de lanzar un backtest:
 
 Cuando el filtro fundamental está activo, se aplica a los mismos símbolos seleccionados para el backtest, sin ampliar esa lista. La selección fundamental usa la fecha global más reciente disponible; un resultado no evaluable por datos insuficientes no equivale a un activo desestimado por sus métricas.
 
+### Filtro fundamental y dashboard
+
+El switch **Filtro Fundamental** hace que el backtest intente actualizar la información fundamental de los símbolos seleccionados. Yahoo mantiene la actualización operativa y Alpha Vantage aporta histórico cuando el administrador ha configurado `ALPHA_VANTAGE_KEY`. Si no existe esa variable, se omite el bootstrap Alpha Vantage; el backtest puede continuar con los datos disponibles.
+
+Desde **Fundamentales** se accede a `/fundamentals`; al seleccionar un símbolo se abre `/fundamentals/<symbol>`. El dashboard solo muestra símbolos configurados para el usuario y es de solo lectura: muestra datos almacenados, no descarga proveedores ni recalcula ratios.
+
+La **Cobertura** representa periodos EPS históricos de la caché normalizada, no la existencia de una valoración: 0 = Sin datos; 1–3 = Cobertura insuficiente; 4–19 = Cobertura parcial; 20 o más = Cobertura suficiente. LTM EPS resume cuatro trimestres completos y necesita cuatro periodos válidos. PER M5Y es una media de 20 PER trimestrales válidos; **No calculado** no significa necesariamente que exista un error. La disponibilidad de métricas Full Ratio se muestra aparte.
+
+`fiscal_date` identifica el periodo contable. `reportedDate` es la fecha de publicación: el backtest no considera el dato disponible antes de esa fecha para evitar look-ahead. El estado Bootstrap describe el progreso de la carga histórica; el icono de ayuda junto al estado explica cada valor.
+
 La temporalidad modifica la serie de datos utilizada por todos los indicadores. Una configuración diaria y una semanal pueden producir resultados muy distintos aunque el resto de parámetros sea idéntico.
 
 ---

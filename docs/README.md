@@ -137,21 +137,22 @@ scenarios/BacktestWeb/
 
 ---
 
-### 🟡 Datos históricos (`Data_files/`)
+### 🟡 Datos históricos (`Data_Files/`)
 
 Ficheros CSV con datos OHLCV descargados principalmente mediante Yahoo Finance, organizados por símbolo y temporalidad.
 
 ```text
-Data_files/
+Data_Files/
 ├── SYMBOL_1d_MAX.csv          Datos diarios
 ├── SYMBOL_1wk_MAX.csv         Datos semanales
 ├── SYMBOL_1h_MAX.csv          Datos horarios para los símbolos disponibles
 ├── SYMBOL_1mo_MAX.csv         Datos mensuales para los símbolos disponibles
 ├── Backtest_config/           Configuraciones locales de backtest
-└── Fundamentals/              Caché de datos fundamentales
+├── Fundamentals/              Caché normalizada y estado de bootstrap
+└── Fundamentals_Legacy/       Caché Q separada para fallback compatible
 ```
 
-La nueva capa fundamental guarda un CSV acumulativo por símbolo en `Fundamentals/` y el estado del bootstrap en `Fundamentals/bootstrap_state.json`. Los ficheros `Q1_`–`Q4_` se conservan únicamente para el fallback de compatibilidad.
+La caché normalizada guarda un CSV acumulativo por símbolo exacto (por ejemplo, `AAPL.csv`) con el esquema `symbol, fiscal_date, reported_date, metric, value, provider, source_type, updated_at`, además de `bootstrap_state.json`. `Fundamentals_Legacy/` contiene exclusivamente ficheros Q (`Q0_*`, `Q1_*`, etc.) para compatibilidad; no forma parte del modelo normalizado.
 
 ---
 
@@ -260,20 +261,23 @@ Este script ejecuta cuatro pasos: sintaxis Python, tests base, estado del servid
 
 ### 🟡 Datos Fundamentales y compatibilidad legado
 
-La capa activa de negocio es `trading_engine/fundamentals/`. El backtest web conserva una transición compatible:
+La capa activa de negocio es `trading_engine/fundamentals/`, implementada en `models.py`, `store.py`, `providers/yahoo.py`, `providers/alpha_vantage.py`, `updater.py`, `bootstrap.py`, `service.py` y `legacy_adapter.py`. El flujo productivo es:
 
 ```text
 símbolos configurados, sin ampliar el universo
   -> Yahoo para fundamentales recientes
   -> bootstrap histórico Alpha Vantage cuando corresponde
   -> caché normalizada acumulativa por símbolo
-  -> adaptador EPS al formato requerido por Full Ratio
-  -> fallback Q legado si falta cobertura normalizada para algún símbolo o falla el adaptador
+   -> EPS normalizado para símbolos cubiertos, adaptado al formato requerido por Full Ratio
+   -> fallback Q únicamente para símbolos sin cobertura normalizada utilizable
+   -> Fundamentals_Legacy/ y combinación en memoria (normalizado prevalece en duplicados)
 ```
 
-Yahoo es el proveedor operativo habitual. Alpha Vantage construye el histórico inicial y no se repite para símbolos `completed`. La clave del bootstrap normalizado se obtiene de `ALPHA_VANTAGE_KEY`; si no existe, Yahoo sigue actualizando y el bootstrap no se solicita. La ruta legado conserva su interfaz anterior mientras dure la migración.
+Yahoo mantiene la actualización operativa. Alpha Vantage construye histórico con el endpoint EARNINGS, una llamada por símbolo, y no se repite para símbolos `completed`. La clave se obtiene de `ALPHA_VANTAGE_KEY`; sin ella Yahoo continúa y no se solicita bootstrap, sin que esa ausencia sea un error. `partial`, `quota_blocked` y `error` son reintentables; `no_data` es terminal hasta reset explícito. Al agotarse cuota se detiene el lote y se persiste estado.
 
-Cada CSV normalizado conserva `symbol`, `fiscal_date`, `reported_date`, `metric`, `value`, `provider`, `source_type` y `updated_at`. `fiscal_date` identifica el periodo fiscal; `reported_date` es la fecha de disponibilidad y no se reemplaza por una fecha estimada. El detalle de fórmulas, estados, selección y look-ahead está en [ARCHITECTURE.md](ARCHITECTURE.md).
+Cada CSV normalizado conserva `symbol`, `fiscal_date`, `reported_date`, `metric`, `value`, `provider`, `source_type` y `updated_at`. `fiscal_date` identifica el periodo fiscal; `reported_date` es la fecha de publicación y determina desde cuándo el dato está disponible, evitando look-ahead. El dashboard `/fundamentals` y el detalle `/fundamentals/<symbol>` muestran solo símbolos configurados y son de solo lectura.
+
+La cobertura EPS del dashboard es independiente de las métricas de valoración: 0 periodos = sin datos; 1–3 = insuficiente; 4–19 = parcial; 20 o más = suficiente. LTM EPS requiere 4 periodos válidos y PER M5Y, 20 PER trimestrales válidos. Fórmulas, estados de bootstrap, selección e integración están descritos en [ARCHITECTURE.md](ARCHITECTURE.md).
 
 El directorio `scenarios/Fundamental_Data/` conserva utilidades standalone y de mantenimiento; no es el flujo productivo del backtest web.
 
@@ -284,7 +288,7 @@ scenarios/Fundamental_Data/
 └── database.py              Persistencia para estas utilidades
 ```
 
-La migración de proveedor, formato, persistencia, disponibilidad por fecha y adaptación al formato legado está implementada progresivamente. La arquitectura aún no ha retirado `manage_fundamental_data()` ni `download_fundamentals_AlphaV()`; su retirada requiere una fase posterior de compatibilidad y validación.
+El flujo normalizado, bootstrap, actualización Yahoo, anti-look-ahead, integración del backtest, fallback parcial separado, dashboard y ayudas contextuales están implementados. La retirada de `manage_fundamental_data()` y `download_fundamentals_AlphaV()` sigue pendiente hasta que Full Ratio consuma directamente el nuevo formato y se cierre la compatibilidad.
 
 ---
 

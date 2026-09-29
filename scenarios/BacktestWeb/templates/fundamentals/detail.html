@@ -25,23 +25,23 @@
 </header>
 <main class="container-fluid py-4">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-        <div><h1 class="h4 mb-1">{{ detail.summary.symbol }}</h1><p class="text-secondary mb-0">Bootstrap: {{ detail.summary.bootstrap_status }} · Cobertura: {{ detail.summary.coverage_status }} · Métricas Full Ratio: {{ detail.summary.full_ratio_status }}</p></div>
+        <div><h1 class="h4 mb-1">{{ detail.summary.symbol }}</h1><p class="text-secondary mb-0">Bootstrap: {{ detail.summary.bootstrap_status }} <i class="bi bi-question-circle" tabindex="0" data-bs-toggle="tooltip" title="pending: pendiente; in_progress: en curso; completed: 20 o más periodos EPS; partial, quota_blocked y error: reintentables; no_data: terminal hasta reset explícito. Sin ALPHA_VANTAGE_KEY no se solicita bootstrap."></i> · Cobertura: {{ detail.summary.coverage_status }} <i class="bi bi-question-circle" tabindex="0" data-bs-toggle="tooltip" title="Cobertura de EPS normalizado: 0 sin datos; 1–3 insuficiente; 4–19 parcial; 20 o más suficiente. No mide disponibilidad de ratios."></i> · Métricas Full Ratio: {{ detail.summary.full_ratio_status }} <i class="bi bi-question-circle" tabindex="0" data-bs-toggle="tooltip" title="Indica si hay métricas Full Ratio guardadas; esta vista no las recalcula."></i></p></div>
         {% if detail.missing_reported_date_count %}<span class="badge text-bg-warning">{{ detail.missing_reported_date_count }} registros EPS sin reported_date; no disponibles históricamente</span>{% endif %}
     </div>
 
     <section class="metric-panel p-3 mb-3">
-        <h2 class="h6 mb-3">Últimas métricas guardadas{% if detail.valuation %}<span class="text-secondary fw-normal ms-2">a {{ detail.valuation.as_of }}</span>{% endif %}</h2>
+        <h2 class="h6 mb-3">Últimas métricas guardadas <i class="bi bi-question-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" title="Se muestran métricas ya guardadas. El detalle no descarga datos ni recalcula Full Ratio; No calculado no implica necesariamente un error."></i>{% if detail.valuation %}<span class="text-secondary fw-normal ms-2">a {{ detail.valuation.as_of }}</span>{% endif %}</h2>
         {% if detail.valuation %}
         <div class="row row-cols-2 row-cols-md-4 row-cols-xl-7 g-3">
             {% for metric in ['LTM EPS', 'LTM EPS %', 'PER', 'PER M5Y', '% PER vs PER M5Y', 'Margen de seguridad', 'Full Ratio'] %}
-            <div class="col"><div class="small text-secondary">{{ metric }}</div><div class="metric-value">{{ '%.2f'|format(detail.valuation[metric]) if detail.valuation[metric] is not none else 'No disponible' }}</div></div>
+            <div class="col"><div class="small text-secondary">{{ metric }}{% if metric == 'LTM EPS' %} <i class="bi bi-question-circle" tabindex="0" data-bs-toggle="tooltip" title="EPS de los últimos cuatro trimestres completos; requiere 4 periodos válidos."></i>{% elif metric == 'PER M5Y' %} <i class="bi bi-question-circle" tabindex="0" data-bs-toggle="tooltip" title="Media de 20 PER trimestrales válidos; si falta historial suficiente puede no estar calculado, sin que eso implique un error."></i>{% elif metric == 'Full Ratio' %} <i class="bi bi-question-circle" tabindex="0" data-bs-toggle="tooltip" title="Margen de seguridad dividido por PER. Aquí solo se muestra si ya está guardado."></i>{% endif %}</div><div class="metric-value">{{ '%.2f'|format(detail.valuation[metric]) if detail.valuation[metric] is not none else 'No disponible' }}</div></div>
             {% endfor %}
         </div>
         {% else %}<p class="text-secondary mb-0">No hay métricas Full Ratio guardadas para este símbolo. El dashboard no las recalcula.</p>{% endif %}
     </section>
 
     <section class="metric-panel p-3 mb-3">
-        <h2 class="h6 mb-3">Diluted EPS por fiscal_date</h2>
+        <h2 class="h6 mb-3">Diluted EPS por fiscal_date <i class="bi bi-question-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" title="fiscal_date identifica el periodo contable. reportedDate indica cuándo se publicó; se usa como fecha de disponibilidad para no introducir look-ahead en el backtest."></i></h2>
         {% if detail.chart_div %}{{ detail.chart_div|safe }}{{ detail.chart_script|safe }}
         {% else %}<p class="text-secondary mb-0">No hay registros EPS utilizables para graficar.</p>{% endif %}
         <p class="small text-secondary mb-0 mt-2">La posición del punto representa el periodo fiscal. La disponibilidad histórica depende de reported_date; los triángulos no tienen fecha de publicación y no deben usarse como disponibles.</p>
@@ -58,7 +58,7 @@
         {% if detail.records %}
         <div class="table-responsive" style="max-height: 65vh">
             <table class="table table-sm table-hover mb-0">
-                <thead class="table-light position-sticky top-0"><tr><th>fiscal_date</th><th>reported_date</th><th>metric</th><th>value</th><th>provider</th><th>source_type</th><th>updated_at</th><th>Disponibilidad</th></tr></thead>
+                <thead class="table-light position-sticky top-0"><tr><th>fiscal_date</th><th>reported_date <i class="bi bi-question-circle" tabindex="0" data-bs-toggle="tooltip" title="Fecha de publicación; el dato no se considera disponible en la simulación antes de esta fecha."></i></th><th>metric</th><th>value</th><th>provider</th><th>source_type</th><th>updated_at</th><th>Disponibilidad <i class="bi bi-question-circle" tabindex="0" data-bs-toggle="tooltip" title="Regla anti-look-ahead basada en reported_date. Si falta, el registro no tiene disponibilidad histórica verificable."></i></th></tr></thead>
                 <tbody>{% for row in detail.records %}<tr>
                     <td>{{ row.fiscal_date }}</td><td>{{ row.reported_date }}</td><td>{{ row.metric }}</td>
                     <td>{{ '%.4f'|format(row.value) if row.value is not none else 'No disponible' }}</td>
@@ -69,5 +69,11 @@
         {% else %}<p class="text-secondary mb-0">No hay caché normalizada para este símbolo.</p>{% endif %}
     </section>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((element) => {
+        bootstrap.Tooltip.getOrCreateInstance(element);
+    });
+</script>
 </body>
 </html>

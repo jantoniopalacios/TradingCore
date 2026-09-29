@@ -41,9 +41,11 @@ Modulo responsable de descarga y gestion de datos de mercado y fundamentales.
 
 En el flujo productivo actual:
 - los datos historicos de mercado se obtienen principalmente mediante Yahoo Finance;
-- la capa `trading_engine/fundamentals/` actualiza EPS reciente con Yahoo y utiliza Alpha Vantage para bootstrap historico;
-- `Data_download` intenta adaptar la cache normalizada y mantiene `manage_fundamental_data` / `download_fundamentals_AlphaV` como compatibilidad cuando falta cobertura para algun simbolo o falla el adaptador.
-- el detalle de estados, disponibilidad temporal y formulas fundamentales se mantiene en [la arquitectura canonica](../ARCHITECTURE.md#fundamentales-actualizacion-y-estado).
+- la capa `trading_engine/fundamentals/` (`models`, `store`, proveedores Yahoo/Alpha Vantage, `updater`, `bootstrap`, `service` y `legacy_adapter`) mantiene el modelo EPS normalizado;
+- Yahoo actualiza datos operativos; Alpha Vantage usa EARNINGS para bootstrap histórico (una llamada por símbolo) solo si existe `ALPHA_VANTAGE_KEY`;
+- `Data_download.load_fundamental_data_with_fallback(...)` conserva los datos normalizados para símbolos cubiertos y limita `manage_fundamental_data` / `download_fundamentals_AlphaV` a los símbolos faltantes. La caché Q vive en `Data_Files/Fundamentals_Legacy/`, no en `Data_Files/Fundamentals/`; los resultados se combinan en memoria y prevalece normalizado en duplicados por símbolo/periodo.
+- el dashboard `/fundamentals` y su detalle `/fundamentals/<symbol>` son de solo lectura; no descargan proveedores ni recalculan ratios.
+- el detalle de estados, disponibilidad temporal y formulas fundamentales se mantiene en [la arquitectura canonica](../ARCHITECTURE.md#fundamentales-actualizacion-estado-y-fallback).
 
 ::: trading_engine.utils.Data_download
     options:
