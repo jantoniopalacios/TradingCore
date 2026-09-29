@@ -53,7 +53,9 @@ def create_app(user_mode="admin"):
     # PASO 1: REGISTRAR BLUEPRINT PRIMERO (FUERA de app_context)
     try:
         from .routes.main_bp import main_bp 
+        from .routes.fundamentals_dashboard import fundamentals_bp
         app.register_blueprint(main_bp)
+        app.register_blueprint(fundamentals_bp)
         app.logger.info("✓ Blueprint main_bp registrado exitosamente")
         cargando_rule = app.url_map._rules_by_endpoint.get('main.cargando', [])
         app.logger.info(f"main.cargando rules after register: {[str(r) for r in cargando_rule]}")

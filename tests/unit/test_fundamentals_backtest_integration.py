@@ -37,6 +37,7 @@ def test_disabled_filter_does_not_construct_or_call_service(tmp_path, monkeypatc
 
 
 def test_enabled_filter_uses_exact_symbols_without_mutating_input(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALPHA_VANTAGE_KEY", "test-key")
     yahoo_provider = FakeYahooProvider()
     alpha_provider = FakeAlphaVantageProvider()
     monkeypatch.setattr(yahoo, "YahooFundamentalProvider", lambda: yahoo_provider)
@@ -93,6 +94,7 @@ def test_normalized_update_error_does_not_raise_to_legacy_flow(tmp_path, monkeyp
 
 
 def test_bootstrap_state_file_is_inside_fundamentals_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALPHA_VANTAGE_KEY", "test-key")
     monkeypatch.setattr(yahoo, "YahooFundamentalProvider", FakeYahooProvider)
     monkeypatch.setattr(
         alpha_vantage,

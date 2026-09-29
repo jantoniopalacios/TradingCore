@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ detail.summary.symbol }} | Fundamentales</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    {{ detail.chart_resources|safe if detail.chart_resources else '' }}
+    <style>
+        body { background: #f8fafc; color: #172033; font: 13px Inter, system-ui, sans-serif; }
+        .topbar { background: #0f172a; color: #f8fafc; }
+        .metric-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .metric-value { font-size: 1.1rem; font-weight: 650; }
+        .table th { white-space: nowrap; font-size: 11px; color: #475569; }
+        .table td { vertical-align: middle; white-space: nowrap; }
+    </style>
+</head>
+<body>
+<header class="topbar py-3">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
+        <div><i class="bi bi-graph-up-arrow text-info me-2"></i><strong>TradingCore</strong><span class="text-secondary ms-2">Fundamentales / {{ detail.summary.symbol }}</span></div>
+        <div class="d-flex align-items-center gap-3"><span class="small text-light">{{ user_name }}</span><a class="btn btn-sm btn-outline-light" href="{{ url_for('fundamentals.dashboard') }}"><i class="bi bi-arrow-left me-1"></i>Cobertura</a></div>
+    </div>
+</header>
+<main class="container-fluid py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div><h1 class="h4 mb-1">{{ detail.summary.symbol }}</h1><p class="text-secondary mb-0">Bootstrap: {{ detail.summary.bootstrap_status }} · Cobertura: {{ detail.summary.coverage_status }}</p></div>
+        {% if detail.missing_reported_date_count %}<span class="badge text-bg-warning">{{ detail.missing_reported_date_count }} registros EPS sin reported_date; no disponibles históricamente</span>{% endif %}
+    </div>
+
+    <section class="metric-panel p-3 mb-3">
+        <h2 class="h6 mb-3">Últimas métricas guardadas{% if detail.valuation %}<span class="text-secondary fw-normal ms-2">a {{ detail.valuation.as_of }}</span>{% endif %}</h2>
+        {% if detail.valuation %}
+        <div class="row row-cols-2 row-cols-md-4 row-cols-xl-7 g-3">
+            {% for metric in ['LTM EPS', 'LTM EPS %', 'PER', 'PER M5Y', '% PER vs PER M5Y', 'Margen de seguridad', 'Full Ratio'] %}
+            <div class="col"><div class="small text-secondary">{{ metric }}</div><div class="metric-value">{{ '%.2f'|format(detail.valuation[metric]) if detail.valuation[metric] is not none else 'No disponible' }}</div></div>
+            {% endfor %}
+        </div>
+        {% else %}<p class="text-secondary mb-0">No hay métricas Full Ratio guardadas para este símbolo. El dashboard no las recalcula.</p>{% endif %}
+    </section>
+
+    <section class="metric-panel p-3 mb-3">
+        <h2 class="h6 mb-3">Diluted EPS por fiscal_date</h2>
+        {% if detail.chart_div %}{{ detail.chart_div|safe }}{{ detail.chart_script|safe }}
+        {% else %}<p class="text-secondary mb-0">No hay registros EPS utilizables para graficar.</p>{% endif %}
+        <p class="small text-secondary mb-0 mt-2">La posición del punto representa el periodo fiscal. La disponibilidad histórica depende de reported_date; los triángulos no tienen fecha de publicación y no deben usarse como disponibles.</p>
+    </section>
+
+    <section class="metric-panel p-3 mb-3">
+        <h2 class="h6 mb-3">Métricas de valoración guardadas</h2>
+        {% if detail.valuation_chart_div %}{{ detail.valuation_chart_div|safe }}{{ detail.valuation_chart_script|safe }}
+        {% else %}<p class="text-secondary mb-0">No hay series de valoración guardadas para graficar.</p>{% endif %}
+    </section>
+
+    <section class="metric-panel p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2"><h2 class="h6 mb-0">Historial normalizado</h2><span class="small text-secondary">{{ detail.records|length }} registros</span></div>
+        {% if detail.records %}
+        <div class="table-responsive" style="max-height: 65vh">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light position-sticky top-0"><tr><th>fiscal_date</th><th>reported_date</th><th>metric</th><th>value</th><th>provider</th><th>source_type</th><th>updated_at</th><th>Disponibilidad</th></tr></thead>
+                <tbody>{% for row in detail.records %}<tr>
+                    <td>{{ row.fiscal_date }}</td><td>{{ row.reported_date }}</td><td>{{ row.metric }}</td>
+                    <td>{{ '%.4f'|format(row.value) if row.value is not none else 'No disponible' }}</td>
+                    <td><span class="badge text-bg-light border">{{ row.provider }}</span></td><td>{{ row.source_type }}</td><td>{{ row.updated_at }}</td><td>{{ row.availability }}</td>
+                </tr>{% endfor %}</tbody>
+            </table>
+        </div>
+        {% else %}<p class="text-secondary mb-0">No hay caché normalizada para este símbolo.</p>{% endif %}
+    </section>
+</main>
+</body>
+</html>
