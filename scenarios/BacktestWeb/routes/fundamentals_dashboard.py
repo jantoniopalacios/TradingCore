@@ -36,12 +36,12 @@ VALUATION_COLUMNS = (
 )
 
 
-def _coverage_label(has_eps_records, available_periods, per_m5y_available):
-    if not has_eps_records:
+def _coverage_label(eps_periods):
+    if eps_periods <= 0:
         return "Sin datos"
-    if available_periods < 4:
+    if eps_periods < 4:
         return "Cobertura insuficiente"
-    if per_m5y_available:
+    if eps_periods >= 20:
         return "Cobertura suficiente"
     return "Cobertura parcial"
 
@@ -305,6 +305,7 @@ def _load_dashboard_data(symbols, fundamentals_path, full_ratio_path):
             }
         )
         eps_records = records[records["metric"] == "diluted_eps"]
+        eps_periods = int(coverage["unique_fiscal_periods"])
         adapted_eps = (
             build_legacy_eps_dataframe([symbol], root)
             if store is not None
@@ -314,6 +315,14 @@ def _load_dashboard_data(symbols, fundamentals_path, full_ratio_path):
         valuation = _load_saved_valuation(full_ratio_path, symbol)
         per_m5y_available = bool(
             valuation is not None and valuation.get("PER M5Y") is not None
+        )
+        full_ratio_metrics_available = bool(
+            valuation
+            and any(
+                item.get(column) is not None
+                for item in valuation["series"]
+                for column in VALUATION_COLUMNS
+            )
         )
         reported_dates = pd.to_datetime(
             eps_records["reported_date"], errors="coerce"
@@ -327,16 +336,12 @@ def _load_dashboard_data(symbols, fundamentals_path, full_ratio_path):
         row = {
             "symbol": symbol,
             "records": int(len(records)),
-            "unique_fiscal_periods": int(coverage["unique_fiscal_periods"]),
+            "unique_fiscal_periods": eps_periods,
             "first_fiscal_date": coverage["first_fiscal_date"],
             "last_fiscal_date": coverage["last_fiscal_date"],
             "latest_reported_date": latest_reported_date,
             "providers": sorted(records["provider"].dropna().astype(str).unique().tolist()),
-            "coverage_status": _coverage_label(
-                not eps_records.empty,
-                valid_periods,
-                per_m5y_available,
-            ),
+            "coverage_status": _coverage_label(eps_periods),
             "ltm_depth": "Suficiente (4 trimestres)" if valid_periods >= 4 else "Insuficiente (<4)",
             "per_m5y_depth": (
                 "Suficiente (20 PER válidos)"
@@ -344,6 +349,9 @@ def _load_dashboard_data(symbols, fundamentals_path, full_ratio_path):
                 else "Insuficiente (<20 PER válidos)"
                 if valuation is not None
                 else "No calculado"
+            ),
+            "full_ratio_status": (
+                "Disponibles" if full_ratio_metrics_available else "No disponibles"
             ),
             "bootstrap_status": bootstrap_status,
         }
@@ -424,6 +432,7 @@ def dashboard():
                 "coverage_status": "Sin datos",
                 "ltm_depth": "No disponible",
                 "per_m5y_depth": "No calculado",
+                "full_ratio_status": "No disponibles",
                 "bootstrap_status": "pending",
             }
             for symbol in symbols

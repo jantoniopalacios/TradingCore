@@ -11,11 +11,12 @@ from trading_engine.fundamentals.models import FundamentalRecord
 from trading_engine.fundamentals.store import FundamentalStore
 
 
-def test_coverage_category_uses_four_ltm_and_twenty_per_depths():
-    assert dashboard_module._coverage_label(False, 0, False) == "Sin datos"
-    assert dashboard_module._coverage_label(True, 3, False) == "Cobertura insuficiente"
-    assert dashboard_module._coverage_label(True, 4, False) == "Cobertura parcial"
-    assert dashboard_module._coverage_label(True, 20, True) == "Cobertura suficiente"
+def test_coverage_category_uses_normalized_eps_period_count():
+    assert dashboard_module._coverage_label(0) == "Sin datos"
+    assert dashboard_module._coverage_label(3) == "Cobertura insuficiente"
+    assert dashboard_module._coverage_label(4) == "Cobertura parcial"
+    assert dashboard_module._coverage_label(19) == "Cobertura parcial"
+    assert dashboard_module._coverage_label(20) == "Cobertura suficiente"
 
 
 @pytest.fixture
@@ -121,6 +122,37 @@ def test_dashboard_coverage_summary_uses_store_and_existing_bootstrap_state(
     assert "2" in body
     assert "Cobertura insuficiente" in body
     assert "partial" in body
+
+
+def test_dashboard_coverage_is_sufficient_without_saved_valuation(
+    client,
+    monkeypatch,
+    tmp_path,
+):
+    _create_user_and_symbols()
+    fundamentals_path, _ = _configure_dashboard_paths(monkeypatch, tmp_path)
+    FundamentalStore(fundamentals_path).merge_records(
+        "AAPL",
+        [
+            _record(
+                "AAPL",
+                date(2020 + index // 4, 3 + (index % 4) * 3, 1),
+                date(2025, 8, 1),
+                1.0,
+            )
+            for index in range(20)
+        ],
+    )
+    _login(client, "dashboard-user")
+
+    response = client.get("/fundamentals")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Cobertura suficiente" in body
+    assert "Suficiente (4 trimestres)" in body
+    assert "No calculado" in body
+    assert "No disponibles" in body
 
 
 def test_symbol_detail_is_limited_to_configured_symbols(client, monkeypatch, tmp_path):
