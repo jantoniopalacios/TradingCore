@@ -481,7 +481,9 @@ def index():
         registros=tandas_ordenadas, # Enviamos las tandas ya ordenadas
         comments=VARIABLE_COMMENTS,
         usuarios_gestion=usuarios_gestion,
-        usuarios=usuarios_gestion
+        usuarios=usuarios_gestion,
+        sidebar_page='index',
+        active_nav='config',
     )
 
 # --- ACCIONES Y VISOR (Todas las funciones restauradas) ---
@@ -1480,6 +1482,8 @@ def save_config_file():
             "activos": symbols_list,
         }
         file_path = _write_config_snapshot(user_mode, requested_name, payload)
+        _persist_user_runtime_config(u, form_data)
+        db.session.commit()
 
         return jsonify({
             "status": "success",
@@ -1488,6 +1492,7 @@ def save_config_file():
             "suggested_filename": _build_default_snapshot_filename(user_mode, config_params),
         })
     except Exception as e:
+        db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
 

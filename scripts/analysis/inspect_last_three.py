@@ -47,7 +47,7 @@ with app.app_context():
 
     # TambiÃ©n listar archivos HTML en Graphics/admin
     import os
-    from scenarios.BacktestWeb.configuracion import BACKTESTING_BASE_DIR
+    from scenarios.BacktestWeb.configuracion import BACKTESTING_BASE_DIR, global_full_ratio_path
     graphics_dir = BACKTESTING_BASE_DIR / 'Graphics' / 'admin'
     print('\nArchivos Bokeh en Graphics/admin:')
     if graphics_dir.exists():
@@ -57,7 +57,7 @@ with app.app_context():
         print('  No existe Graphics/admin')
 
     # Mostrar path de FullRatio
-    fr = BACKTESTING_BASE_DIR / 'Run_Results' / 'admin' / 'FullRatio' / 'FR_diario.csv'
+    fr = global_full_ratio_path() / 'FR_diario.csv'
     print('\nFullRatio path:', fr)
 
 print('\nInspecciÃ³n finalizada.')

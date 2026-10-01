@@ -12,6 +12,7 @@ def calcular_ratios(ohlcv_data, financial_data)           # Mantenida como ejemp
 """
 
 import pandas as pd
+from trading_engine.fundamentals.valuation_cache import persist_valuation_rows
 import numpy as np
 from pathlib import Path  # Importamos Pathlib
 
@@ -327,7 +328,11 @@ def calcular_fullratio_OHLCV(ohlcv_data: pd.DataFrame, financial_data: pd.DataFr
     stocks_data.set_index("Date", inplace=True)
 
     if consolidated_file:
-        stocks_data.to_csv(consolidated_file, sep=";")
+        persist_valuation_rows(
+            output_folder,
+            stocks_data.reset_index(),
+            stocks_data["Symbol"].dropna().astype(str).unique().tolist(),
+        )
         print(f"✅ Full Ratio guardado en: {consolidated_file}")
 
     return stocks_data

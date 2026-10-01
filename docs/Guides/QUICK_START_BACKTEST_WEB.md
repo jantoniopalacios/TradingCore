@@ -48,7 +48,7 @@ Para configurar la clave solo en la sesión actual de PowerShell:
 $env:ALPHA_VANTAGE_KEY="TU_CLAVE"
 ```
 
-El dashboard está disponible en `/fundamentals` y enlaza al detalle `/fundamentals/<symbol>`. Solo muestra datos almacenados para símbolos configurados: no descarga proveedores ni recalcula ratios. La cobertura EPS histórica no equivale a métricas calculadas: 0 periodos es sin datos; 1–3, insuficiente; 4–19, parcial; 20 o más, suficiente. LTM EPS requiere 4 trimestres válidos y PER M5Y, 20 PER válidos. Consulta [la arquitectura fundamental](../ARCHITECTURE.md#fundamentales-actualizacion-estado-y-fallback) para estados, anti-look-ahead, fórmulas y criterios de selección.
+El dashboard está disponible en `/fundamentals` y enlaza al detalle `/fundamentals/<symbol>`. Lee la valoración global guardada en `Backtesting/Run_Results/Global/FullRatio/FR_diario.csv`, limitada a los símbolos configurados para el usuario; no descarga proveedores ni recalcula ratios. La cobertura EPS histórica no equivale a métricas calculadas: 0 periodos es sin datos; 1–3, insuficiente; 4–19, parcial; 20 o más, suficiente. LTM EPS requiere 4 trimestres válidos y PER M5Y, 20 PER válidos. Consulta [la arquitectura fundamental](../ARCHITECTURE.md#fundamentales-actualizacion-estado-y-fallback) para estados, anti-look-ahead, fórmulas y criterios de selección.
 
 ## Paso 5: Seguir el progreso por fases (sin refresco manual)
 

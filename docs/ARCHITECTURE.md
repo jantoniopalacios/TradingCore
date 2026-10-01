@@ -181,11 +181,13 @@ Los estados persistidos del bootstrap son `pending`, `in_progress`, `completed`,
 
 Entre 1 y 19 periodos el estado es `partial`; la cobertura por proveedor y símbolo se conserva para diagnóstico. `load_fundamental_data_with_fallback(...)` calcula los símbolos no cubiertos por EPS normalizado utilizable, consulta el mecanismo legacy solo para ese subconjunto y combina ambos resultados en memoria. Un símbolo ya cubierto no se vuelve a descargar por legacy. Ante un error al preparar el adaptador, no hay símbolos normalizados utilizables y se aplica el fallback al universo solicitado.
 
-El dashboard `/fundamentals` y el detalle `/fundamentals/<symbol>` muestran exclusivamente símbolos configurados por el usuario y datos almacenados. Son vistas de solo lectura: no descargan proveedores ni recalculan ratios.
+El dashboard `/fundamentals` y el detalle `/fundamentals/<symbol>` muestran exclusivamente símbolos configurados por el usuario y datos almacenados. Son vistas de solo lectura: no descargan proveedores ni recalculan ratios. La caché de valoración `FR_diario.csv` es global en `Backtesting/Run_Results/Global/FullRatio/`; cualquier usuario ve las métricas globales de los símbolos que tenga configurados. Los resultados de backtest siguen separados por usuario.
+
+Al inicializar la caché global, si todavía no existe, TradingCore fusiona de forma determinista los `FR_diario.csv` legacy de `Backtesting/Run_Results/<usuario>/FullRatio/`, deduplica por `Symbol` + `Date` y deja intactos los ficheros originales. Un archivo global existente nunca se reemplaza durante la migración.
 
 La columna **Cobertura** mide periodos EPS en la caché normalizada, no disponibilidad de valoración: 0 = `Sin datos`; 1–3 = `Cobertura insuficiente`; 4–19 = `Cobertura parcial`; 20 o más = `Cobertura suficiente`. LTM EPS, PER M5Y y disponibilidad de métricas Full Ratio se muestran por separado. LTM EPS requiere cuatro periodos válidos; PER M5Y requiere 20 PER trimestrales válidos. `No calculado` no implica necesariamente un error.
 
-El resumen muestra registros, periodos EPS, primer y último periodo fiscal, último `reportedDate`, proveedores, cobertura, LTM EPS, PER M5Y, disponibilidad Full Ratio y bootstrap. El detalle muestra el histórico normalizado, el gráfico EPS con sus fechas de disponibilidad y métricas de valoración solo si ya están guardadas.
+El resumen muestra registros, periodos EPS, primer y último periodo fiscal, último `reportedDate`, proveedores, cobertura, LTM EPS, PER M5Y, disponibilidad Full Ratio y bootstrap. El detalle muestra el histórico normalizado, el gráfico EPS con sus fechas de disponibilidad y métricas de valoración global solo si ya están guardadas. `Eval.` describe disponibilidad/suficiencia de datos, no calidad del activo; `Mantener` y `Desestimar` son una valoración fundamental general de TradingCore, no órdenes de estrategia. El cálculo del MoS es global, mientras que su uso como filtro AND posterior a una señal técnica y sus parámetros (`margen_seguridad_threshold`, `margen_seguridad_minimo`, `margen_seguridad_ascendente`) son configurables por usuario.
 
 ### Métricas y disponibilidad temporal
 

@@ -1,0 +1,64 @@
+<div class="sidebar-reveal-zone" aria-hidden="true"></div>
+
+<aside class="sidebar d-flex flex-column" aria-label="Menú principal">
+    <div class="mb-4 px-1 d-flex align-items-center">
+        <i class="bi bi-lightning-charge-fill text-primary fs-4 me-2"></i>
+        <h5 class="fw-bold text-white mb-0">TRADINGCORE <span class="text-primary">PRO</span></h5>
+    </div>
+    <div class="mx-1 mb-4 p-2 rounded-3 border border-secondary border-opacity-25" style="background: rgba(255,255,255,0.03);">
+        <div class="d-flex align-items-center">
+            <div class="position-relative">
+                <i class="bi bi-person-circle fs-3 {{ 'text-info' if session.get('user_mode') == 'admin' else 'text-secondary' }}"></i>
+                <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-dark rounded-circle" style="width: 10px; height: 10px;"></span>
+            </div>
+            <div class="ms-2 overflow-hidden">
+                <p class="text-muted mb-0 fw-bold" style="font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase;">Sesión Activa</p>
+                <p class="text-white mb-0 small text-truncate fw-medium" title="{{ session.get('user_name', 'Invitado') }}">
+                    {{ session.get('user_mode', 'Invitado') }}
+                    {% if session.get('user_mode') == 'admin' %}<i class="bi bi-patch-check-fill text-info ms-1" title="Administrador"></i>{% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <nav class="nav flex-column nav-sidebar" id="mainTab" aria-label="Navegación principal">
+        {% if sidebar_page == 'index' %}
+        <button class="nav-link {{ 'active' if active_nav == 'config' else '' }}" id="btn-nav-config" data-bs-toggle="tab" data-bs-target="#pane-config" type="button"><i class="bi bi-sliders me-2"></i> CONFIGURACIÓN</button>
+        <button class="nav-link {{ 'active' if active_nav == 'symbols' else '' }}" id="btn-nav-symbols" data-bs-toggle="tab" data-bs-target="#pane-symbols" type="button"><i class="bi bi-list-stars me-2"></i> LISTA ACTIVOS</button>
+        {% else %}
+        <a class="nav-link" href="{{ url_for('main.index') }}#pane-config"><i class="bi bi-sliders me-2"></i> CONFIGURACIÓN</a>
+        <a class="nav-link" href="{{ url_for('main.index') }}#pane-symbols"><i class="bi bi-list-stars me-2"></i> LISTA ACTIVOS</a>
+        {% endif %}
+
+        <a class="nav-link {{ 'active' if active_nav == 'fundamentals' else '' }}" href="{{ url_for('fundamentals.dashboard') }}" {% if active_nav == 'fundamentals' %}aria-current="page"{% endif %}><i class="bi bi-graph-up-arrow me-2"></i> FUNDAMENTALES</a>
+
+        {% if sidebar_page == 'index' %}
+        <button class="nav-link {{ 'active' if active_nav == 'files' else '' }}" id="tab-master-files" data-bs-toggle="tab" data-bs-target="#pane-files" type="button"><i class="bi bi-folder2-open me-2"></i> EXPLORADOR</button>
+        <button class="nav-link text-info fw-bold {{ 'active' if active_nav == 'sql' else '' }}" id="tab-historial" data-bs-toggle="tab" data-bs-target="#pane-sql" type="button"><i class="bi bi-database me-2"></i> HISTORIAL SQL</button>
+        {% else %}
+        <a class="nav-link" href="{{ url_for('main.index') }}#pane-files"><i class="bi bi-folder2-open me-2"></i> EXPLORADOR</a>
+        <a class="nav-link text-info fw-bold" href="{{ url_for('main.index') }}#pane-sql"><i class="bi bi-database me-2"></i> HISTORIAL SQL</a>
+        {% endif %}
+
+        {% if session.get('user_mode') == 'admin' %}
+            {% if sidebar_page == 'index' %}
+            <button class="nav-link {{ 'active' if active_nav == 'users' else '' }}" id="tab-users" data-bs-toggle="tab" data-bs-target="#pane-users" type="button"><i class="bi bi-people me-2"></i> USUARIOS</button>
+            <button class="nav-link {{ 'active' if active_nav == 'scheduler' else '' }}" id="tab-scheduler" data-bs-toggle="tab" data-bs-target="#pane-scheduler" type="button"><i class="bi bi-cpu me-2"></i> SCHEDULER</button>
+            {% else %}
+            <a class="nav-link" href="{{ url_for('main.index') }}#pane-users"><i class="bi bi-people me-2"></i> USUARIOS</a>
+            <a class="nav-link" href="{{ url_for('main.index') }}#pane-scheduler"><i class="bi bi-cpu me-2"></i> SCHEDULER</a>
+            {% endif %}
+        {% endif %}
+    </nav>
+
+    {% if sidebar_page == 'index' %}
+    <div class="mt-auto pt-4 border-top border-secondary">
+        <button type="button" onclick="lanzarEstrategia()" class="btn btn-primary w-100 fw-bold mb-3 shadow-sm"><i class="bi bi-play-fill me-1"></i> LANZAR BACKTEST</button>
+        <button type="button" onclick="abrirGuardarConfigModal()" class="btn btn-outline-light btn-sm w-100 opacity-75 mb-2"><i class="bi bi-save me-1"></i> GUARDAR CONFIG</button>
+        <button type="button" onclick="abrirCargarConfigModal()" class="btn btn-outline-info btn-sm w-100 opacity-75 mb-4"><i class="bi bi-upload me-1"></i> CARGAR CONFIG</button>
+        <a href="{{ url_for('main.logout') }}" class="btn btn-outline-danger btn-sm w-100 border-0"><i class="bi bi-box-arrow-left me-2"></i>Cerrar Sesión</a>
+    </div>
+    {% else %}
+    <a href="{{ url_for('main.logout') }}" class="btn btn-outline-danger btn-sm w-100 border-0 mt-auto"><i class="bi bi-box-arrow-left me-2"></i>Cerrar Sesión</a>
+    {% endif %}
+</aside>

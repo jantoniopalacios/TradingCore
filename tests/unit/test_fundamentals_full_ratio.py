@@ -5,7 +5,7 @@ import pytest
 from trading_engine.utils.Calculos_Financieros import calcular_fullratio_OHLCV
 
 
-def _latest_full_ratio(margin, per, eps_growth=None):
+def _latest_full_ratio(margin, per, eps_growth=None, output_path=None):
     fiscal_dates = pd.date_range(
         "2020-03-31",
         periods=23,
@@ -42,7 +42,11 @@ def _latest_full_ratio(margin, per, eps_growth=None):
     latest_report = reported_dates[-1]
     prices.loc[latest_report, "Close"] = per * ltm_eps.iloc[-1]
 
-    result = calcular_fullratio_OHLCV(prices, fundamentals)
+    result = calcular_fullratio_OHLCV(
+        prices,
+        fundamentals,
+        output_path=output_path,
+    )
     return result.loc[latest_report]
 
 
@@ -97,3 +101,18 @@ def test_higher_margin_increases_full_ratio_for_fixed_per():
     higher_margin = _latest_full_ratio(40.0, 20.0)
 
     assert higher_margin["Full Ratio"] > lower_margin["Full Ratio"]
+
+
+def test_full_ratio_output_path_merges_other_symbols(tmp_path):
+    output_path = tmp_path / "Global" / "FullRatio"
+    output_path.mkdir(parents=True)
+    pd.DataFrame(
+        [{"Date": "2025-08-15", "Symbol": "MSFT", "Full Ratio": 0.75}]
+    ).to_csv(output_path / "FR_diario.csv", sep=";", index=False)
+
+    _latest_full_ratio(40.0, 10.0, output_path=output_path)
+
+    saved = pd.read_csv(output_path / "FR_diario.csv", sep=";")
+    assert set(saved["Symbol"]) == {"AAPL", "MSFT"}
+    assert saved.loc[saved["Symbol"] == "MSFT", "Full Ratio"].iloc[0] == 0.75
+    assert not saved.duplicated(["Symbol", "Date"]).any()

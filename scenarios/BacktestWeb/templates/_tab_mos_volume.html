@@ -15,15 +15,15 @@
             </div>
             <div class="modal-body">
     <h6 class="text-primary"><strong>1. Qué es / qué mide</strong></h6>
-    <p>Esta pestaña agrupa dos filtros de contexto: <strong>Margen de Seguridad (MoS)</strong> y <strong>Volumen</strong>. No son indicadores direccionales clásicos; sirven para confirmar que una señal técnica tiene suficiente respaldo fundamental o de participación.</p>
+    <p>Esta pestaña agrupa dos filtros de contexto: <strong>Margen de Seguridad (MoS)</strong> y <strong>Volumen</strong>. El MoS lo calcula el módulo fundamental global para cada activo; los parámetros de esta pestaña determinan cómo lo usa esta estrategia.</p>
 
     <h6 class="mt-4 text-primary"><strong>2. Cómo lo usa TradingCore</strong></h6>
-    <p>Cuando están activos, MoS y Volumen funcionan como filtros AND de entrada. La señal técnica debe existir primero y después estos filtros deben autorizarla.</p>
+    <p>Cuando están activos, MoS y Volumen funcionan como filtros AND posteriores a la señal técnica de entrada. El MoS no crea por sí solo una señal de compra ni genera una señal de venta independiente.</p>
 
     <h6 class="mt-4 text-primary"><strong>3. Parámetros de configuración</strong></h6>
     <ul class="small">
         <li><strong>margen_seguridad_active:</strong> activa el filtro MoS.</li>
-        <li><strong>margen_seguridad_threshold:</strong> umbral mínimo requerido.</li>
+        <li><strong>margen_seguridad_threshold:</strong> umbral mínimo de MoS requerido por esta estrategia.</li>
         <li><strong>margen_seguridad_minimo:</strong> exige además que el MoS esté en estado mínimo.</li>
         <li><strong>margen_seguridad_ascendente:</strong> exige además que el MoS esté ascendiendo.</li>
         <li><strong>volume_active:</strong> activa los filtros de volumen.</li>
@@ -34,7 +34,7 @@
     </ul>
 
     <h6 class="mt-4 text-success"><strong>4. Condiciones de compra</strong></h6>
-    <p class="small">Si MoS está activo, debe superar su umbral y, si se exige, confirmar estado mínimo y/o estar ascendiendo. Las confirmaciones activadas se combinan con AND. Si Volumen está activo, debe cumplir sus condiciones de nivel y/o estado. Solo entonces dejan pasar la señal técnica.</p>
+    <p class="small">El valor global de MoS se calcula en el módulo fundamental a partir de las métricas guardadas del activo. Si MoS está activo, debe superar el threshold configurado por el usuario y, si se exigen, cumplir las confirmaciones de mínimo y/o ascenso. Las condiciones activadas se combinan con AND después de la señal técnica. Volumen aplica sus propios parámetros de forma independiente.</p>
 
     <h6 class="mt-4 text-danger"><strong>5. Condiciones de venta / bloqueo</strong></h6>
     <p class="small">En la implementación actual estos filtros se utilizan principalmente para bloquear entradas. No generan por sí solos una señal de venta independiente.</p>
@@ -84,7 +84,7 @@
             </div>
             <div class="col-2"><span class="text-muted small">{% if comments.margen_seguridad_threshold %}<a href="#" title="{{ comments.margen_seguridad_threshold }}">?</a>{% endif %}</span></div>
         </div>
-        <p class="text-muted small ms-2"><i class="fas fa-info-circle"></i> El MoS debe ser superior al umbral para autorizar la compra.</p>
+        <p class="text-muted small ms-2"><i class="fas fa-info-circle"></i> El MoS global del activo debe superar el threshold de esta estrategia para dejar pasar una señal técnica de compra; no crea la señal.</p>
 
         <h5 class="mt-4 text-secondary">Filtros de Estado (MoS)</h5>
         <div class="row row-control align-items-center mb-2">

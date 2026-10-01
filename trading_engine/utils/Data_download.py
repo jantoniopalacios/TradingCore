@@ -228,7 +228,7 @@ def _normalize_downloaded_ohlcv(data: pd.DataFrame, symbol: str) -> pd.DataFrame
 def _is_degraded_download(
     downloaded_data: pd.DataFrame,
     cached_data: pd.DataFrame,
-    start_dt: datetime,
+    start_dt: datetime | None,
 ) -> tuple[bool, str]:
     if cached_data.empty or downloaded_data.empty:
         return False, ""
@@ -238,7 +238,7 @@ def _is_degraded_download(
     cached_min = cached_data.index.min()
     downloaded_min = downloaded_data.index.min()
 
-    if cached_min <= start_dt and downloaded_min > start_dt:
+    if start_dt is not None and cached_min <= start_dt and downloaded_min > start_dt:
         return True, (
             f"la descarga empieza en {downloaded_min:%Y-%m-%d} y la caché previa cubría "
             f"desde {cached_min:%Y-%m-%d}"
@@ -292,8 +292,8 @@ def _is_not_better_or_updated_download(
 
 def descargar_datos_YF(
     simbolos_df: pd.DataFrame, 
-    start_date: str,
-    end_date: str,
+    start_date: str | None,
+    end_date: str | None,
     intervalo: str, 
     data_files_path: Path
 ) -> pd.DataFrame:
@@ -334,8 +334,10 @@ def descargar_datos_YF(
     all_data = pd.DataFrame()
     download_diagnostics = []
     
-    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-    end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+    if (start_date is None) != (end_date is None):
+        raise ValueError("start_date y end_date deben proporcionarse juntas o ambas omitirse.")
+    start_dt = datetime.strptime(start_date, '%Y-%m-%d') if start_date else None
+    end_dt = datetime.strptime(end_date, '%Y-%m-%d') if end_date else None
 
     # Yahoo Finance limita datos intradiarios (1m, 1h) a los últimos 730 días
     INTERVALOS_INTRADIARIOS = {'1m', '2m', '5m', '15m', '30m', '60m', '1h', '90m'}
@@ -504,8 +506,12 @@ def descargar_datos_YF(
         #    Incluye ventana de warm-up para que los indicadores estén estabilizados
         #    desde la fecha de análisis real (start_dt).
         if not data_to_use.empty:
-            # Seleccionar rango de datos solicitado
-            final_data = data_to_use.loc[start_dt:end_dt].copy()
+            # Sin rango explícito se conserva todo el historial MAX para evaluación.
+            final_data = (
+                data_to_use.loc[start_dt:end_dt].copy()
+                if start_dt is not None and end_dt is not None
+                else data_to_use.copy()
+            )
             
             if final_data.empty:
                 logger.warning(
@@ -553,6 +559,27 @@ def descargar_datos_YF(
     logger.info("Descarga y gestión de caché OHLCV completada.")
     all_data.attrs['download_diagnostics'] = download_diagnostics
     return all_data
+
+
+def load_or_download_full_ohlcv(
+    symbols: list[str],
+    intervalo: str = "1d",
+    data_files_path: Path | None = None,
+) -> pd.DataFrame:
+    """Carga o descarga todo el histórico MAX usando la caché y defensas existentes."""
+    if not symbols:
+        return pd.DataFrame()
+    if data_files_path is None:
+        raise ValueError("data_files_path es obligatorio para cargar el histórico OHLCV.")
+
+    symbols_df = pd.DataFrame({"Symbol": list(dict.fromkeys(symbols))})
+    return descargar_datos_YF(
+        symbols_df,
+        start_date=None,
+        end_date=None,
+        intervalo=intervalo,
+        data_files_path=Path(data_files_path),
+    )
 
 # --------------------------------------------------------------------------------
 # --- ORQUESTACIÓN FUNDAMENTAL (SOLO ALPHAVANTAGE) ---

@@ -273,7 +273,7 @@ Volumen actúa como filtro de entrada: no crea por sí solo una compra si no exi
 
 ## 16. Margen de Seguridad (MoS)
 
-El **Margen de Seguridad (MoS)** es un filtro fundamental opcional. Cuando está activo exige que el valor de MoS supere `margen_seguridad_threshold`.
+El **Margen de Seguridad (MoS)** se calcula globalmente para cada activo en el módulo fundamental. Cada usuario configura si su estrategia lo usa como filtro y con qué parámetros. Cuando está activo, exige que el valor global de MoS supere `margen_seguridad_threshold`.
 
 Pueden añadirse dos confirmaciones:
 
@@ -282,7 +282,7 @@ Pueden añadirse dos confirmaciones:
 
 Las confirmaciones activadas se combinan con lógica **AND**: si se activan mínimo y ascendente, ambas deben cumplirse además del umbral. Si faltan los datos necesarios de MoS, el filtro activo bloquea la entrada.
 
-MoS no genera una señal técnica independiente; autoriza o bloquea una entrada propuesta por la lógica técnica. Es distinto del filtrado fundamental previo del universo de símbolos.
+MoS se aplica como filtro **AND posterior** a una señal técnica de compra: puede autorizarla o bloquearla, pero no genera por sí solo una señal de compra ni una señal de venta independiente. `margen_seguridad_threshold`, `margen_seguridad_minimo` y `margen_seguridad_ascendente` pertenecen a la configuración de cada usuario. Es distinto del filtrado fundamental previo del universo de símbolos.
 
 ## 17. Cómo se combinan los indicadores
 

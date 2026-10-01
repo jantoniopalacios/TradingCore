@@ -44,7 +44,13 @@ except ImportError as e:
 # 5. Imports Locales y Persistencia
 from .database import db, Simbolo, Usuario
 from .DBStore import save_backtest_run
-from .configuracion import BACKTESTING_BASE_DIR, cargar_y_asignar_configuracion, asignar_parametros_a_system
+from .configuracion import (
+    BACKTESTING_BASE_DIR,
+    cargar_y_asignar_configuracion,
+    asignar_parametros_a_system,
+    global_full_ratio_path,
+)
+from trading_engine.fundamentals.valuation_cache import migrate_legacy_valuation_cache
 from .estrategia_system import System
 
 # Configuración de Logger
@@ -245,6 +251,11 @@ def ejecutar_backtest(config_dict: dict, progress_callback=None):
         logger.info(f"[1/9] Cargando configuración para usuario: {user_mode}")
         datos_base = cargar_y_asignar_configuracion(user_mode)
         config_final = {**datos_base, **config_dict}
+        config_final['full_ratio_path'] = global_full_ratio_path()
+        migrate_legacy_valuation_cache(
+            config_final['full_ratio_path'],
+            BACKTESTING_BASE_DIR / 'Run_Results',
+        )
         logger.info("✅ Configuración cargada")
 
         # 2. Sincronizar Clase Global System

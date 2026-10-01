@@ -51,6 +51,11 @@ MAIL_CONFIG_GLOBAL = PROJECT_ROOT / "trading_engine" / "utils" / "Config" / "set
 BACKTESTING_BASE_DIR = PROJECT_ROOT / "Backtesting"
 DATA_FILES_BASE_PATH = PROJECT_ROOT / "Data_Files"
 
+
+def global_full_ratio_path(backtesting_base_dir=None):
+    root = Path(backtesting_base_dir or BACKTESTING_BASE_DIR)
+    return root / "Run_Results" / "Global" / "FullRatio"
+
 # Restaurada la variable DB_URI que solicitaste
 DB_URI = DATABASE_URL
 
@@ -257,7 +262,7 @@ def asignar_parametros_a_system(config_data: dict, rutas: dict):
     user_mode = rutas.get('user_mode', 'invitado')
     data_files_path = DATA_FILES_BASE_PATH
     fundamentals_path = data_files_path / "Fundamentals"
-    full_ratio_path = rutas['results_dir'] / "FullRatio"
+    full_ratio_path = global_full_ratio_path()
 
     for p in [data_files_path, fundamentals_path, full_ratio_path, rutas['graph_dir']]:
         p.mkdir(parents=True, exist_ok=True)

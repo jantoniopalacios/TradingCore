@@ -6,57 +6,71 @@
     <title>Fundamentales | TradingCore</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar.css') }}">
     <style>
         body { background: #f8fafc; color: #172033; font: 13px Inter, system-ui, sans-serif; }
-        .topbar { background: #0f172a; color: #f8fafc; }
         .metric-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
         .table th { white-space: nowrap; font-size: 11px; color: #475569; }
         .table td { vertical-align: middle; white-space: nowrap; }
         .status { display: inline-block; padding: .25rem .5rem; border-radius: 5px; background: #e2e8f0; color: #334155; font-size: 11px; }
-        .status-sufficient { background: #dcfce7; color: #166534; }
+        .status-yes { background: #dcfce7; color: #166534; }
         .status-partial { background: #fef3c7; color: #92400e; }
-        .status-empty { background: #fee2e2; color: #991b1b; }
+        .status-no { background: #fee2e2; color: #991b1b; }
+        .help-icon { color: #64748b; cursor: help; }
+        .valuation-label { font-weight: 600; }
+        .selection-count { min-width: 9rem; }
     </style>
 </head>
 <body>
-<header class="topbar py-3">
-    <div class="container-fluid d-flex justify-content-between align-items-center">
-        <div><i class="bi bi-graph-up-arrow text-info me-2"></i><strong>TradingCore</strong><span class="text-secondary ms-2">Fundamentales</span></div>
-        <div class="d-flex align-items-center gap-3">
-            <span class="small text-light">{{ user_name }}</span>
-            <a class="btn btn-sm btn-outline-light" href="{{ url_for('main.index') }}"><i class="bi bi-arrow-left me-1"></i>Volver</a>
-        </div>
-    </div>
-</header>
+{% include '_sidebar.html' %}
+<div class="main-content">
 <main class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-end mb-3">
-        <div><h1 class="h4 mb-1">Cobertura fundamental <i class="bi bi-question-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" title="Solo muestra los símbolos configurados para tu usuario y datos ya almacenados. Esta página no descarga proveedores ni recalcula ratios."></i></h1><p class="text-secondary mb-0">Solo símbolos configurados para tu usuario. Vista de diagnóstico en modo lectura.</p></div>
+        <div><h1 class="h4 mb-1">Valoración fundamental <i class="bi bi-question-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" title="Muestra la valoración fundamental global guardada para tus símbolos configurados. Solo lee datos: no descarga proveedores ni recalcula ratios."></i></h1><p class="text-secondary mb-0">Evaluabilidad y valoración actual de los activos configurados.</p></div>
     </div>
     <div class="metric-panel p-3">
         {% if symbols %}
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <span id="selection-count" class="selection-count fw-semibold">0 seleccionados</span>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" id="update-and-evaluate-fundamentals" class="btn btn-sm btn-primary" data-action-url="{{ url_for('fundamentals.update_and_evaluate_selected_fundamentals') }}" disabled>
+                    <i class="bi bi-arrow-repeat me-1"></i>Actualizar y evaluar
+                </button>
+                <button type="button" id="update-fundamentals" class="btn btn-sm btn-outline-secondary" data-action-url="{{ url_for('fundamentals.update_selected_fundamentals') }}" disabled>
+                    <i class="bi bi-arrow-repeat me-1"></i>Actualizar fundamentales
+                </button>
+                <button type="button" id="evaluate-fundamentals" class="btn btn-sm btn-outline-secondary" data-action-url="{{ url_for('fundamentals.evaluate_selected_fundamentals') }}" disabled>
+                    <i class="bi bi-calculator me-1"></i>Evaluar seleccionados
+                </button>
+            </div>
+        </div>
+        <div id="fundamentals-action-message" class="alert d-none py-2" role="status" aria-live="polite"></div>
         <div class="table-responsive">
             <table class="table table-hover table-sm mb-0">
                 <thead><tr>
-                    <th>Símbolo</th><th>Registros</th><th>Periodos EPS</th><th>Primer fiscal</th><th>Último fiscal</th>
-                    <th>Último reportedDate <i class="bi bi-question-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" title="Fecha de publicación más reciente. reportedDate marca cuándo se conocía el dato; el backtest no lo usa antes para evitar look-ahead."></i></th>
-                    <th>Proveedores <i class="bi bi-question-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" title="Yahoo mantiene la actualización operativa; Alpha Vantage se usa para bootstrap histórico."></i></th>
-                    <th>Cobertura <i class="bi bi-question-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" title="Periodos EPS históricos normalizados: Sin datos = 0; insuficiente = 1–3; parcial = 4–19; suficiente = 20 o más. Es independiente de las métricas calculadas."></i></th>
-                    <th>LTM EPS <i class="bi bi-question-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" title="Beneficio por acción de los últimos cuatro trimestres completos. Requiere 4 periodos EPS válidos."></i></th>
-                    <th>PER M5Y <i class="bi bi-question-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" title="Media de 20 PER trimestrales válidos. No calculado no implica necesariamente un error: puede faltar historial o no existir una métrica guardada."></i></th>
-                    <th>Métricas Full Ratio <i class="bi bi-question-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" title="Disponibles: existe alguna métrica Full Ratio guardada. No disponibles: no hay métricas guardadas. El dashboard no las calcula."></i></th>
-                    <th>Bootstrap <button type="button" class="btn btn-link p-0 text-secondary align-baseline" aria-label="Ayuda sobre estados Bootstrap" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left" data-bs-html="true" data-bs-title="Estados Bootstrap" data-bs-content="<strong>pending</strong>: pendiente; <strong>in_progress</strong>: en curso; <strong>completed</strong>: al menos 20 periodos EPS; <strong>partial</strong>: historial parcial, reintentable; <strong>quota_blocked</strong> y <strong>error</strong>: reintentables; <strong>no_data</strong>: terminal hasta reset explícito.<br>Al agotarse la cuota AV se detiene el lote y se guarda el estado. Sin <code>ALPHA_VANTAGE_KEY</code> no se solicita bootstrap; no es un error."><i class="bi bi-question-circle" aria-hidden="true"></i></button></th>
+                    <th><input type="checkbox" id="select-all-symbols" class="form-check-input" aria-label="Seleccionar todos"></th>
+                    <th>Ticker</th>
+                    <th>Último informe <i class="bi bi-question-circle help-icon" tabindex="0" data-bs-toggle="tooltip" title="Fecha de publicación del último informe con EPS utilizable (reportedDate)."></i></th>
+                    <th>Eval. <i class="bi bi-question-circle help-icon" tabindex="0" data-bs-toggle="tooltip" title="Mide disponibilidad y suficiencia de datos para calcular la valoración; no mide la calidad del activo. El motivo concreto aparece al pasar el cursor por el estado."></i></th>
+                    <th>PER <i class="bi bi-question-circle help-icon" tabindex="0" data-bs-toggle="tooltip" title="Relación entre el precio de mercado y el LTM EPS. Es una métrica calculada y compartida globalmente para la fecha de valoración indicada."></i></th>
+                    <th>LTM EPS % <i class="bi bi-question-circle help-icon" tabindex="0" data-bs-toggle="tooltip" title="Crecimiento porcentual del EPS de los últimos doce meses (LTM EPS), calculado con periodos trimestrales completos."></i></th>
+                    <th>Margen seg. <i class="bi bi-question-circle help-icon" tabindex="0" data-bs-toggle="tooltip" title="Métrica GLOBAL del activo calculada por el módulo fundamental. Cada estrategia puede usarla después como filtro configurable de su señal técnica."></i></th>
+                    <th>Full Ratio <i class="bi bi-question-circle help-icon" tabindex="0" data-bs-toggle="tooltip" title="Resume el Margen de seguridad relativo al PER (Margen de seguridad / PER) y forma parte de la valoración fundamental general de TradingCore."></i></th>
+                    <th>Valoración <i class="bi bi-question-circle help-icon" tabindex="0" data-bs-toggle="tooltip" title="Valoración general de TradingCore: Mantener o Desestimar según sus criterios fundamentales. No equivale directamente a una orden de compra o venta de la estrategia."></i></th>
                 </tr></thead>
                 <tbody>
                 {% for item in symbols %}
-                    {% set coverage_class = 'status-sufficient' if item.coverage_status == 'Cobertura suficiente' else 'status-partial' if item.coverage_status == 'Cobertura parcial' else 'status-empty' if item.coverage_status in ('Sin datos', 'Cobertura insuficiente') else '' %}
+                    {% set evaluation_class = 'status-yes' if item.evaluation_status == 'Sí' else 'status-partial' if item.evaluation_status == 'Parcial' else 'status-no' %}
                     <tr>
+                        <td><input type="checkbox" class="form-check-input symbol-select" value="{{ item.symbol }}" aria-label="Seleccionar {{ item.symbol }}"></td>
                         <td><a href="{{ url_for('fundamentals.symbol_detail', symbol=item.symbol) }}" class="fw-semibold text-decoration-none">{{ item.symbol }}</a></td>
-                        <td>{{ item.records }}</td><td>{{ item.unique_fiscal_periods }}</td>
-                        <td>{{ item.first_fiscal_date or 'No disponible' }}</td><td>{{ item.last_fiscal_date or 'No disponible' }}</td>
-                        <td>{{ item.latest_reported_date or 'No disponible' }}</td>
-                        <td>{{ item.providers|join(', ') if item.providers else 'No disponible' }}</td>
-                        <td><span class="status {{ coverage_class }}">{{ item.coverage_status }}</span></td>
-                        <td>{{ item.ltm_depth }}</td><td>{{ item.per_m5y_depth }}</td><td>{{ item.full_ratio_status }}</td><td><span class="status">{{ item.bootstrap_status }}</span></td>
+                        <td>{{ item.latest_reported_date or '—' }}</td>
+                        <td><span class="status {{ evaluation_class }}" tabindex="0" data-bs-toggle="tooltip" title="{{ item.evaluation_reason }}">{{ item.evaluation_status }}</span></td>
+                        <td>{{ '%.2f'|format(item.metrics['PER']) if item.metrics['PER'] is not none else '—' }}</td>
+                        <td>{{ '%.2f%%'|format(item.metrics['LTM EPS %']) if item.metrics['LTM EPS %'] is not none else '—' }}</td>
+                        <td>{{ '%.2f'|format(item.metrics['Margen de seguridad']) if item.metrics['Margen de seguridad'] is not none else '—' }}</td>
+                        <td>{{ '%.2f'|format(item.metrics['Full Ratio']) if item.metrics['Full Ratio'] is not none else '—' }}</td>
+                        <td><span class="valuation-label" tabindex="0" data-bs-toggle="tooltip" title="{{ item.valuation_explanation }}">{{ item.valuation_label }}</span></td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -66,10 +80,91 @@
             <div class="text-center py-5"><i class="bi bi-inbox fs-2 text-secondary"></i><p class="mt-2 mb-0">No hay símbolos configurados para esta cuenta.</p></div>
         {% endif %}
     </div>
-    <p class="small text-secondary mt-3 mb-0">Solo lectura. La cobertura cuenta periodos EPS normalizados; LTM EPS requiere 4 periodos válidos y PER M5Y, 20 PER trimestrales válidos.</p>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
 <script>
+    const symbolCheckboxes = Array.from(document.querySelectorAll('.symbol-select'));
+    const selectAllSymbols = document.getElementById('select-all-symbols');
+    const selectionCount = document.getElementById('selection-count');
+    const actionMessage = document.getElementById('fundamentals-action-message');
+    const actionButtons = [
+        document.getElementById('update-and-evaluate-fundamentals'),
+        document.getElementById('update-fundamentals'),
+        document.getElementById('evaluate-fundamentals'),
+    ].filter(Boolean);
+
+    function showActionMessage(message, status) {
+        if (!actionMessage) return;
+        actionMessage.textContent = message;
+        actionMessage.className = `alert alert-${status === 'error' ? 'danger' : status === 'partial' ? 'warning' : 'success'} py-2`;
+    }
+
+    const savedActionMessage = sessionStorage.getItem('fundamentalsActionMessage');
+    if (savedActionMessage) {
+        try {
+            const result = JSON.parse(savedActionMessage);
+            showActionMessage(result.message, result.status);
+        } finally {
+            sessionStorage.removeItem('fundamentalsActionMessage');
+        }
+    }
+
+    function updateSelectionState() {
+        if (!selectionCount || !selectAllSymbols) return;
+        const selected = symbolCheckboxes.filter((checkbox) => checkbox.checked).length;
+        selectionCount.textContent = `${selected} seleccionados`;
+        actionButtons.forEach((button) => { button.disabled = selected === 0; });
+        selectAllSymbols.checked = symbolCheckboxes.length > 0 && selected === symbolCheckboxes.length;
+        selectAllSymbols.indeterminate = selected > 0 && selected < symbolCheckboxes.length;
+    }
+
+    symbolCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', updateSelectionState));
+    if (selectAllSymbols) {
+        selectAllSymbols.addEventListener('change', () => {
+            symbolCheckboxes.forEach((checkbox) => { checkbox.checked = selectAllSymbols.checked; });
+            updateSelectionState();
+        });
+    }
+
+    async function runFundamentalAction(button) {
+        const selectedSymbols = symbolCheckboxes
+            .filter((checkbox) => checkbox.checked)
+            .map((checkbox) => checkbox.value);
+        if (selectedSymbols.length === 0) {
+            showActionMessage('No hay activos seleccionados.', 'error');
+            return;
+        }
+
+        const originalContent = button.innerHTML;
+        actionButtons.forEach((item) => { item.disabled = true; });
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Procesando';
+        actionMessage.classList.add('d-none');
+
+        try {
+            const response = await fetch(button.dataset.actionUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbols: selectedSymbols }),
+            });
+            const result = await response.json();
+            if (response.ok && result.status !== 'error') {
+                sessionStorage.setItem('fundamentalsActionMessage', JSON.stringify(result));
+                window.location.reload();
+                return;
+            }
+            showActionMessage(result.message || 'No se pudo completar la acción.', 'error');
+        } catch (error) {
+            showActionMessage('No se pudo completar la acción. Inténtalo de nuevo.', 'error');
+        } finally {
+            button.innerHTML = originalContent;
+            updateSelectionState();
+        }
+    }
+
+    actionButtons.forEach((button) => button.addEventListener('click', () => runFundamentalAction(button)));
+    updateSelectionState();
+
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((element) => {
         bootstrap.Tooltip.getOrCreateInstance(element);
     });
@@ -77,5 +172,6 @@
         bootstrap.Popover.getOrCreateInstance(element);
     });
 </script>
+</div>
 </body>
 </html>
